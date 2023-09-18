@@ -1,0 +1,10 @@
+-f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+h5py
+ipykernel
+
+jax-md==0.2.3
+jax[cuda12_pip]
+matplotlib
+pandas
+pyvista
+typing-extensions
