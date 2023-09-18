@@ -1,0 +1,10 @@
+.vscode/
+.ruff_cache/
+.ipynb_checkpoints/
+venv*/
+*data*/
+
+__pycache__/
+*.egg-info
+
+*.out
