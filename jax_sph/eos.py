@@ -20,3 +20,21 @@ class TaitEoS:
     def rho_fn(self, p):
         p_temp = p + self.p_ref - self.p_bg
         return self.rho_ref * (p_temp / self.p_ref) ** (1 / self.gamma)
+    
+
+
+class RIEMANNEoS:
+    """Equation of state
+
+    From: "A weakly compressible SPH method based on a
+    low-dissipation Riemann solver", Zhang, Hu, Adams, 2017
+    """
+
+    def __init__(self, rho_ref, vmax):
+        self.rho_ref = rho_ref
+        self.vmax = vmax
+
+    def p_fn(self, rho):
+        return 100 * self.vmax ** 2 * (rho - self.rho_ref)
+    def rho_fn(self, p):
+        return p / (100 * self.vmax ** 2) + self.rho_ref
