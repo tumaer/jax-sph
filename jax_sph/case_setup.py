@@ -8,6 +8,7 @@ import numpy as np
 from jax import vmap
 
 from jax_sph.eos import TaitEoS
+from jax_sph.eos import RIEMANNEoS
 from jax_sph.utils import noise_masked, pos_init_cartesian_2d, pos_init_cartesian_3d
 
 EPS = jnp.finfo(float).eps
@@ -78,7 +79,10 @@ class SimulationSetup(ABC):
             sequence_length = int(args.t_end / dt)
 
         # Equation of state
-        eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
+        if args.solver == "RIE":
+            eos = RIEMANNEoS(rho_ref, args.Vmax)
+        else:
+            eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
         # initialize box and regular grid positions of particles
         # Tag particle: 0 - fluid, 1 - solid wall, 2 - moving wall

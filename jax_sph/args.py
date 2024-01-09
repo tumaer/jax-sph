@@ -21,7 +21,7 @@ class Args:
             "--solver",
             type=str,
             default="SPH",
-            choices=["SPH", "GNS", "SEGNN", "UT"],
+            choices=["SPH", "GNS", "SEGNN", "UT", "RIE"],
             help="vanilla correspond to density transport",
         )
         self.parser.add_argument(
@@ -146,3 +146,20 @@ class Args:
         self.parser.add_argument(
             "--no-f64", action="store_true", help="Whether to use 64 bit precision"
         )
+        self.parser.add_argument(
+            "--Vmax",
+            type=float,
+            default=1,
+            help="Estimatet max flow velocity to calculate artificial speed of sound",
+            )
+        self.parser.add_argument(
+            "--is-limiter",
+            action="store_true",
+            help="Dissipation limiter for Riemann solver",
+        )
+        self.parser.add_argument(
+            "--eta-limiter",
+            type=float,
+            default=3,
+            help="Define parameter to modulate the numeric dissipation of the Riemann solver",
+            )
