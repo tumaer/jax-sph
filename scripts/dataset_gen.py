@@ -201,12 +201,11 @@ def compute_statistics_h5(args):
 
                 # The velocity and acceleration computation is based on an
                 # inversion of Semi-Implicit Euler
+                vel = displacement_fn_sets(r[1:], r[:-1])
                 if loop == "mean":
-                    vel = displacement_fn_sets(r[1:], r[:-1])
                     vels.append(vel.mean((0, 1)))
                     accs.append((vel[1:] - vel[:-1]).mean((0, 1)))
                 elif loop == "std":
-                    vel = displacement_fn_sets(r[1:], r[:-1])
                     centered_vel = vel - vel_mean
                     vels_sq.append(np.square(centered_vel).mean((0, 1)))
                     centered_acc = vel[1:] - vel[:-1] - acc_mean
