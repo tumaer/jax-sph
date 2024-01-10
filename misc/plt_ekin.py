@@ -116,7 +116,7 @@ def main(src_dir):
             facecolors="none",
             label="Jax-fluids Nx=64",
         )
-    except:
+    except FileNotFoundError:
         print("Not working with TGV or no reference data available")
 
     ax[0].legend()

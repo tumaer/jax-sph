@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "jax-sph"
+version = "0.0.1"
+description = "JAX-SPH: Smoothed Particle Hydrodynamics in JAX"
+authors = ["Artur Toshev <artur.toshev@tum.de>",]
+maintainers = ["Artur Toshev <artur.toshev@tum.de>",]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<=3.11"
+h5py = ">=3.9.0"
+pandas = ">=2.1.4" # for validation
+pyvista = ">=0.42.2" # for visualization
+jax = "0.4.23"
+jaxlib = "0.4.23"
+jax-md = "0.2.8"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = ">=3.3.1"
+pytest = ">=7.3.1"
+pytest-cov = ">=4.1.0"
+ruff = ">=0.1.8"
+
+[tool.poetry.group.temp.dependencies]
+ott-jax = ">=0.4.2"
+ipykernel = ">=6.25.1"
+
+[tool.ruff]
+ignore = ["F821", "E402"]
+exclude = [
+    ".git",
+    ".venv*",
+    "venv*",
+    "dist"
+]
+show-fixes = true
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle
+    "F", # Pyflakes
+    "SIM", # flake8-simplify
+    "I", # isort
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

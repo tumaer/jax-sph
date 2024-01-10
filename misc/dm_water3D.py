@@ -36,7 +36,7 @@ def read_h5_demo(args):
     x_offset, y_offset, z_offset = {}, {}, {}
     box = {}
 
-    for key in hf.keys():
+    for key in hf:
         r = hf[f"{key}/r"][:]
         # print(key, r.shape, r.mean())
         velo_init[int(key[-2:])] = (r[1] - r[0]) / 0.005
