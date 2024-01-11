@@ -79,6 +79,7 @@ def simulate(args):
         model = SPHRIEMANNv2(
             displacement_fn,
             eos_fn,
+            g_ext_fn,
             args.dx,
             args.dim,
             args.dt,

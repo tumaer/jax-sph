@@ -29,12 +29,13 @@ class RIEMANNEoS:
     low-dissipation Riemann solver", Zhang, Hu, Adams, 2017
     """
 
-    def __init__(self, rho_ref, vmax):
+    def __init__(self, rho_ref, p_background, vmax):
         self.rho_ref = rho_ref
         self.vmax = vmax
+        self.p_bg = p_background
 
     def p_fn(self, rho):
-        return 100 * self.vmax ** 2 * (rho - self.rho_ref)
+        return 100 * self.vmax ** 2 * (rho - self.rho_ref) + self.p_bg
     
     def rho_fn(self, p):
-        return p / (100 * self.vmax ** 2) + self.rho_ref
+        return (p - self.p_bg) / (100 * self.vmax ** 2) + self.rho_ref
