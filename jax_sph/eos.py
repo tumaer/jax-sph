@@ -1,6 +1,5 @@
 """Equation of state"""
 
-
 class TaitEoS:
     """Equation of state
 
@@ -36,5 +35,6 @@ class RIEMANNEoS:
 
     def p_fn(self, rho):
         return 100 * self.vmax ** 2 * (rho - self.rho_ref)
+    
     def rho_fn(self, p):
         return p / (100 * self.vmax ** 2) + self.rho_ref

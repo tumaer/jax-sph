@@ -12,9 +12,12 @@ from cases import select_case
 from jax_sph import partition
 from jax_sph.integrator import si_euler
 from jax_sph.integrator import kick_drift_kick
+from jax_sph.integrator import kick_drift_kick_RIE2
+from jax_sph.integrator import si_euler_RIE2
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver.sph_tvf import SPHTVF
-from jax_sph.solver.sph_riemann import SPHRIEMANN
+from jax_sph.solver.sph_riemann_backup import SPHRIEMANN
+from jax_sph.solver.sph_riemann import SPHRIEMANNv2
 from jax_sph.solver.ut import UTSimulator
 from jax_sph.utils import get_ekin, get_val_max
 
@@ -72,12 +75,26 @@ def simulate(args):
             args.eta_limiter,
             args.is_limiter,
         )
+    elif args.solver == "RIE2":
+        model = SPHRIEMANNv2(
+            displacement_fn,
+            eos_fn,
+            args.dx,
+            args.dim,
+            args.dt,
+            args.Vmax,
+            args.eta_limiter,
+            args.is_limiter,
+            args.density_evolution,
+        )
     elif args.solver == "UT":
         model = UTSimulator(g_ext_fn)
 
     # Instantiate advance function for our use case
     if args.solver == "RIE":
         advance = kick_drift_kick(model, shift_fn)
+    elif args.solver == "RIE2":
+        advance = kick_drift_kick_RIE2(model, shift_fn)
     else:    
         advance = si_euler(args.tvf, model, shift_fn, bc_fn)
 

@@ -81,6 +81,8 @@ class SimulationSetup(ABC):
         # Equation of state
         if args.solver == "RIE":
             eos = RIEMANNEoS(rho_ref, args.Vmax)
+        elif args.solver == "RIE2":
+            eos = RIEMANNEoS(rho_ref, args.Vmax)
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
@@ -117,20 +119,39 @@ class SimulationSetup(ABC):
         mass = jnp.ones(num_particles) * mass_ref
         eta = jnp.ones(num_particles) * eta_ref
 
+        # initialize accelerations for TGV
+        if jnp.logical_and(args.case == "TGV", args.dim == 2):
+            dvdt = vmap(self._init_acceleration2D)(r)
+            
+            state = {
+                "r": r,
+                "tag": tag,
+                "u": v,
+                "v": v,
+                "dudt": dvdt,
+                "dvdt": dvdt,
+                "drhodt": jnp.zeros_like(rho),
+                "rho": rho,
+                "p": eos.p_fn(rho),
+                "mass": mass,
+                "eta": eta,
+            }
+
+        else:
         # initialize the state dictionary
-        state = {
-            "r": r,
-            "tag": tag,
-            "u": v,
-            "v": v,
-            "dudt": jnp.zeros_like(v),
-            "dvdt": jnp.zeros_like(v),
-            "drhodt": jnp.zeros_like(rho),
-            "rho": rho,
-            "p": eos.p_fn(rho),
-            "mass": mass,
-            "eta": eta,
-        }
+            state = {
+                "r": r,
+                "tag": tag,
+                "u": v,
+                "v": v,
+                "dudt": jnp.zeros_like(v),
+                "dvdt": jnp.zeros_like(v),
+                "drhodt": jnp.zeros_like(rho),
+                "rho": rho,
+                "p": eos.p_fn(rho),
+                "mass": mass,
+                "eta": eta,
+            }
 
         args.dt, args.sequence_length = dt, sequence_length
         args.num_particles_max = num_particles
@@ -172,13 +193,17 @@ class SimulationSetup(ABC):
         pass
 
     @abstractmethod
+    def _init_acceleration2D(self, r):
+        pass
+
+    @abstractmethod
     def _init_velocity3D(self, r):
         pass
 
     @abstractmethod
     def _external_acceleration_fn(self, r):
         pass
-
+    
     @abstractmethod
     def _boundary_conditions_fn(self, state):
         pass

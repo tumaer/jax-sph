@@ -9,16 +9,18 @@ from jax_sph.kernels import QuinticKernel
 EPS = jnp.finfo(float).eps
 
 
-def SPHRIEMANN(
+def SPHRIEMANNv2(
     displacement_fn,
     eos,
     dx,
     dim,
+    dt,
     Vmax,
     eta_limiter=3,
     is_limiter=False,
+    is_rho_evol=False,
 ):
-    """Acceleration according to Riemann-SPH
+    """Conservation laws according to Riemann-SPH
 
     Based on: "A weakly compressible SPH method based on a
     low-dissipation Riemann solver", Zhang, Hu, Adams, 2017
@@ -26,7 +28,7 @@ def SPHRIEMANN(
 
     # SPH kernel function
     # h = 1.3dx in paper
-    kernel_fn = QuinticKernel(h=1.3 * dx, dim=dim)
+    kernel_fn = QuinticKernel(h=dx, dim=dim)
 
     def forward(state, neighbors):
         """Update step of SPH solver
@@ -48,92 +50,131 @@ def SPHRIEMANN(
         r_i_s, r_j_s = r[i_s], r[j_s]
         dr_i_j = vmap(displacement_fn)(r_i_s, r_j_s)
         dist = space.distance(dr_i_j)
-        #w_dist = vmap(kernel_fn.w)(dist)
-
-        # norm because we don't have the directions e_s
-        e_ij = -dr_i_j / (dist[:, None] + EPS)
-
-        ##### Compute primitives
-
-        # pressure
-        p = vmap(eos.p_fn)(rho)
-        #background_pressure_tvf = vmap(eos.p_fn)(jnp.zeros_like(p))
+        w_dist = vmap(kernel_fn.w)(dist)
 
         # artificial speed of sound, below eq. (2)
         c0 = 10 * Vmax
 
-        # if enabled, introduce dissipation limiter eq. (11)  jnp.full_like(temp, c0)  10 * jnp.absolute(U_av)
+        
+        if is_rho_evol:
+            # Compute density gradient
+            def rho_evol_fn(
+                r_ij, 
+                d_ij, 
+                rho_i, 
+                rho_j, 
+                m_j, 
+                v_i, 
+                v_j, 
+                p_i, 
+                p_j
+                ):
+
+
+                # Compute unit vector, above eq. (6)                 
+                e_ij = r_ij / (d_ij + EPS)
+
+                # Compute kernel gradient
+                _kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij) 
+
+                # Compute average states eq. (6)
+                u_L = jnp.dot(v_i, e_ij)
+                u_R = jnp.dot(v_j, e_ij)
+                U_avg= (u_L + u_R) / 2
+                v_avg = (v_i +  v_j) / 2
+                rho_avg = (rho_i + rho_j) / 2
+
+                # Compute Riemann states eq. (7) and below eq. (9)
+                U_star = U_avg + 0.5 * (p_i - p_j) / (rho_avg * c0)
+                v_star = U_star * e_ij + (v_avg - U_avg * e_ij)
+
+                # Mass conservation with linear Riemann solver eq. (8)
+                eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), _kernel_grad)
+                return eq_8
+
+
+            temp = vmap(rho_evol_fn)(
+                dr_i_j, 
+                dist, 
+                rho[i_s], 
+                rho[j_s], 
+                mass[j_s], 
+                v[i_s], 
+                v[j_s], 
+                p[i_s], 
+                p[j_s]
+                )
+            
+            drhodt = ops.segment_sum(temp, i_s, N)
+            rho = rho + dt * drhodt
+
+        else:
+            rho = mass * ops.segment_sum(w_dist, i_s, N)
+
+
+        # pressure
+        p = vmap(eos.p_fn)(rho)
+        
+
+        # if enabled, introduce dissipation limiter eq. (11) 
         if is_limiter:
-            def beta_fn(u_L, u_R, U_av, eta_limiter):
-                #u_L = jnp.absolute(u_L)
-                #u_R = jnp.absolute(u_R)
+            def beta_fn(u_L, u_R, eta_limiter):
                 temp = eta_limiter * jnp.maximum(u_L - u_R, jnp.zeros_like(u_L))
                 beta = jnp.minimum(temp, jnp.full_like(temp, c0))
                 return beta
         else:
-            def beta_fn(u_L, u_R, U_av, eta_limiter):
+            def beta_fn(u_L, u_R, eta_limiter):
                 return c0
+            
 
+        # Compute velocity gradient
 
-
-   
-        ##### Compute RHS
-
-        def conservation_fn(
+        def acceleration_fn_riemann(
+            r_ij,
             d_ij,
-            rho_L,
-            rho_R,
+            rho_i,
+            rho_j,
+            m_j,
             v_i,
             v_j,
-            m_j,
-            p_L,
-            p_R,
-            e_ij,
-        ):
+            p_i,
+            p_j,
+            ):
             
-            # [:, None]
+            # Compute unit vector, above eq. (6) 
+            e_ij = r_ij / (d_ij + EPS)
 
-            # state velocities eq. (6)
+            # Compute kernel gradient
+            _kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij)
+
+            # Compute average states eq. (6)
             u_L = jnp.dot(v_i, e_ij)
             u_R = jnp.dot(v_j, e_ij)
-            #print(jnp.shape(U_L))
+            P_avg = (p_i + p_j) / 2
+            rho_avg = (rho_i + rho_j) / 2
+            
 
-            # average quantities
-            U_av = (u_L + u_R) / 2
-            rho_av = (rho_L + rho_R) / 2
-            p_av = (p_L + p_R) / 2
-            v_av = (v_i + v_j) / 2
+            # Compute Riemann states eq. (7) and (10)
+            P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
-            # linear Riemann solver eq. (7)
-            U_star = U_av + 0.5 * (p_L - p_R) / (c0 * rho_av + EPS)
-            p_star = p_av + 0.5 * beta_fn(u_L, u_R, U_av, eta_limiter) * rho_av * (u_L - u_R)
-            v_star = U_star * e_ij + (v_av - U_av * e_ij)
+            # Momentum conservation with linear Riemann solver eq. (9)
+            eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * _kernel_grad 
 
-            # compute the common prefactor
-            _kernel_grad = kernel_fn.grad_w(d_ij) * (-e_ij)
-            _c = 2 * m_j / rho_R 
-            # mass conservation eq. (8)
-            eq_8 = rho_L * _c * jnp.dot((v_i - v_star), _kernel_grad)
+            return eq_9
 
-            # momentum conservation eq. (9)
-            eq_9 = (-1) * _c * p_star / rho_L * _kernel_grad
-
-            return eq_8, eq_9
-
-        out = vmap(conservation_fn)(
-            dist,
-            rho[i_s],
-            rho[j_s],
-            v[i_s],
-            v[j_s],
-            mass[j_s],
-            p[i_s],
+        out = vmap(acceleration_fn_riemann)(
+            dr_i_j, 
+            dist, 
+            rho[i_s], 
+            rho[j_s], 
+            mass[j_s], 
+            v[i_s], 
+            v[j_s], 
+            p[i_s], 
             p[j_s],
-            e_ij,
-        )
-        
-        drhodt = ops.segment_sum(out[0], i_s, N)
-        dvdt = ops.segment_sum(out[1], i_s, N)
+            )
+
+        dvdt = ops.segment_sum(out, i_s, N)
 
         state = {
             "r": r,
