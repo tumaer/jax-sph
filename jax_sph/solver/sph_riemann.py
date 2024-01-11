@@ -12,6 +12,7 @@ EPS = jnp.finfo(float).eps
 def SPHRIEMANNv2(
     displacement_fn,
     eos,
+    g_ext_fn,
     dx,
     dim,
     dt,
@@ -20,14 +21,19 @@ def SPHRIEMANNv2(
     is_limiter=False,
     is_rho_evol=False,
 ):
-    """Conservation laws according to Riemann-SPH
+    """Conservation laws according to Riemann-SPH 
 
     Based on: "A weakly compressible SPH method based on a
     low-dissipation Riemann solver", Zhang, Hu, Adams, 2017
+
+    and: "Dual-criteria time stepping for weakly compressible smoothed
+    particle hydrodynamics", Zhang, Rezavand, Hu, 2019
+
+    and: "A transport-velocity formulation for smoothed particle
+    hydrodynamics", Adami, Hu, Adams, 2013
     """
 
     # SPH kernel function
-    # h = 1.3dx in paper
     kernel_fn = QuinticKernel(h=dx, dim=dim)
 
     def forward(state, neighbors):
@@ -52,7 +58,10 @@ def SPHRIEMANNv2(
         dist = space.distance(dr_i_j)
         w_dist = vmap(kernel_fn.w)(dist)
 
-        # artificial speed of sound, below eq. (2)
+        # external acceleration field
+        g_ext = g_ext_fn(r)
+
+        # artificial speed of sound, below eq. (2), Zhang (2017)
         c0 = 10 * Vmax
 
         
@@ -71,25 +80,25 @@ def SPHRIEMANNv2(
                 ):
 
 
-                # Compute unit vector, above eq. (6)                 
+                # Compute unit vector, above eq. (6), Zhang (2017)                 
                 e_ij = r_ij / (d_ij + EPS)
 
                 # Compute kernel gradient
-                _kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij) 
+                kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij) 
 
-                # Compute average states eq. (6)
+                # Compute average states eq. (6), Zhang (2017)
                 u_L = jnp.dot(v_i, e_ij)
                 u_R = jnp.dot(v_j, e_ij)
                 U_avg= (u_L + u_R) / 2
                 v_avg = (v_i +  v_j) / 2
                 rho_avg = (rho_i + rho_j) / 2
 
-                # Compute Riemann states eq. (7) and below eq. (9)
+                # Compute Riemann states eq. (7) and below eq. (9), Zhang (2017)
                 U_star = U_avg + 0.5 * (p_i - p_j) / (rho_avg * c0)
                 v_star = U_star * e_ij + (v_avg - U_avg * e_ij)
 
-                # Mass conservation with linear Riemann solver eq. (8)
-                eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), _kernel_grad)
+                # Mass conservation with linear Riemann solver eq. (8), Zhang (2017)
+                eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), kernel_grad)
                 return eq_8
 
 
@@ -102,7 +111,7 @@ def SPHRIEMANNv2(
                 v[i_s], 
                 v[j_s], 
                 p[i_s], 
-                p[j_s]
+                p[j_s],
                 )
             
             drhodt = ops.segment_sum(temp, i_s, N)
@@ -114,9 +123,8 @@ def SPHRIEMANNv2(
 
         # pressure
         p = vmap(eos.p_fn)(rho)
-        
 
-        # if enabled, introduce dissipation limiter eq. (11) 
+        # if enabled, introduce dissipation limiter eq. (11), Zhang (2017) 
         if is_limiter:
             def beta_fn(u_L, u_R, eta_limiter):
                 temp = eta_limiter * jnp.maximum(u_L - u_R, jnp.zeros_like(u_L))
@@ -139,28 +147,40 @@ def SPHRIEMANNv2(
             v_j,
             p_i,
             p_j,
+            eta_i,
+            eta_j,
             ):
             
-            # Compute unit vector, above eq. (6) 
+            # Compute unit vector, above eq. (6), Zhang (2017) 
             e_ij = r_ij / (d_ij + EPS)
 
             # Compute kernel gradient
-            _kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij)
+            kernel_part_diff = kernel_fn.grad_w(d_ij)
+            kernel_grad = kernel_part_diff * (e_ij)
 
-            # Compute average states eq. (6)
+            # Compute average states Riemann eq. (6), Zhang (2017)
             u_L = jnp.dot(v_i, e_ij)
             u_R = jnp.dot(v_j, e_ij)
             P_avg = (p_i + p_j) / 2
             rho_avg = (rho_i + rho_j) / 2
+
+            # Compute inter-particle-averaged shear viscosity (harmonic mean) eq. (6), Adami (2013)
+            eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
             
 
-            # Compute Riemann states eq. (7) and (10)
+            # Compute Riemann states eq. (7) and (10), Zhang (2017)
             P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
-            # Momentum conservation with linear Riemann solver eq. (9)
-            eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * _kernel_grad 
+            # pressure term with linear Riemann solver eq. (9), Zhang (2017)
+            eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad 
+         
+            # viscosity term eq. (6), Zhang (2019)
+            v_ij = v_i - v_j
+            eq_6 = 2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS) * kernel_part_diff
+            
 
-            return eq_9
+
+            return eq_9 + eq_6
 
         out = vmap(acceleration_fn_riemann)(
             dr_i_j, 
@@ -172,6 +192,8 @@ def SPHRIEMANNv2(
             v[j_s], 
             p[i_s], 
             p[j_s],
+            eta[i_s],
+            eta[j_s],
             )
 
         dvdt = ops.segment_sum(out, i_s, N)
@@ -182,8 +204,8 @@ def SPHRIEMANNv2(
             "u": v,
             "v": v,
             "drhodt": drhodt,
-            "dudt": dvdt,
-            "dvdt": dvdt,
+            "dudt": dvdt + g_ext,
+            "dvdt": dvdt + g_ext,
             "rho": rho,
             "p": p,
             "mass": mass,

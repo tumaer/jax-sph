@@ -80,9 +80,9 @@ class SimulationSetup(ABC):
 
         # Equation of state
         if args.solver == "RIE":
-            eos = RIEMANNEoS(rho_ref, args.Vmax)
+            eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
         elif args.solver == "RIE2":
-            eos = RIEMANNEoS(rho_ref, args.Vmax)
+            eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
