@@ -552,7 +552,7 @@ if __name__ == "__main__":
         val_2D_LDC(args.src_dir, save_fig=True)
 
     elif args.case == "2D_TGV":
-        val_TGV(args.src_dir, 2, [20, 50, 100], True)
+        val_TGV(args.src_dir, 2, [20, 50, 100, 200], True)
     elif args.case == "3D_TGV":
         val_TGV(args.src_dir, 3, [20, 40], True)
 

@@ -90,3 +90,11 @@ class TGV(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         return state
+    
+    def _init_acceleration2D(self, r):
+        x, y = r
+        # from Transport Veocity paper by Adami et al. 2013, here Re = 100
+        du = -1.0 * (-8) * jnp.pi ** 2 / 100 * jnp.cos(2.0 * jnp.pi * x) * jnp.sin(2.0 * jnp.pi * y)
+        dv = +1.0 * (-8) * jnp.pi ** 2 / 100 * jnp.sin(2.0 * jnp.pi * x) * jnp.cos(2.0 * jnp.pi * y)
+
+        return jnp.array([du, dv])
