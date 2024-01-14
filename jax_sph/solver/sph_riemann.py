@@ -87,15 +87,15 @@ def SPHRIEMANNv2(
                 kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij) 
 
                 # Compute average states eq. (6), Zhang (2017)
-                u_L = jnp.dot(v_i, e_ij)
-                u_R = jnp.dot(v_j, e_ij)
+                u_L = jnp.dot(v_i, -e_ij)
+                u_R = jnp.dot(v_j, -e_ij)
                 U_avg= (u_L + u_R) / 2
                 v_avg = (v_i +  v_j) / 2
                 rho_avg = (rho_i + rho_j) / 2
 
                 # Compute Riemann states eq. (7) and below eq. (9), Zhang (2017)
                 U_star = U_avg + 0.5 * (p_i - p_j) / (rho_avg * c0)
-                v_star = U_star * e_ij + (v_avg - U_avg * e_ij)
+                v_star = U_star * (-e_ij) + (v_avg - U_avg * (-e_ij))
 
                 # Mass conservation with linear Riemann solver eq. (8), Zhang (2017)
                 eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), kernel_grad)
@@ -159,8 +159,8 @@ def SPHRIEMANNv2(
             kernel_grad = kernel_part_diff * (e_ij)
 
             # Compute average states Riemann eq. (6), Zhang (2017)
-            u_L = jnp.dot(v_i, e_ij)
-            u_R = jnp.dot(v_j, e_ij)
+            u_L = jnp.dot(v_i, -e_ij)
+            u_R = jnp.dot(v_j, -e_ij)
             P_avg = (p_i + p_j) / 2
             rho_avg = (rho_i + rho_j) / 2
 
