@@ -5,6 +5,7 @@ from jax import ops, vmap
 from jax_md import space
 
 from jax_sph.kernels import QuinticKernel
+from jax_sph.kernels import WendlandC2Kernel
 
 EPS = jnp.finfo(float).eps
 
@@ -34,7 +35,7 @@ def SPHRIEMANNv2(
     """
 
     # SPH kernel function
-    kernel_fn = QuinticKernel(h=dx, dim=dim)
+    kernel_fn = WendlandC2Kernel(h=1.3*dx, dim=dim)
 
     def forward(state, neighbors):
         """Update step of SPH solver

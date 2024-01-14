@@ -33,3 +33,41 @@ class QuinticKernel:
         """Evaluates the 1D kernel gradient at the radial distance r."""
 
         return grad(self.w)(r)
+    
+
+class WendlandC2Kernel:
+    """The 5th-order C2 kernel function of Wendland."""
+
+    def __init__(self, h, dim=3):
+        self._one_over_h = 1.0 / h
+        self.dim = dim
+
+        self._normalized_cutoff = 2.0
+        self.cutoff = self._normalized_cutoff * h
+        if dim == 1:
+            self._sigma = 5.0 / 8.0 * self._one_over_h
+        elif dim == 2:
+            self._sigma = 7.0 / 4.0 / jnp.pi * self._one_over_h**2
+        elif dim == 3:
+            self._sigma = 21.0 / 16.0 / jnp.pi * self._one_over_h**3
+
+    def w(self, r):
+        """Evaluates the kernel at the radial distance r."""
+        if self.dim == 1:
+            q = r * self._one_over_h
+            q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
+            q2 = 1.5 * q + 1.0
+
+            return self._sigma * (q1**3 * q2)
+        else:
+            q = r * self._one_over_h
+            q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
+            q2 = 2.0 * q + 1.0
+
+            return self._sigma * (q1**4 * q2)
+
+
+    def grad_w(self, r):
+        """Evaluates the 1D kernel gradient at the radial distance r."""
+
+        return grad(self.w)(r)
