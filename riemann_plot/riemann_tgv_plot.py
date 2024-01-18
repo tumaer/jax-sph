@@ -157,7 +157,7 @@ def val_TGV_Riemann(val_root, dim=2, nxs=[10, 20], save_fig=False):
     if dim == 2:
         dirs = [d for d in dirs if ("2D_TGV_RIE2" in d)]
     elif dim == 3:
-        dirs = [d for d in dirs if ("3D_TGV_RIE2" in d)]
+        dirs = [d for d in dirs if ("3D_TGV_RIE" in d)]
     dirs = sorted(dirs)
 
     # to each directory read the medatada file and store nx values

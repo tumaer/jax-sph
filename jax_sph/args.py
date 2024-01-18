@@ -21,7 +21,7 @@ class Args:
             "--solver",
             type=str,
             default="SPH",
-            choices=["SPH", "GNS", "SEGNN", "UT", "RIE", "RIE2"],
+            choices=["SPH", "GNS", "SEGNN", "UT", "RIE", "RIE2", "RIE3"],
             help="vanilla correspond to density transport",
         )
         self.parser.add_argument(

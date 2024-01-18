@@ -20,6 +20,7 @@ class Rlx(SimulationSetup):
         dx = args.dx
         self.L, self.H, self.W = self.nx * dx, self.ny * dx, self.nz * dx
         self.relax_pbc = args.relax_pbc
+        self.args.p_bg_factor = 0.0
 
         # custom variables related only to this Simulation
         self.args.g_ext_magnitude = 0.0
