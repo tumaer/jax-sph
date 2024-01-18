@@ -1,3 +1,24 @@
+import jax.numpy as jnp
+from jax import ops, vmap
+from jax_md import space
+import numpy as np
+
+
+#a = jnp.array([1, 0, 0, 0, 1, 1, 0, 1, 1, 0])
+#c = jnp.array([[1, 0, 0, 0, 1, 1, 0, 1, 1, 0],[2, 0, 0, 2, 2, 4, 3, 3, 2, 1]] )
+#print(a)
+#mask_wall = a == 1
+#mask_wall = mask_wall.reshape((1,10))
+#b = jnp.where(a == 0, 1, 0)
+#print(mask_wall)
+#print(a[a == 1])
+
+
+a = jnp.array([[-1, 1], [-1, -11], [1, -1], [1, 1]])
+#print(jnp.linalg.norm(a, ord=2, axis=1))
+print(jnp.where(a < 0, 0, a))
+
+
 """Riemann-SPH implementation"""
 
 import jax.numpy as jnp
@@ -37,7 +58,7 @@ def SPHRIEMANNv2(
     """
 
     # SPH kernel function
-    kernel_fn = WendlandC2Kernel(h=1.3*dx, dim=dim)
+    kernel_fn = QuinticKernel(h=dx, dim=dim)
 
     def forward(state, neighbors):
         """Update step of SPH solver
@@ -47,13 +68,12 @@ def SPHRIEMANNv2(
             neighbors (_type_): Neighbors object.
         """
 
-        r, tag, mass = state["r"], state["tag"], state["mass"]
+        r, tag_real, mass = state["r"], state["tag"], state["mass"]
         v, dvdt = state["v"], state["dvdt"]
         rho, eta, p = state["rho"], state["eta"], state["p"]
         drhodt = state["drhodt"]
         N = len(r)
-        
-        
+        tag = jnp.where(tag_real > 0, 1.0, 0.0)
 
         # precompute displacements `dr` and distances `dist`
         # the second vector is sorted
@@ -67,23 +87,22 @@ def SPHRIEMANNv2(
         g_ext = g_ext_fn(r)
 
         # artificial speed of sound, below eq. (2), Zhang (2017)
-        c0 = 10 * Vmax
+        c0 = 10.0 * Vmax
 
         # if enabled, introduce dissipation limiter eq. (11), Zhang (2017) 
         if is_limiter:
             def beta_fn(u_L, u_R, eta_limiter):
-                temp = eta_limiter * jnp.maximum(u_L - u_R, jnp.zeros_like(u_L))
+                temp = eta_limiter * jnp.maximum((u_L - u_R), jnp.zeros_like(u_L))
                 beta = jnp.minimum(temp, jnp.full_like(temp, c0))
                 return beta
         else:
             def beta_fn(u_L, u_R, eta_limiter):
                 return c0
+             
 
+        #### BC from Zhang (2017) 
 
         if is_bc_trick:
-
-            wall_mask = jnp.where(tag > 0, 1.0, 0.0)
-            fluid_mask = jnp.where(tag == 0, 1.0, 0.0)
                       
 
             # fucntion for normal vector
@@ -100,31 +119,22 @@ def SPHRIEMANNv2(
 
                 return phi
             
-            temp = vmap(wall_phi_vec)(dr_i_j, dist, wall_mask[j_s], wall_mask[i_s], mass[j_s], rho[j_s])
+            temp = vmap(wall_phi_vec)(dr_i_j, dist, tag[j_s], tag[i_s], mass[j_s], rho[j_s])
             phi = ops.segment_sum(temp, i_s, N) 
 
             # compute normal vector for boundary particles eq. (15), Zhang (2017)
-            n_w  = phi / (jnp.linalg.norm(phi, ord=2 , axis=1) + EPS)[:,None] * wall_mask[:, None]
+            n_w  = phi / (jnp.linalg.norm(phi, ord=2 , axis=1) + EPS)[:,None] * tag[:, None]
 
             # try to avoid accumulation of numerical errors
             n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0 , n_w)
 
             # require operations with sender fluid and receiver wall/lid
-            #tag_inv = jnp.where(tag == 0, 1.0, 0.0)
-
-            if is_free_slip:
-                def free_weight(fluid_mask_i):
-                    return fluid_mask_i
-            else:
-                def free_weight(fluid_mask_i):
-                    return 1
-
-
-
+            tag_inv = jnp.where(tag == 0, 1.0, 0.0)
+            
 
             if is_rho_evol:
                 # Compute density gradient
-                def rho_evol_fn(
+                def rho_evol_fn( 
                     r_ij, 
                     d_ij, 
                     rho_i, 
@@ -134,7 +144,9 @@ def SPHRIEMANNv2(
                     v_j, 
                     p_i, 
                     p_j,
-                    wall_mask_j,
+                    tag_j,
+                    tag_inv_i,
+                    tag_inv_j,
                     n_w_j,
                     g_ext_i,
                     ):
@@ -146,26 +158,27 @@ def SPHRIEMANNv2(
                     # Compute kernel gradient
                     kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij) 
 
-                    # Compute average states eq. (6)/(12)/(13), Zhang (2017)
-                    u_L = jnp.where(wall_mask_j == 1, jnp.dot(v_i, -n_w_j), jnp.dot(v_i, -e_ij))
+                    # Compute left states eq. (6)/(12), Zhang (2017)
+                    u_L = jnp.dot(v_i, -e_ij) * tag_inv_j * tag_inv_i + jnp.dot(v_i, -n_w_j) * tag_j * tag_inv_i
                     p_L = p_i
                     rho_L = rho_i
 
-                    u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
-                    p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
-                    rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
+                    # Compute left states eq. (6)/(13)/(14), Zhang (2017)
+                    u_R =  jnp.dot(v_j, -e_ij) * tag_inv_j * tag_inv_i + (-u_L + 2 * jnp.dot(v_j, n_w_j)) * tag_j * tag_inv_i
+                    p_R = (p_L + rho_L * jnp.dot(g_ext_i,  -r_ij)) * tag_j * tag_inv_i + p_j * tag_inv_j * tag_inv_i
+                    rho_R = rho_j * tag_inv_j * tag_inv_i + eos.rho_fn(p_R) * tag_j * tag_inv_i
 
-                    U_avg = (u_L + u_R) / 2
-                    P_avg = (p_L + p_R) / 2
-                    v_avg = (v_i +  v_j) / 2
-                    rho_avg = (rho_L + rho_R) / 2
+                    # Compute average states eq. (6), Zhang (2017)
+                    U_avg= (u_L + u_R) / 2.0
+                    v_avg = (v_i +  v_j) / 2.0
+                    rho_avg = (rho_L + rho_R) / 2.0
 
                     # Compute Riemann states eq. (7) and below eq. (9), Zhang (2017)
                     U_star = U_avg + 0.5 * (p_L - p_R) / (rho_avg * c0)
                     v_star = U_star * (-e_ij) + (v_avg - U_avg * (-e_ij))
 
                     # Mass conservation with linear Riemann solver eq. (8), Zhang (2017)
-                    eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), kernel_grad)
+                    eq_8 = 2.0 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), kernel_grad)
                     return eq_8
 
 
@@ -179,26 +192,33 @@ def SPHRIEMANNv2(
                     v[j_s], 
                     p[i_s], 
                     p[j_s],
-                    wall_mask[j_s],
+                    tag[j_s],
+                    tag_inv[i_s],
+                    tag_inv[j_s],
                     n_w[j_s],
                     g_ext[i_s],
                     )
                 
-                drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
+                drhodt = ops.segment_sum(temp, i_s, N)
                 rho = rho + dt * drhodt
 
             else:
                 rho = mass * ops.segment_sum(w_dist, i_s, N)
 
-
             # pressure
             p = vmap(eos.p_fn)(rho)
 
-            
+            # free slip BC
+            if is_free_slip:
+                def free_slip(tag_inv_i):
+                    return tag_inv_i
+            else:
+                def free_slip(tag_inv_i): 
+                    return 1
+       
                 
 
             # Compute velocity gradient
-
             def acceleration_fn_riemann(
                 r_ij,
                 d_ij,
@@ -211,8 +231,9 @@ def SPHRIEMANNv2(
                 p_j,
                 eta_i,
                 eta_j,
-                wall_mask_j,
-                fluid_mask_i,
+                tag_j,
+                tag_inv_i,
+                tag_inv_j,
                 n_w_j,
                 g_ext_i,
                 ):
@@ -224,33 +245,34 @@ def SPHRIEMANNv2(
                 kernel_part_diff = kernel_fn.grad_w(d_ij)
                 kernel_grad = kernel_part_diff * (e_ij)
 
-                # Compute average states eq. (6)/(12)/(13), Zhang (2017)
-                u_L = jnp.where(wall_mask_j == 1, jnp.dot(v_i, -n_w_j), jnp.dot(v_i, -e_ij))
+                # Compute right states eq. (6)/(12), Zhang (2017)
+                u_L = jnp.dot(v_i, -e_ij) * tag_inv_j * tag_inv_i + jnp.dot(v_i, -n_w_j) * tag_j * tag_inv_i
                 p_L = p_i
                 rho_L = rho_i
 
-                u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
-                p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
-                rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
+                # Compute left states eq. (6)/(13)/(14), Zhang (2017)
+                u_R = jnp.dot(v_j, -e_ij) * tag_inv_j * tag_inv_i + (-u_L + 2 * jnp.dot(v_j, n_w_j)) * tag_j * tag_inv_i
+                p_R = (p_L + rho_L * jnp.dot(g_ext_i,  -r_ij)) * tag_j * tag_inv_i + p_j * tag_inv_j * tag_inv_i
+                rho_R = rho_j * tag_inv_j * tag_inv_i + eos.rho_fn(p_R) * tag_j * tag_inv_i
 
-                U_avg = (u_L + u_R) / 2
-                P_avg = (p_L + p_R) / 2
-                v_avg = (v_i +  v_j) / 2
-                rho_avg = (rho_L + rho_R) / 2
+                # Compute average states Riemann eq. (6), Zhang (2017)
+                P_avg = (p_L + p_R) / 2.0
+                U_avg= (u_L + u_R) / 2.0
+                v_avg = (v_i +  v_j) / 2.0
+                rho_avg = (rho_L + rho_R) / 2.0
 
                 # Compute inter-particle-averaged shear viscosity (harmonic mean) eq. (6), Adami (2013)
-                eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
+                eta_ij = 2.0 * eta_i * eta_j / (eta_i + eta_j + EPS)
                 
-
                 # Compute Riemann states eq. (7) and (10), Zhang (2017)
                 P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
                 # pressure term with linear Riemann solver eq. (9), Zhang (2017)
-                eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad 
+                eq_9 = -2.0 * m_j * (P_star / (rho_L * rho_R)) * kernel_grad 
             
                 # viscosity term eq. (6), Zhang (2019)
                 v_ij = v_i - v_j
-                eq_6 = 2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS) * kernel_part_diff * free_weight(fluid_mask_i)
+                eq_6 = 2.0 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS) * kernel_part_diff * free_slip(tag_inv_i)
                 
 
 
@@ -268,19 +290,21 @@ def SPHRIEMANNv2(
                 p[j_s],
                 eta[i_s],
                 eta[j_s],
-                wall_mask[j_s],                    
-                fluid_mask[i_s],
+                tag[j_s],
+                tag_inv[i_s],
+                tag_inv[j_s],
                 n_w[j_s],
                 g_ext[i_s],
                 )
 
             dvdt = ops.segment_sum(out, i_s, N)
 
-            p_non = p / (rho + EPS) # /H and /g, but both are 1 here
+            # nondimensional pressure for g = 1, H = 1
+            p_non = p / rho
 
             state = {
                 "r": r,
-                "tag": tag,
+                "tag": tag_real,
                 "u": v,
                 "v": v,
                 "drhodt": drhodt,
@@ -291,11 +315,20 @@ def SPHRIEMANNv2(
                 "mass": mass,
                 "eta": eta,
                 "p_non": p_non,
-
             }
 
 
 
+
+
+
+
+
+
+
+
+
+        #### Without BC to save computational cost
 
 
         else:
@@ -323,16 +356,16 @@ def SPHRIEMANNv2(
                     # Compute average states eq. (6), Zhang (2017)
                     u_L = jnp.dot(v_i, -e_ij)
                     u_R = jnp.dot(v_j, -e_ij)
-                    U_avg= (u_L + u_R) / 2
-                    v_avg = (v_i +  v_j) / 2
-                    rho_avg = (rho_i + rho_j) / 2
+                    U_avg= (u_L + u_R) / 2.0
+                    v_avg = (v_i +  v_j) / 2.0
+                    rho_avg = (rho_i + rho_j) / 2.0
 
                     # Compute Riemann states eq. (7) and below eq. (9), Zhang (2017)
                     U_star = U_avg + 0.5 * (p_i - p_j) / (rho_avg * c0)
                     v_star = U_star * (-e_ij) + (v_avg - U_avg * (-e_ij))
 
                     # Mass conservation with linear Riemann solver eq. (8), Zhang (2017)
-                    eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), kernel_grad)
+                    eq_8 = 2.0 * rho_i * m_j / rho_j * jnp.dot((v_i - v_star), kernel_grad)
                     return eq_8
 
 
@@ -357,8 +390,6 @@ def SPHRIEMANNv2(
 
             # pressure
             p = vmap(eos.p_fn)(rho)
-
-            
                 
 
             # Compute velocity gradient
@@ -387,22 +418,22 @@ def SPHRIEMANNv2(
                 # Compute average states Riemann eq. (6), Zhang (2017)
                 u_L = jnp.dot(v_i, -e_ij)
                 u_R = jnp.dot(v_j, -e_ij)
-                P_avg = (p_i + p_j) / 2
-                rho_avg = (rho_i + rho_j) / 2
+                P_avg = (p_i + p_j) / 2.0
+                rho_avg = (rho_i + rho_j) / 2.0
 
                 # Compute inter-particle-averaged shear viscosity (harmonic mean) eq. (6), Adami (2013)
-                eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
+                eta_ij = 2.0 * eta_i * eta_j / (eta_i + eta_j + EPS)
                 
 
                 # Compute Riemann states eq. (7) and (10), Zhang (2017)
                 P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
                 # pressure term with linear Riemann solver eq. (9), Zhang (2017)
-                eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad 
+                eq_9 = -2.0 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad 
             
                 # viscosity term eq. (6), Zhang (2019)
                 v_ij = v_i - v_j
-                eq_6 = 2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS) * kernel_part_diff
+                eq_6 = 2.0 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS) * kernel_part_diff
                 
 
 
@@ -426,7 +457,7 @@ def SPHRIEMANNv2(
 
             state = {
                 "r": r,
-                "tag": tag,
+                "tag": tag_real,
                 "u": v,
                 "v": v,
                 "drhodt": drhodt,
@@ -437,8 +468,8 @@ def SPHRIEMANNv2(
                 "mass": mass,
                 "eta": eta,
             }
-        
 
         return state
+        
 
     return forward

@@ -36,7 +36,7 @@ def si_euler(tvf, model, shift_fn, bc_fn):
 
     return advance
 
-def si_euler_RIE2(model, shift_fn):
+def si_euler_RIE(model, shift_fn, bc_fn):
     """Semi-implicit Euler integrator"""
 
     def advance(dt, state, neighbors):
@@ -64,6 +64,9 @@ def si_euler_RIE2(model, shift_fn):
         # 4. Compute accelerations
         state = model(state, neighbors)
 
+        # 5. Impose boundary conditions on dummy particles (if applicable)
+        state = bc_fn(state)
+
         return state, neighbors
 
     return advance
@@ -71,7 +74,7 @@ def si_euler_RIE2(model, shift_fn):
 
 
 
-def kick_drift_kick_RIE2(model, shift_fn):
+def kick_drift_kick_RIE2(model, shift_fn, bc_fn):
 
     def advance(dt, state, neighbors):
      
@@ -92,13 +95,16 @@ def kick_drift_kick_RIE2(model, shift_fn):
         # 6 fully integrate v
         state["v"] = v_05 + 0.5 * dt * state["dvdt"]
 
+        # 7. Impose boundary conditions on dummy particles (if applicable)
+        state = bc_fn(state)
+
 
         return state, neighbors
 
     return advance
 
 
-
+'''
 def kick_drift_kick(model, shift_fn):
 
     def advance(dt, state, neighbors):
@@ -128,4 +134,4 @@ def kick_drift_kick(model, shift_fn):
         return state, neighbors
 
     return advance
-
+'''
