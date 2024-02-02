@@ -1,0 +1,9 @@
+extends: defaults.yaml
+
+data_dir: datasets/2D_TGV_2500_10kevery100
+wandb_project: sitl
+
+model: sitl
+num_mp_steps: 2
+latent_dim: 24
+lr_start: 5.e-4
