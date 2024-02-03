@@ -7,3 +7,13 @@ model: sitl
 num_mp_steps: 2
 latent_dim: 24
 lr_start: 5.e-4
+
+pushforward:
+  steps: [-1]
+  unrolls: [0]
+  probs: [1]
+
+# TODO Argument 'ShapedArray(uint8[])' of type <class 'str'> is not a valid JAX type
+f64: False
+
+neighbor_list_multiplier: 2.0

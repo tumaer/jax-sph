@@ -5,6 +5,7 @@ from typing import Tuple
 
 from lagrangebench.data import H5Dataset
 
+
 def setup_data(args: Namespace) -> Tuple[H5Dataset, H5Dataset, Namespace]:
     if not osp.isabs(args.config.data_dir):
         args.config.data_dir = osp.join(os.getcwd(), args.config.data_dir)

@@ -9,6 +9,7 @@ import haiku as hk
 import jax.numpy as jnp
 import jmp
 from jax_md import space
+from jax_md.partition import Sparse
 import numpy as np
 import wandb
 import yaml
@@ -21,6 +22,8 @@ from lagrangebench.utils import PushforwardConfig
 from experiments.config import NestedLoader, cli_arguments
 from experiments.utils import setup_data
 from experiments.sitl import SolverInTheLoop
+
+from jax_sph import partition
 
 
 def train_or_infer(args: Namespace):
@@ -54,10 +57,32 @@ def train_or_infer(args: Namespace):
     args.normalization_stats = case.normalization_stats
     args.config.has_external_force = data_train.external_force_fn is not None
 
-    if jnp.array(args.metadata["periodic_boundary_conditions"]).any():
+    pbc = jnp.array(args.metadata["periodic_boundary_conditions"])
+
+    if pbc.any():
         displacement_fn, shift_fn = space.periodic(side=jnp.array(args.box))
     else:
         displacement_fn, shift_fn = space.free()
+
+    # TODO pretty ugly
+
+    num_particles = args.metadata["num_particles_max"]
+    neighbor_fn = partition.neighbor_list(
+        displacement_fn,
+        jnp.array(args.box),
+        # TODO why are there 100x more neighbors?
+        r_cutoff=3.0 * args.metadata["dx"],
+        dr_threshold=3 * args.metadata["dx"] * 0.25,
+        capacity_multiplier=args.config.neighbor_list_multiplier,
+        mask_self=False,
+        format=Sparse,
+        num_particles_max=num_particles,
+        pbc=pbc,
+    )
+    neighbors = neighbor_fn.allocate(
+        jnp.zeros((num_particles, args.metadata["dim"]), jnp.float32),
+        num_particles=num_particles,
+    )
 
     # setup model from configs
     def model(x):
@@ -65,7 +90,8 @@ def train_or_infer(args: Namespace):
             latent_size=args.config.latent_dim,
             blocks_per_step=args.config.num_mlp_layers,
             num_mp_steps=args.config.num_mp_steps,
-            msteps=5,
+            dim=args.metadata["dim"],
+            num_sitl_steps=2,
             dt=args.metadata["dt"] * args.metadata["write_every"],
             # TODO ask artur
             p_bg_factor=0.0,
@@ -73,15 +99,11 @@ def train_or_infer(args: Namespace):
             base_viscosity=args.metadata["viscosity"],
             # TODO ask artur
             kernel_radius=args.metadata["dx"],
-            # kernel_radius=args.metadata["default_connectivity_radius"],
-            dim=args.metadata["dim"],
-            box=args.box,
-            pbc=args.metadata["periodic_boundary_conditions"],
-            num_particles_max=args.metadata["num_particles_max"],
-            neighbor_list_multiplier=args.config.neighbor_list_multiplier,
             shift_fn=shift_fn,
             displacement_fn=displacement_fn,
+            neighbors=neighbors,
         )(x)
+
     model = hk.without_apply_rng(hk.transform_with_state(model))
 
     # mixed precision training based on this reference:

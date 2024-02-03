@@ -1,16 +1,16 @@
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict
 from enum import Enum
-from dataclasses import dataclass
 
 import jax.numpy as jnp
 from jax import vmap, ops
+from jax import lax
 from jax_md import space
-from jax_md.partition import Sparse
 import haiku as hk
 
-from jax_sph import eos, kernels, integrator, partition
+from jax_sph import eos, kernels, integrator
 from jax_sph.solver.sph_tvf import SPHTVF
 from lagrangebench.models import GNS
+
 
 class SITLMode(Enum):
     SITL = "sitl"
@@ -24,7 +24,8 @@ class SolverInTheLoop(hk.Module):
         latent_size: int,
         blocks_per_step: int,
         num_mp_steps: int,
-        msteps: int,
+        dim: int,
+        num_sitl_steps: int,
         dt: float,
         base_viscosity: float,
         tvf: float,
@@ -33,16 +34,15 @@ class SolverInTheLoop(hk.Module):
         # ext_force_fn,
         shift_fn,
         displacement_fn,
-        dim: int,
-        box: List[float],
-        pbc: List[bool],
-        num_particles_max: int,
-        neighbor_list_multiplier: float,
+        neighbors,
         mode: str = SITLMode.SITL,
     ):
         super().__init__()
 
         self.model = GNS(dim, latent_size, blocks_per_step, num_mp_steps, 16, 9)
+
+        # TODO
+        dt = dt / num_sitl_steps
 
         ext_force_fn = lambda x: jnp.zeros(x.shape)
 
@@ -57,7 +57,7 @@ class SolverInTheLoop(hk.Module):
             p_ref=p_ref,
             rho_ref=rho_ref,
             p_background=p_bg_factor * p_ref,
-            gamma=gamma_eos
+            gamma=gamma_eos,
         )
         solver = SPHTVF(
             displacement_fn,
@@ -69,7 +69,7 @@ class SolverInTheLoop(hk.Module):
         )
         self.solver = integrator.si_euler(tvf, solver, shift_fn, lambda x: x)
 
-        self.msteps = msteps
+        self.num_sitl_steps = num_sitl_steps
         self.dt = dt
         self.base_viscosity = base_viscosity
         self.kernel_radius = kernel_radius
@@ -78,17 +78,8 @@ class SolverInTheLoop(hk.Module):
         self.shift_fn = shift_fn
         self.displacement_fn = displacement_fn
         self.kernel_fn = kernels.QuinticKernel(kernel_radius, dim=dim)
-        self.neighbor_fn = partition.neighbor_list(
-            displacement_fn,
-            jnp.array(box),
-            r_cutoff=3 * kernel_radius,
-            dr_threshold=3 * kernel_radius * 0.25,
-            capacity_multiplier=1.25,
-            mask_self=False,
-            format=Sparse,
-            num_particles_max=num_particles_max,
-            pbc=jnp.array(pbc),
-        )
+
+        self.neighbors = lax.stop_gradient(neighbors)
 
     def acceleration_fn(
         self,
@@ -108,11 +99,11 @@ class SolverInTheLoop(hk.Module):
         p_j,
         p_bg_i,
     ):
-        
+
         def stress(rho: float, u, v):
             """Transport stress tensor. See 'A' just under (Eq. 4)"""
             return jnp.outer(rho * u, v - u)
-        
+
         # (Eq. 6) - inter-particle-averaged shear viscosity (harmonic mean)
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + 1e-8)
         # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
@@ -133,18 +124,21 @@ class SolverInTheLoop(hk.Module):
 
         return a_eq_8, a_eq_13
 
-    def _transform(self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]) -> Dict[str, jnp.ndarray]:
+    def _transform(
+        self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
+    ) -> Dict[str, jnp.ndarray]:
         features, tag = sample
 
-        num_particles = (tag != -1).sum()
+        # TODO why
+        # num_particles = (tag != -1).sum()
+        num_particles = 2500
 
         v = features["vel_hist"]
-        
+
         r = features["abs_pos"][..., -1]
 
-        # TODO look how to set this to features["senders"] and features["receivers"]
-        neighbors = self.neighbor_fn.allocate(r, num_particles=num_particles)
-        i_s, j_s = neighbors.idx
+        self.neighbors = self.neighbors.update(r, num_particles=num_particles)
+        i_s, j_s = self.neighbors.idx
 
         eta = jnp.ones(num_particles) * self.base_viscosity
         mass = jnp.ones(num_particles)
@@ -159,7 +153,7 @@ class SolverInTheLoop(hk.Module):
         # # TODO: related to density evolution. Optimize implementation
         # # norm because we don't have the directions e_s
         # e_s = dr_i_j / (dist[:, None] + 1e-8)
-        # grad_w_dist_norm = vmap(self.kernel_fn.grad_w)(dist)        
+        # grad_w_dist_norm = vmap(self.kernel_fn.grad_w)(dist)
         # grad_w_dist = grad_w_dist_norm[:, None] * e_s
         # v_j_s = (mass / rho)[j_s]
         # temp = v_j_s * ((v[i_s] - v[j_s]) * grad_w_dist).sum(axis=1)
@@ -210,9 +204,9 @@ class SolverInTheLoop(hk.Module):
             "mass": mass,
             "eta": eta,
         }
-        
-        return state, neighbors
-    
+
+        return state
+
     def __call__(
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
@@ -220,20 +214,23 @@ class SolverInTheLoop(hk.Module):
         if self.mode == SITLMode.MP_ONLY:
             pos = self.model(sample)["acc"]
         else:
-            state, neighbors = self._transform(sample)
+            state = self._transform(sample)
             # num_particles = (state["tag"] != -1).sum()
 
-            for s in range(self.msteps):
+            for s in range(self.num_sitl_steps):
                 if self.mode in [SITLMode.SOLVER_ONLY, SITLMode.SITL]:
-                    state, neighbors = self.solver(self.dt, state, neighbors)
+                    state, self.neighbors = self.solver(self.dt, state, self.neighbors)
                     # TODO list overflow
 
                 if self.mode == SITLMode.SITL:
                     # correction
-                    sample_ = sample
-                    sample_["senders"] = neighbors.idx[0]
-                    sample_["receivers"] = neighbors.idx[1]
-                    sample_["vel_hist"] = state["v"]
-                    state["r"] = self.model(sample_)["acc"]
+                    features, tag = sample
+                    # features["senders"] = neighbors.idx[0]
+                    # features["receivers"] = neighbors.idx[1]
+                    # TODO recompute edge attributes
+                    features["vel_hist"] = state["v"]
+                    state["r"] = self.model((features, tag))["acc"]
+
+            pos = state["r"]
 
         return {"pos": pos}
