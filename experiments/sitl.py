@@ -1,21 +1,23 @@
-from typing import Tuple, Dict
 from enum import Enum
+from typing import Dict, Tuple
 
-import jax.numpy as jnp
-from jax import vmap, ops
-from jax import lax
-from jax_md import space
 import haiku as hk
-
-from jax_sph import eos, kernels, integrator
-from jax_sph.solver.sph_tvf import SPHTVF
+import jax.numpy as jnp
+from jax import lax, ops, vmap
+from jax_md import space
 from lagrangebench.models import GNS
+
+from jax_sph import eos, integrator, kernels
+from jax_sph.solver.sph_tvf import SPHTVF
 
 
 class SITLMode(Enum):
     SITL = "sitl"
     SOLVER_ONLY = "solver"
     MP_ONLY = "mp"
+
+    def __eq__(self, other):
+        return self.value == other
 
 
 class SolverInTheLoop(hk.Module):
@@ -99,7 +101,6 @@ class SolverInTheLoop(hk.Module):
         p_j,
         p_bg_i,
     ):
-
         def stress(rho: float, u, v):
             """Transport stress tensor. See 'A' just under (Eq. 4)"""
             return jnp.outer(rho * u, v - u)
@@ -210,7 +211,6 @@ class SolverInTheLoop(hk.Module):
     def __call__(
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
-
         if self.mode == SITLMode.MP_ONLY:
             pos = self.model(sample)["acc"]
         else:
