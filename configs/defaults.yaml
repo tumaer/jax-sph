@@ -81,7 +81,7 @@ f64: True
 # Neighbour list backend. jaxmd_vmap, jaxmd_scan, matscipy
 neighbor_list_backend: jaxmd_vmap
 # Neighbour list capacity multiplier
-neighbor_list_multiplier: 5.0
+neighbor_list_multiplier: 1.25
 # number of workers for data loading
 num_workers: 4
 

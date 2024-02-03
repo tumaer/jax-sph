@@ -5,12 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
+            "name": "sitl",
             "type": "debugpy",
             "request": "launch",
             "module": "experiments.run",
             "args": [
                 "-c=configs/sitl.yaml"
+            ],
+            "justMyCode": false,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "sph",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "args": [
+                "--case=Rlx", 
+                "--solver=SPH",
+                "--tvf=1.0", 
+                "--dim=2", 
+                "--dx=0.05",
+                "--nxnynz=50_50_20",
+                "--seed=123",
+                "--relax-pbc", 
+                "--r0-noise-factor=0.25",
             ],
             "justMyCode": false,
             "console": "integratedTerminal"
