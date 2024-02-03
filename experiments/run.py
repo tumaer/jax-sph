@@ -1,28 +1,26 @@
 import copy
 import os
-import pprint
 import os.path as osp
+import pprint
 from argparse import Namespace
 from datetime import datetime
 
 import haiku as hk
 import jax.numpy as jnp
 import jmp
-from jax_md import space
-from jax_md.partition import Sparse
 import numpy as np
 import wandb
 import yaml
-
+from jax_md import space
+from jax_md.partition import Sparse
 from lagrangebench import Trainer, infer
 from lagrangebench.case_setup import case_builder
 from lagrangebench.evaluate import averaged_metrics
 from lagrangebench.utils import PushforwardConfig
 
 from experiments.config import NestedLoader, cli_arguments
-from experiments.utils import setup_data
 from experiments.sitl import SolverInTheLoop
-
+from experiments.utils import setup_data
 from jax_sph import partition
 
 
