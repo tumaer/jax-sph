@@ -1,12 +1,14 @@
 extends: defaults.yaml
 
-data_dir: datasets/2D_TGV_2500_10kevery100
+data_dir: /local/disk1/datasets/dataset_rpf_coarsening/2D_RPF_3200_10kevery20
 wandb_project: sitl
 
 model: sitl
-num_mp_steps: 2
-latent_dim: 24
+num_mp_steps: 10
+latent_dim: 64
 lr_start: 5.e-4
+num_sitl_steps: 1
+
 
 pushforward:
   steps: [-1]
@@ -16,9 +18,14 @@ pushforward:
 # TODO Argument 'ShapedArray(uint8[])' of type <class 'str'> is not a valid JAX type
 f64: False
 
-neighbor_list_multiplier: 2.0
+neighbor_list_multiplier: 2.5
 
 loss_weight:
-  pos: 1.0
+  pos: 0.0
   vel: 0.0
-  acc: 0.0
+  acc: 1.0
+
+eval_n_trajs: 5
+
+# log_steps: 100
+# eval_steps: 1000
