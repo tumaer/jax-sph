@@ -6,6 +6,7 @@ from argparse import Namespace
 from datetime import datetime
 
 import haiku as hk
+import jax
 import jax.numpy as jnp
 import jmp
 import numpy as np
@@ -15,6 +16,7 @@ from jax_md import space
 from jax_md.partition import Sparse
 from lagrangebench import Trainer, infer
 from lagrangebench.case_setup import case_builder
+from lagrangebench.data.utils import get_dataset_stats
 from lagrangebench.evaluate import averaged_metrics
 from lagrangebench.utils import PushforwardConfig
 
@@ -48,7 +50,7 @@ def train_or_infer(args: Namespace):
         dtype=(jnp.float64 if args.config.f64 else jnp.float32),
     )
 
-    _, particle_type = data_train[0]
+    features, particle_type = data_train[0]
 
     args.info.homogeneous_particles = particle_type.max() == particle_type.min()
     args.metadata = data_train.metadata
@@ -68,9 +70,7 @@ def train_or_infer(args: Namespace):
     neighbor_fn = partition.neighbor_list(
         displacement_fn,
         jnp.array(args.box),
-        # TODO why are there 100x more neighbors?
         r_cutoff=3.0 * args.metadata["dx"],
-        dr_threshold=3 * args.metadata["dx"] * 0.25,
         capacity_multiplier=args.config.neighbor_list_multiplier,
         mask_self=False,
         format=Sparse,
@@ -78,9 +78,9 @@ def train_or_infer(args: Namespace):
         pbc=pbc,
     )
     neighbors = neighbor_fn.allocate(
-        jnp.zeros((num_particles, args.metadata["dim"]), jnp.float32),
-        num_particles=num_particles,
+        features[:, 0, :], num_particles=num_particles, extra_capacity=10
     )
+    neighbors_update_fn = jax.jit(neighbors.update)
 
     # setup model from configs
     def model(x):
@@ -89,17 +89,18 @@ def train_or_infer(args: Namespace):
             blocks_per_step=args.config.num_mlp_layers,
             num_mp_steps=args.config.num_mp_steps,
             dim=args.metadata["dim"],
-            num_sitl_steps=2,
+            num_sitl_steps=args.config.num_sitl_steps,
             dt=args.metadata["dt"] * args.metadata["write_every"],
-            # TODO ask artur
             p_bg_factor=0.0,
-            tvf=0.0,
             base_viscosity=args.metadata["viscosity"],
-            # TODO ask artur
-            kernel_radius=args.metadata["dx"],
+            dx=args.metadata["dx"],
             shift_fn=shift_fn,
+            ext_force_fn=data_train.external_force_fn,
             displacement_fn=displacement_fn,
-            neighbors=neighbors,
+            neighbors_update_fn=neighbors_update_fn,
+            normalization_stats=get_dataset_stats(
+                args.metadata, args.config.isotropic_norm, args.config.noise_std
+            ),
         )(x)
 
     model = hk.without_apply_rng(hk.transform_with_state(model))

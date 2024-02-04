@@ -1,23 +1,13 @@
-from enum import Enum
 from typing import Dict, Tuple
 
 import haiku as hk
 import jax.numpy as jnp
-from jax import lax, ops, vmap
+from jax import ops, vmap
 from jax_md import space
 from lagrangebench.models import GNS
 
-from jax_sph import eos, integrator, kernels
+from jax_sph import eos, kernels
 from jax_sph.solver.sph_tvf import SPHTVF
-
-
-class SITLMode(Enum):
-    SITL = "sitl"
-    SOLVER_ONLY = "solver"
-    MP_ONLY = "mp"
-
-    def __eq__(self, other):
-        return self.value == other
 
 
 class SolverInTheLoop(hk.Module):
@@ -30,14 +20,13 @@ class SolverInTheLoop(hk.Module):
         num_sitl_steps: int,
         dt: float,
         base_viscosity: float,
-        tvf: float,
         p_bg_factor: float,
-        kernel_radius: float,
-        # ext_force_fn,
+        dx: float,
+        ext_force_fn,
         shift_fn,
         displacement_fn,
-        neighbors,
-        mode: str = SITLMode.SITL,
+        neighbors_update_fn,
+        normalization_stats,
     ):
         super().__init__()
 
@@ -45,8 +34,15 @@ class SolverInTheLoop(hk.Module):
 
         # TODO
         dt = dt / num_sitl_steps
+        self.num_sitl_steps = num_sitl_steps
+        self.dt = dt
+        self.dx = dx
+        self.dim = dim
+        self.base_viscosity = base_viscosity
+        self.normalization_stats = normalization_stats
 
-        ext_force_fn = lambda x: jnp.zeros(x.shape)
+        if ext_force_fn is None:
+            ext_force_fn = lambda r: jnp.zeros_like(r)
 
         rho_ref = 1.0
 
@@ -61,27 +57,20 @@ class SolverInTheLoop(hk.Module):
             p_background=p_bg_factor * p_ref,
             gamma=gamma_eos,
         )
-        solver = SPHTVF(
+        self.solver = SPHTVF(
             displacement_fn,
             self.eos,
             ext_force_fn,
-            kernel_radius,
+            dx,
             dim,
             dt,
         )
-        self.solver = integrator.si_euler(tvf, solver, shift_fn, lambda x: x)
 
-        self.num_sitl_steps = num_sitl_steps
-        self.dt = dt
-        self.base_viscosity = base_viscosity
-        self.kernel_radius = kernel_radius
-
-        self.mode = mode
         self.shift_fn = shift_fn
-        self.displacement_fn = displacement_fn
-        self.kernel_fn = kernels.QuinticKernel(kernel_radius, dim=dim)
+        self.displacement_fn_vmap = vmap(displacement_fn)
+        self.kernel_fn = kernels.QuinticKernel(dx, dim=dim)
 
-        self.neighbors = lax.stop_gradient(neighbors)
+        self.neighbors_update_fn = neighbors_update_fn
 
     def acceleration_fn(
         self,
@@ -91,20 +80,13 @@ class SolverInTheLoop(hk.Module):
         rho_j,
         u_i,
         u_j,
-        v_i,
-        v_j,
         m_i,
         m_j,
         eta_i,
         eta_j,
         p_i,
         p_j,
-        p_bg_i,
     ):
-        def stress(rho: float, u, v):
-            """Transport stress tensor. See 'A' just under (Eq. 4)"""
-            return jnp.outer(rho * u, v - u)
-
         # (Eq. 6) - inter-particle-averaged shear viscosity (harmonic mean)
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + 1e-8)
         # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
@@ -115,15 +97,29 @@ class SolverInTheLoop(hk.Module):
         _kernel_grad = self.kernel_fn.grad_w(d_ij)
         _c = _weighted_volume * _kernel_grad / (d_ij + 1e-8)
 
-        # (Eq. 8): \boldsymbol{e}_{ij} is computed as r_ij/d_ij here.
-        _A = (stress(rho_i, u_i, v_i) + stress(rho_j, u_j, v_j)) / 2
         _u_ij = u_i - u_j
-        a_eq_8 = _c * (-p_ij * r_ij + jnp.dot(_A, r_ij) + eta_ij * _u_ij)
+        a_eq_8 = _c * (-p_ij * r_ij + eta_ij * _u_ij)
 
-        # (Eq. 13) - or at least the acceleration term
-        a_eq_13 = _c * 1.0 * p_bg_i * r_ij
+        return a_eq_8
 
-        return a_eq_8, a_eq_13
+    def si_euler(self, state, acc_correction=0.0):
+        # 1. Twice 1/2dt integration of u and v
+        state["u"] += 1.0 * self.dt * (state["dudt"] + acc_correction)
+
+        # 2. Integrate position with velocity v
+        state["r"] = self.shift_fn(state["r"], 1.0 * self.dt * state["u"])
+
+        # 3. Update neighbors list
+        num_particles = (state["tag"] != -1).sum()
+        neighbors = self.neighbors_update_fn(state["r"], num_particles=num_particles)
+
+        # 4. Compute accelerations
+        state = self.solver(state, neighbors)
+
+        # 5. Impose boundary conditions on dummy particles (if applicable)
+        # state = bc_fn(state)
+
+        return state
 
     def _transform(
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
@@ -132,73 +128,52 @@ class SolverInTheLoop(hk.Module):
 
         # TODO why
         # num_particles = (tag != -1).sum()
-        num_particles = 2500
+        num_particles = 3200
 
-        v = features["vel_hist"]
+        u_stats = self.normalization_stats["velocity"]
+        u = features["vel_hist"] * u_stats["std"] + u_stats["mean"]
+        u = u / self.dt
 
-        r = features["abs_pos"][..., -1]
+        r = features["abs_pos"][:, -1, :]
 
-        self.neighbors = self.neighbors.update(r, num_particles=num_particles)
-        i_s, j_s = self.neighbors.idx
+        neighbors = self.neighbors_update_fn(r, num_particles=num_particles)
+        i_s, j_s = neighbors.idx
 
         eta = jnp.ones(num_particles) * self.base_viscosity
-        mass = jnp.ones(num_particles)
+        mass = jnp.ones(num_particles) * self.dx**self.dim
 
         r_i_s, r_j_s = r[i_s], r[j_s]
-        dr_i_j = vmap(self.displacement_fn)(r_i_s, r_j_s)
+        dr_i_j = self.displacement_fn_vmap(r_i_s, r_j_s)
         dist = space.distance(dr_i_j)
         w_dist = vmap(self.kernel_fn.w)(dist)
 
         rho = mass * ops.segment_sum(w_dist, i_s, num_particles)
 
-        # # TODO: related to density evolution. Optimize implementation
-        # # norm because we don't have the directions e_s
-        # e_s = dr_i_j / (dist[:, None] + 1e-8)
-        # grad_w_dist_norm = vmap(self.kernel_fn.grad_w)(dist)
-        # grad_w_dist = grad_w_dist_norm[:, None] * e_s
-        # v_j_s = (mass / rho)[j_s]
-        # temp = v_j_s * ((v[i_s] - v[j_s]) * grad_w_dist).sum(axis=1)
-        # drhodt = rho * ops.segment_sum(temp, i_s, num_particles)
-        # rho = rho + self.dt * drhodt
-
-        # if False:
-        #     # # correction term, see "A generalized transport-velocity
-        #     # # formulation for SPH" by Zhang et al. 2017
-        #     # TODO: check renormalization with different kernel cutoff
-        #     nominator = ops.segment_sum(mass[j_s] * w_dist, i_s, N)
-        #     rho_denominator = ops.segment_sum((mass / rho)[j_s] * w_dist, i_s, N)
-        #     rho_denominator = jnp.where(rho_denominator > 1, 1, rho_denominator)
-        #     rho = nominator / rho_denominator
-
         p = self.eos.p_fn(rho)
 
-        out = vmap(self.acceleration_fn)(
+        dudt = vmap(self.acceleration_fn)(
             dr_i_j,
             dist,
             rho[i_s],
             rho[j_s],
-            v[i_s],
-            v[j_s],
-            v[i_s],
-            v[j_s],
+            u[i_s],
+            u[j_s],
             mass[i_s],
             mass[j_s],
             eta[i_s],
             eta[j_s],
             p[i_s],
             p[j_s],
-            jnp.zeros_like(p[i_s]),
         )
-        dudt = ops.segment_sum(out[0], i_s, num_particles)
-        dvdt = ops.segment_sum(out[1], i_s, num_particles)
+        dudt = ops.segment_sum(dudt, i_s, num_particles)
 
         state = {
             "r": r,
             "tag": tag,
-            "u": v,
-            "v": v,
+            "u": u,
+            "v": u,
             "dudt": dudt,
-            "dvdt": dvdt,
+            "dvdt": dudt,
             "drhodt": None,
             "rho": rho,
             "p": p,
@@ -211,26 +186,29 @@ class SolverInTheLoop(hk.Module):
     def __call__(
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
-        if self.mode == SITLMode.MP_ONLY:
-            pos = self.model(sample)["acc"]
-        else:
-            state = self._transform(sample)
-            # num_particles = (state["tag"] != -1).sum()
+        state = self._transform(sample)
+        r0 = state["r"].copy()
+        u0 = state["u"].copy() * self.dt
 
-            for s in range(self.num_sitl_steps):
-                if self.mode in [SITLMode.SOLVER_ONLY, SITLMode.SITL]:
-                    state, self.neighbors = self.solver(self.dt, state, self.neighbors)
-                    # TODO list overflow
+        for _ in range(self.num_sitl_steps):
+            # correction
+            features, tag = sample
+            # TODO recompute edge attributes
+            # features["senders"] = neighbors.idx[0]
+            # features["receivers"] = neighbors.idx[1]
+            u_stats = self.normalization_stats["velocity"]
+            features["vel_hist"] = (state["u"] - u_stats["mean"]) / u_stats["std"]
+            # NOTE no normalization. forcing the model to output physical acceleration
+            acc_correction = self.model((features, tag))["acc"] / self.num_sitl_steps
 
-                if self.mode == SITLMode.SITL:
-                    # correction
-                    features, tag = sample
-                    # features["senders"] = neighbors.idx[0]
-                    # features["receivers"] = neighbors.idx[1]
-                    # TODO recompute edge attributes
-                    features["vel_hist"] = state["v"]
-                    state["r"] = self.model((features, tag))["acc"]
+            # solver step
+            state = self.si_euler(state, acc_correction)
 
-            pos = state["r"]
+        # get effective acceleration
+        u_new = self.displacement_fn_vmap(state["r"], r0)
+        a_new = u_new - u0
 
-        return {"pos": pos}
+        acc_stats = self.normalization_stats["acceleration"]
+        a_new = (a_new - acc_stats["mean"]) / acc_stats["std"]
+
+        return {"acc": a_new}
