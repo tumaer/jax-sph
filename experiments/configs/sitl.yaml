@@ -5,11 +5,21 @@ model: sitl
 input_seq_length: 2
 # Number of message passing steps
 num_mp_steps: 10
-num_sitl_steps: 1
+num_sitl_steps: 2
 # Number of MLP layers
 num_mlp_layers: 2
 # Hidden dimension
 latent_dim: 64
+
+pushforward:
+  # At which training step to introduce next unroll stage
+  steps: [-1, 20000, 50000]
+  # For how many steps to unroll
+  unrolls: [0, 2, 10]
+  # Which probability ratio to keep between the unrolls
+  probs: [7, 2, 1]
+
+
 # Load checkpointed model from this directory
 model_dir:
 # SEGNN only parameters
@@ -45,13 +55,15 @@ isotropic_norm: False
 # Loss settings
 # Loss weight for position, acceleration, and velocity components
 loss_weight:
-  acc: 1.0
+  vel: 1.0
+  acc: 0.0
+  pos: 0.0
 
 # Run settings
 # train, infer, all
 mode: all
 # Dataset directory
-data_dir: /home/atoshev/data/2D_RPF_3200_10kevery10
+data_dir: /home/atoshev/data/2D_RPF_3200_10kevery20
 # Number of rollout steps. If "-1", then defaults to sequence_length - input_seq_len.
 # n_rollout_steps must be <= ground truth len. For extrapolation use n_extrap_steps
 n_rollout_steps: 20
