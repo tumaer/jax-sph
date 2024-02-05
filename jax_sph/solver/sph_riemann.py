@@ -151,7 +151,7 @@ def SPHRIEMANNv2(
                     p_L = p_i
                     rho_L = rho_i
 
-                    u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
+                    u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.dot(v_j, -e_ij), jnp.dot(v_j, -e_ij))   # 2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
                     p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
                     rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
 
@@ -229,7 +229,7 @@ def SPHRIEMANNv2(
                 p_L = p_i
                 rho_L = rho_i
 
-                u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
+                u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.dot(v_j, -e_ij), jnp.dot(v_j, -e_ij))  #2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
                 p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
                 rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
 

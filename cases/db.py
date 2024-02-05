@@ -59,7 +59,7 @@ class DB(SimulationSetup):
         dx6 = 6 * self.args.dx
         L_wall, H_wall = self.L_wall, self.H_wall
 
-        is_cartesian = False
+        is_cartesian = True
 
         if is_cartesian:
             r_fluid = dx3 + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
