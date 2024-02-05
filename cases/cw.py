@@ -15,9 +15,10 @@ class CW(SimulationSetup):
 
         self.L_wall = 1.0
         self.H_wall = 1.0
-        self.L = 0.2
-        self.H = 0.2
-        self.cube_offset = np.array([0.4, 0.5])
+        self.L = 0.4
+        self.H = 0.4
+        self.cube_offset = np.array([0.3, 0.4])
+        self.u_init = 0.5
 
         self.u_ref = 1  # TODO: 2 ** 0.5
         self.args.g_ext_magnitude = 1.0
@@ -69,7 +70,8 @@ class CW(SimulationSetup):
         return self._tag2D(r)
 
     def _init_velocity2D(self, r):
-        return jnp.zeros_like(r)
+        res = jnp.array([0.0, -self.u_init])
+        return res
 
     def _init_velocity3D(self, r):
         return jnp.zeros_like(r)
