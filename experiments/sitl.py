@@ -187,28 +187,12 @@ class SolverInTheLoop(hk.Module):
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
         state = self._transform(sample)
-        r0 = state["r"].copy()
-        u0 = state["u"].copy() * self.dt
-
-        for _ in range(self.num_sitl_steps):
-            # correction
-            features, tag = sample
-            # TODO recompute edge attributes
-            # features["senders"] = neighbors.idx[0]
-            # features["receivers"] = neighbors.idx[1]
-            u_stats = self.normalization_stats["velocity"]
-            features["vel_hist"] = (state["u"] - u_stats["mean"]) / u_stats["std"]
-            # NOTE no normalization. forcing the model to output physical acceleration
-            acc_correction = self.model((features, tag))["acc"] / self.num_sitl_steps
-
-            # solver step
-            state = self.si_euler(state, acc_correction)
-
-        # get effective acceleration
-        u_new = self.displacement_fn_vmap(state["r"], r0)
-        a_new = u_new - u0
-
         acc_stats = self.normalization_stats["acceleration"]
-        a_new = (a_new - acc_stats["mean"]) / acc_stats["std"]
 
-        return {"acc": a_new}
+        # solver step
+        acc_sph = self.si_euler(state)["dudt"]
+        acc_sph = acc_sph * (self.dt * self.num_sitl_steps) ** 2 / acc_stats["std"]
+        # correction
+        acc_gns = self.model(sample)["acc"]
+
+        return {"acc": acc_sph + acc_gns}
