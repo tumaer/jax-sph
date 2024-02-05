@@ -1,8 +1,8 @@
+import argparse
 import copy
 import os
 import os.path as osp
 import pprint
-from argparse import Namespace
 from datetime import datetime
 
 import haiku as hk
@@ -18,15 +18,14 @@ from lagrangebench import Trainer, infer
 from lagrangebench.case_setup import case_builder
 from lagrangebench.data.utils import get_dataset_stats
 from lagrangebench.evaluate import averaged_metrics
-from lagrangebench.utils import PushforwardConfig
+from lagrangebench.models.gns import GNS
 
-from experiments.config import NestedLoader, cli_arguments
 from experiments.sitl import SolverInTheLoop
 from experiments.utils import setup_data
 from jax_sph import partition
 
 
-def train_or_infer(args: Namespace):
+def train_or_infer(args: argparse.Namespace):
     data_train, data_valid, data_test, args = setup_data(args)
 
     # neighbors search
@@ -64,8 +63,6 @@ def train_or_infer(args: Namespace):
     else:
         displacement_fn, shift_fn = space.free()
 
-    # TODO pretty ugly
-
     num_particles = args.metadata["num_particles_max"]
     neighbor_fn = partition.neighbor_list(
         displacement_fn,
@@ -83,25 +80,37 @@ def train_or_infer(args: Namespace):
     neighbors_update_fn = jax.jit(neighbors.update)
 
     # setup model from configs
-    def model(x):
-        return SolverInTheLoop(
-            latent_size=args.config.latent_dim,
-            blocks_per_step=args.config.num_mlp_layers,
-            num_mp_steps=args.config.num_mp_steps,
-            dim=args.metadata["dim"],
-            num_sitl_steps=args.config.num_sitl_steps,
-            dt=args.metadata["dt"] * args.metadata["write_every"],
-            p_bg_factor=0.0,
-            base_viscosity=args.metadata["viscosity"],
-            dx=args.metadata["dx"],
-            shift_fn=shift_fn,
-            ext_force_fn=data_train.external_force_fn,
-            displacement_fn=displacement_fn,
-            neighbors_update_fn=neighbors_update_fn,
-            normalization_stats=get_dataset_stats(
-                args.metadata, args.config.isotropic_norm, args.config.noise_std
-            ),
-        )(x)
+    if args.config.model == "sitl":
+
+        def model(x):
+            return SolverInTheLoop(
+                latent_size=args.config.latent_dim,
+                blocks_per_step=args.config.num_mlp_layers,
+                num_mp_steps=args.config.num_mp_steps,
+                dim=args.metadata["dim"],
+                num_sitl_steps=args.config.num_sitl_steps,
+                dt=args.metadata["dt"] * args.metadata["write_every"],
+                p_bg_factor=0.0,
+                base_viscosity=args.metadata["viscosity"],
+                dx=args.metadata["dx"],
+                shift_fn=shift_fn,
+                ext_force_fn=data_train.external_force_fn,
+                displacement_fn=displacement_fn,
+                neighbors_update_fn=neighbors_update_fn,
+                normalization_stats=get_dataset_stats(
+                    args.metadata, args.config.isotropic_norm, args.config.noise_std
+                ),
+            )(x)
+    elif args.config.model == "gns":
+
+        def model(x):
+            return GNS(
+                args.metadata["dim"],
+                latent_size=args.config.latent_dim,
+                blocks_per_step=args.config.num_mlp_layers,
+                num_mp_steps=args.config.num_mp_steps,
+                particle_type_embedding_size=16,
+            )(x)
 
     model = hk.without_apply_rng(hk.transform_with_state(model))
 
@@ -130,7 +139,7 @@ def train_or_infer(args: Namespace):
             yaml.dump(vars(args.config), f)
 
         if args.config.wandb:
-            # wandb doesn't like Namespace objects
+            # wandb doesn't like argparse.Namespace objects
             args_dict = copy.copy(args)
             args_dict.config = vars(args.config)
             args_dict.info = vars(args.info)
@@ -145,18 +154,11 @@ def train_or_infer(args: Namespace):
         else:
             wandb_run = None
 
-        pf_config = PushforwardConfig(
-            steps=args.config.pushforward["steps"],
-            unrolls=args.config.pushforward["unrolls"],
-            probs=args.config.pushforward["probs"],
-        )
-
         trainer = Trainer(
             model,
             case,
             data_train,
             data_valid,
-            pushforward=pf_config,
             metrics=args.config.metrics,
             seed=args.config.seed,
             batch_size=args.config.batch_size,
@@ -222,26 +224,25 @@ def train_or_infer(args: Namespace):
 
 
 if __name__ == "__main__":
-    cli_args = cli_arguments()
-    if "config" in cli_args:  # to (re)start training
-        config_path = cli_args["config"]
-    elif "model_dir" in cli_args:  # to run inference
-        config_path = os.path.join(cli_args["model_dir"], "config.yaml")
+    parser = argparse.ArgumentParser(description="LagrangeBench")
+    parser.add_argument("-c", "--config", type=str, help="Path to the config file")
+    parser.add_argument("--model_dir", type=str, help="Path to the model directory")
+    cli_args = parser.parse_args()
+
+    if cli_args.config is not None:  # to (re)start training
+        config_path = cli_args.config
+    elif cli_args.model_dir is not None:  # to run inference
+        config_path = os.path.join(cli_args.model_dir, "config.yaml")
 
     with open(config_path, "r") as f:
-        args = yaml.load(f, NestedLoader)
+        args = yaml.load(f, Loader=yaml.FullLoader)
 
-    # priority to command line arguments
-    args.update(cli_args)
-    args = Namespace(config=Namespace(**args), info=Namespace())
+    args = argparse.Namespace(
+        config=argparse.Namespace(**args), info=argparse.Namespace()
+    )
     print("#" * 79, "\nStarting a LagrangeBench run with the following configs:")
     pprint.pprint(vars(args.config))
     print("#" * 79)
-
-    # specify cuda device
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152 from TensorFlow
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.config.gpu)
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(args.config.xla_mem_fraction)
 
     if args.config.f64:
         from jax import config

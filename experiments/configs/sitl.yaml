@@ -1,16 +1,15 @@
-# Fallback parameters for the config file. These are overwritten by the config file.
-extends:
+
 # Model settings
-# Model architecture name. gns, segnn, egnn
-model:
+model: sitl
 # Length of the position input sequence
 input_seq_length: 2
 # Number of message passing steps
 num_mp_steps: 10
+num_sitl_steps: 1
 # Number of MLP layers
 num_mlp_layers: 2
 # Hidden dimension
-latent_dim: 128
+latent_dim: 64
 # Load checkpointed model from this directory
 model_dir:
 # SEGNN only parameters
@@ -29,7 +28,7 @@ step_max: 500000
 # Batch size
 batch_size: 1
 # Starting learning rate
-lr_start: 1.e-4
+lr_start: 5.e-4
 # Final learning rate after decay
 lr_final: 1.e-6
 # Rate of learning rate decay
@@ -42,14 +41,6 @@ noise_std: 0.0003
 magnitude_features: False
 # Whether to normalize inputs and outputs with the same value in x, y, ans z.
 isotropic_norm: False
-# Parameters related to the push-forward trick
-pushforward:
-  # At which training step to introduce next unroll stage
-  steps: [-1, 200000, 300000, 400000]
-  # For how many steps to unroll
-  unrolls: [0, 1, 2, 3]
-  # Which probability ratio to keep between the unrolls
-  probs: [18, 2, 1, 1]
 
 # Loss settings
 # Loss weight for position, acceleration, and velocity components
@@ -60,35 +51,33 @@ loss_weight:
 # train, infer, all
 mode: all
 # Dataset directory
-data_dir:
+data_dir: /home/atoshev/data/2D_RPF_3200_10kevery10
 # Number of rollout steps. If "-1", then defaults to sequence_length - input_seq_len.
 # n_rollout_steps must be <= ground truth len. For extrapolation use n_extrap_steps
 n_rollout_steps: 20
 # Number of evaluation trajectories. "-1" for all available
-eval_n_trajs: 50
+eval_n_trajs: 5 # TODO
 # Number of extrapolation steps
 n_extrap_steps: 0
 # Whether to use test or validation split
 test: False
 # Seed
 seed: 0
-# Cuda device. "-1" for cpu
-gpu: 0
-# GPU memory allocation https://jax.readthedocs.io/en/latest/gpu_memory_allocation.html
-xla_mem_fraction: 0.75
 # Double precision everywhere other than the ML model
-f64: True
+# TODO Argument 'ShapedArray(uint8[])' of type <class 'str'> is not a valid JAX type
+f64: False
+f64: False
 # Neighbour list backend. jaxmd_vmap, jaxmd_scan, matscipy
 neighbor_list_backend: jaxmd_vmap
 # Neighbour list capacity multiplier
-neighbor_list_multiplier: 1.25
+neighbor_list_multiplier: 2.5
 # number of workers for data loading
 num_workers: 4
 
 # Logging settings
 # Use wandb for logging
 wandb: False
-wandb_project: False
+wandb_project: sitl
 # Change this with your own entity
 wandb_entity: lagrangebench
 # Number of steps between training logging
