@@ -127,8 +127,7 @@ class SolverInTheLoop(hk.Module):
         features, tag = sample
 
         # TODO why
-        # num_particles = (tag != -1).sum()
-        num_particles = 3200
+        num_particles = features["abs_pos"].shape[0]
 
         u_stats = self.normalization_stats["velocity"]
         u = features["vel_hist"] * u_stats["std"] + u_stats["mean"]
@@ -187,12 +186,26 @@ class SolverInTheLoop(hk.Module):
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
         state = self._transform(sample)
-        acc_stats = self.normalization_stats["acceleration"]
+        # acc_stats = self.normalization_stats["acceleration"]
+        vel_stats = self.normalization_stats["velocity"]
 
-        # solver step
-        acc_sph = self.si_euler(state)["dudt"]
-        acc_sph = acc_sph * (self.dt * self.num_sitl_steps) ** 2 / acc_stats["std"]
-        # correction
-        acc_gns = self.model(sample)["acc"]
+        for _ in range(self.num_sitl_steps):
+            # solver step
+            state = self.si_euler(state)
 
-        return {"acc": acc_sph + acc_gns}
+            # correction
+            features, tag = sample
+            features["vel_hist"] = (state["u"] - vel_stats["mean"]) / vel_stats["std"]
+            features["rel_disp"] = self.displacement_fn_vmap(
+                state["r"][features["senders"]], state["r"][features["receivers"]]
+            )
+            features["rel_dist"] = space.distance(features["rel_disp"])[:, None]
+            vel_gns = self.model((features, tag))["acc"]
+            # state["dudt"] += acc_gns * acc_stats["std"] + acc_stats["mean"]
+            state["u"] += vel_gns * vel_stats["std"] + vel_stats["mean"]
+            state["r"] = self.shift_fn(state["r"], state["u"] * self.dt)
+
+        # acc = state["dudt"] * acc_stats["std"] + acc_stats["mean"]
+        vel = state["u"] * vel_stats["std"] + vel_stats["mean"]
+
+        return {"vel": vel}

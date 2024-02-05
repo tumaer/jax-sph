@@ -19,6 +19,7 @@ from lagrangebench.case_setup import case_builder
 from lagrangebench.data.utils import get_dataset_stats
 from lagrangebench.evaluate import averaged_metrics
 from lagrangebench.models.gns import GNS
+from lagrangebench.utils import PushforwardConfig
 
 from experiments.sitl import SolverInTheLoop
 from experiments.utils import setup_data
@@ -154,6 +155,12 @@ def train_or_infer(args: argparse.Namespace):
         else:
             wandb_run = None
 
+        pf_config = PushforwardConfig(
+            steps=args.config.pushforward["steps"],
+            unrolls=args.config.pushforward["unrolls"],
+            probs=args.config.pushforward["probs"],
+        )
+
         trainer = Trainer(
             model,
             case,
@@ -178,6 +185,7 @@ def train_or_infer(args: argparse.Namespace):
             metrics_stride=args.config.metrics_stride,
             num_workers=args.config.num_workers,
             batch_size_infer=args.config.batch_size_infer,
+            pushforward=pf_config,
         )
         _, _, _ = trainer(
             step_max=args.config.step_max,
