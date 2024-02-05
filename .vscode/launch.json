@@ -1,0 +1,47 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "CUDA_VISIBLE_DEVICES": ""
+            },
+        },
+        {
+            "name": "inverse",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--case=CW",
+                "--solver=SPH",
+                "--dim=2",
+                "--dx=0.05",
+                "--t-end=2",
+                "--dt=0.004",
+                "--viscosity=0.01",
+                "--r0-noise-factor=0.2",
+                "--write-every=10",
+                "--write-vtk",
+                "--write-h5",
+                "--seed=123",
+                "--data-path=data_cw",
+                "--density-evolution",
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": ""
+            }
+        },
+
+    ]
+}
