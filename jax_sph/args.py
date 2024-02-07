@@ -25,6 +25,13 @@ class Args:
             help="vanilla correspond to density transport",
         )
         self.parser.add_argument(
+            "--kernel",
+            type=str,
+            default="QSK",
+            choices=["QSK", "WC2K", "M4K"],
+            help="choose kernel function",
+        )
+        self.parser.add_argument(
             "--tvf",
             type=float,
             default=0.0,
