@@ -1,6 +1,5 @@
 """Core simulation loop"""
 
-
 import time
 
 import numpy as np

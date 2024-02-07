@@ -13,7 +13,7 @@
                 "-c=experiments/configs/sitl.yaml"
             ],
             "env": {
-                "CUDA_VISIBLE_DEVICES": "4"
+                "CUDA_VISIBLE_DEVICES": "0"
             },
             "justMyCode": false,
             "console": "integratedTerminal"

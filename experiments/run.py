@@ -65,7 +65,7 @@ def train_or_infer(args: argparse.Namespace):
         displacement_fn, shift_fn = space.free()
 
     num_particles = args.metadata["num_particles_max"]
-    neighbor_fn = partition.neighbor_list(
+    sph_neighbor_fn = partition.neighbor_list(
         displacement_fn,
         jnp.array(args.box),
         r_cutoff=3.0 * args.metadata["dx"],
@@ -75,10 +75,24 @@ def train_or_infer(args: argparse.Namespace):
         num_particles_max=num_particles,
         pbc=pbc,
     )
-    neighbors = neighbor_fn.allocate(
+    gnn_neighbor_fn = partition.neighbor_list(
+        displacement_fn,
+        jnp.array(args.box),
+        r_cutoff=args.metadata["default_connectivity_radius"],
+        capacity_multiplier=args.config.neighbor_list_multiplier,
+        mask_self=False,
+        format=Sparse,
+        num_particles_max=num_particles,
+        pbc=pbc,
+    )
+    sph_neighbors = sph_neighbor_fn.allocate(
         features[:, 0, :], num_particles=num_particles, extra_capacity=10
     )
-    neighbors_update_fn = jax.jit(neighbors.update)
+    sph_neighbors_update_fn = jax.jit(sph_neighbors.update)
+    gnn_neighbors = gnn_neighbor_fn.allocate(
+        features[:, 0, :], num_particles=num_particles, extra_capacity=10
+    )
+    gnn_neighbors_update_fn = jax.jit(gnn_neighbors.update)
 
     # setup model from configs
     if args.config.model == "sitl":
@@ -94,14 +108,17 @@ def train_or_infer(args: argparse.Namespace):
                 p_bg_factor=0.0,
                 base_viscosity=args.metadata["viscosity"],
                 dx=args.metadata["dx"],
+                gnn_radius=args.metadata["default_connectivity_radius"],
                 shift_fn=shift_fn,
                 ext_force_fn=data_train.external_force_fn,
                 displacement_fn=displacement_fn,
-                neighbors_update_fn=neighbors_update_fn,
+                sph_nbrs_upd_fn=sph_neighbors_update_fn,
+                gnn_nbrs_upd_fn=gnn_neighbors_update_fn,
                 normalization_stats=get_dataset_stats(
                     args.metadata, args.config.isotropic_norm, args.config.noise_std
                 ),
             )(x)
+
     elif args.config.model == "gns":
 
         def model(x):
