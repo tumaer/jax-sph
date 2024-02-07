@@ -13,11 +13,11 @@ latent_dim: 64
 
 pushforward:
   # At which training step to introduce next unroll stage
-  steps: [-1, 20000, 50000]
+  steps: [-1, 200000, 300000, 400000]
   # For how many steps to unroll
-  unrolls: [0, 2, 10]
+  unrolls: [0, 1, 2, 3]
   # Which probability ratio to keep between the unrolls
-  probs: [7, 2, 1]
+  probs: [18, 2, 1, 1]
 
 
 # Load checkpointed model from this directory
@@ -38,7 +38,7 @@ step_max: 500000
 # Batch size
 batch_size: 1
 # Starting learning rate
-lr_start: 5.e-4
+lr_start: 1.e-3
 # Final learning rate after decay
 lr_final: 1.e-6
 # Rate of learning rate decay
@@ -55,15 +55,15 @@ isotropic_norm: False
 # Loss settings
 # Loss weight for position, acceleration, and velocity components
 loss_weight:
-  vel: 1.0
-  acc: 0.0
+  vel: 0.0
+  acc: 1.0
   pos: 0.0
 
 # Run settings
 # train, infer, all
 mode: all
 # Dataset directory
-data_dir: /home/atoshev/data/2D_RPF_3200_10kevery20
+data_dir:
 # Number of rollout steps. If "-1", then defaults to sequence_length - input_seq_len.
 # n_rollout_steps must be <= ground truth len. For extrapolation use n_extrap_steps
 n_rollout_steps: 20
@@ -82,7 +82,7 @@ f64: False
 # Neighbour list backend. jaxmd_vmap, jaxmd_scan, matscipy
 neighbor_list_backend: jaxmd_vmap
 # Neighbour list capacity multiplier
-neighbor_list_multiplier: 2.5
+neighbor_list_multiplier: 2.0
 # number of workers for data loading
 num_workers: 4
 

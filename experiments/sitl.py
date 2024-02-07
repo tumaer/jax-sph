@@ -19,13 +19,15 @@ class SolverInTheLoop(hk.Module):
         dim: int,
         num_sitl_steps: int,
         dt: float,
+        gnn_radius: float,
         base_viscosity: float,
         p_bg_factor: float,
         dx: float,
         ext_force_fn,
         shift_fn,
         displacement_fn,
-        neighbors_update_fn,
+        sph_nbrs_upd_fn,
+        gnn_nbrs_upd_fn,
         normalization_stats,
     ):
         super().__init__()
@@ -33,10 +35,11 @@ class SolverInTheLoop(hk.Module):
         self.model = GNS(dim, latent_size, blocks_per_step, num_mp_steps, 16, 9)
 
         # TODO
-        dt = dt / num_sitl_steps
         self.num_sitl_steps = num_sitl_steps
-        self.dt = dt
+        self.effective_dt = dt
+        self.stil_dt = dt / num_sitl_steps
         self.dx = dx
+        self.gnn_radius = gnn_radius
         self.dim = dim
         self.base_viscosity = base_viscosity
         self.normalization_stats = normalization_stats
@@ -67,10 +70,11 @@ class SolverInTheLoop(hk.Module):
         )
 
         self.shift_fn = shift_fn
-        self.displacement_fn_vmap = vmap(displacement_fn)
+        self.disp_fn_vmap = vmap(displacement_fn)
         self.kernel_fn = kernels.QuinticKernel(dx, dim=dim)
 
-        self.neighbors_update_fn = neighbors_update_fn
+        self.sph_nbrs_upd_fn = sph_nbrs_upd_fn
+        self.gnn_nbrs_upd_fn = gnn_nbrs_upd_fn
 
     def acceleration_fn(
         self,
@@ -102,47 +106,41 @@ class SolverInTheLoop(hk.Module):
 
         return a_eq_8
 
-    def si_euler(self, state, acc_correction=0.0):
-        # 1. Twice 1/2dt integration of u and v
-        state["u"] += 1.0 * self.dt * (state["dudt"] + acc_correction)
+    def to_physical(self, x, key="velocity"):
+        stats = self.normalization_stats[key]
+        x = x * stats["std"] + stats["mean"]
+        x = x / self.effective_dt
+        if key == "acceleration":
+            x = x / self.effective_dt
+        return x
 
-        # 2. Integrate position with velocity v
-        state["r"] = self.shift_fn(state["r"], 1.0 * self.dt * state["u"])
-
-        # 3. Update neighbors list
-        num_particles = (state["tag"] != -1).sum()
-        neighbors = self.neighbors_update_fn(state["r"], num_particles=num_particles)
-
-        # 4. Compute accelerations
-        state = self.solver(state, neighbors)
-
-        # 5. Impose boundary conditions on dummy particles (if applicable)
-        # state = bc_fn(state)
-
-        return state
+    def to_effective(self, x, key="velocity"):
+        stats = self.normalization_stats[key]
+        x = x * self.effective_dt
+        if key == "acceleration":
+            x = x * self.effective_dt
+        x = (x - stats["mean"]) / stats["std"]
+        return x
 
     def _transform(
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
         features, tag = sample
 
-        # TODO why
         num_particles = features["abs_pos"].shape[0]
 
-        u_stats = self.normalization_stats["velocity"]
-        u = features["vel_hist"] * u_stats["std"] + u_stats["mean"]
-        u = u / self.dt
+        u = self.to_physical(features["vel_hist"])
 
         r = features["abs_pos"][:, -1, :]
 
-        neighbors = self.neighbors_update_fn(r, num_particles=num_particles)
+        neighbors = self.sph_nbrs_upd_fn(r, num_particles=num_particles)
         i_s, j_s = neighbors.idx
 
         eta = jnp.ones(num_particles) * self.base_viscosity
         mass = jnp.ones(num_particles) * self.dx**self.dim
 
         r_i_s, r_j_s = r[i_s], r[j_s]
-        dr_i_j = self.displacement_fn_vmap(r_i_s, r_j_s)
+        dr_i_j = self.disp_fn_vmap(r_i_s, r_j_s)
         dist = space.distance(dr_i_j)
         w_dist = vmap(self.kernel_fn.w)(dist)
 
@@ -186,26 +184,41 @@ class SolverInTheLoop(hk.Module):
         self, sample: Tuple[Dict[str, jnp.ndarray], jnp.ndarray]
     ) -> Dict[str, jnp.ndarray]:
         state = self._transform(sample)
-        # acc_stats = self.normalization_stats["acceleration"]
-        vel_stats = self.normalization_stats["velocity"]
+        features, tag = sample
+        r0 = state["r"].copy()
+        u0 = state["u"].copy()
+        N = (state["tag"] != -1).sum()
 
         for _ in range(self.num_sitl_steps):
-            # solver step
-            state = self.si_euler(state)
+            # solver step and neighbors list
+            sph_neighbors = self.sph_nbrs_upd_fn(state["r"], num_particles=N)
+            acc_sph = self.solver(state, sph_neighbors)["dudt"]
 
             # correction
-            features, tag = sample
-            features["vel_hist"] = (state["u"] - vel_stats["mean"]) / vel_stats["std"]
-            features["rel_disp"] = self.displacement_fn_vmap(
-                state["r"][features["senders"]], state["r"][features["receivers"]]
+            gnn_neighbors = self.gnn_nbrs_upd_fn(state["r"], num_particles=N)
+            features["receivers"], features["senders"] = gnn_neighbors.idx
+            features["vel_hist"] = self.to_effective(state["u"])
+            features["rel_disp"] = (
+                self.disp_fn_vmap(
+                    state["r"][features["receivers"]], state["r"][features["senders"]]
+                )
+                / self.gnn_radius
             )
             features["rel_dist"] = space.distance(features["rel_disp"])[:, None]
-            vel_gns = self.model((features, tag))["acc"]
-            # state["dudt"] += acc_gns * acc_stats["std"] + acc_stats["mean"]
-            state["u"] += vel_gns * vel_stats["std"] + vel_stats["mean"]
-            state["r"] = self.shift_fn(state["r"], state["u"] * self.dt)
+            acc_gns = self.model((features, tag))["acc"]
+            acc_gns = self.to_physical(acc_gns, key="acceleration")
 
-        # acc = state["dudt"] * acc_stats["std"] + acc_stats["mean"]
-        vel = state["u"] * vel_stats["std"] + vel_stats["mean"]
+            # integrate
+            # 1. Twice 1/2dt integration of u and v
+            state["u"] += self.stil_dt * (acc_sph + acc_gns)
+            state["v"] = state["u"]
 
-        return {"vel": vel}
+            # 2. Integrate position with velocity v
+            state["r"] = self.shift_fn(state["r"], self.stil_dt * state["u"])
+
+        # to effective units
+        vel = self.disp_fn_vmap(state["r"], r0)
+        acc = vel - u0 * self.effective_dt
+        acc = self.to_effective(acc, "acceleration") / self.effective_dt**2
+
+        return {"acc": acc}
