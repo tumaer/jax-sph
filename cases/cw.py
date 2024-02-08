@@ -15,9 +15,9 @@ class CW(SimulationSetup):
 
         self.L_wall = 1.0
         self.H_wall = 1.0
-        self.L = 0.4
-        self.H = 0.4
-        self.cube_offset = np.array([0.3, 0.4])
+        self.L = 0.3
+        self.H = 0.3
+        self.cube_offset = np.array([0.5, 0.5])
         self.u_init = 0.5
 
         self.u_ref = 1  # TODO: 2 ** 0.5
