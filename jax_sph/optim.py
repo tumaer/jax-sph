@@ -127,31 +127,58 @@ def loss_fn_wrapper(advance,args):
     
     return loss_fn
 
-def ploting(r_plt, init_state, target_position):
-    fig = plt.figure(figsize=(5, 5))
-    plt.scatter(r_plt[:,0],r_plt[:,1], label='updated', s=5)
-    plt.scatter(target_position[:,0], target_position[:,1], label='target', s=5)
-    plt.scatter(init_state["r"][:,0], init_state["r"][:,1], label='init', s=5)
-    plt.legend()
+def ploting(r_plt, init_state, target_final_position, target_state_init, mask):
+    # Add two plots side by side
+    
+    fig = plt.figure(figsize=(10, 5))
+    
+    # plt.scatter(r_plt[:,0],r_plt[:,1], label='updated', s=5)
+    # plt.scatter(target_final_position[:,0], target_final_position[:,1], label='target 100', s=5, c='r')
+    # plt.scatter(target_state_init["r"][:,0], target_state_init["r"][:,1], label='target 0', s=5, c='g')
+    # plt.scatter(init_state["r"][:,0], init_state["r"][:,1], label='init', s=5, c='k')
+    
+    plt.subplot(1, 2, 1)  # (rows, columns, panel number)
+    plt.scatter(init_state["r"][mask][:,0], init_state["r"][mask][:,1], label='init', s=5, c='k')
+    plt.scatter(target_state_init["r"][mask][:,0], target_state_init["r"][mask][:,1], label='target 0', s=5, c='g')
+    plt.scatter(target_final_position[:,0], target_final_position[:,1], label='target 100', s=5, c='r')
+    #create a mask for the wall 
+    plt.scatter(init_state["r"][~mask][:,0], init_state["r"][~mask][:,1], label='wall', s=5, color='k',  alpha=0.1)
+    plt.legend(loc='upper right')
+    plt.axis('equal')
+    
+    plt.title('Initial Configuration')
+
+    plt.subplot(1, 2, 2)
+    plt.scatter(r_plt[mask][:,0],r_plt[mask][:,1], label='updated', s=5, c='k')
+    plt.scatter(target_state_init["r"][mask][:,0], target_state_init["r"][mask][:,1], label='target 0', s=5, c='g')
+    plt.scatter(target_final_position[:,0], target_final_position[:,1], label='target 100', s=5, c='r')
+    plt.scatter(init_state["r"][~mask][:,0], init_state["r"][~mask][:,1], label='wall', s=5, color='k',  alpha=0.1)
+    
+    plt.title('Target Configuration')
+    
+    
+    plt.legend(loc='upper right')
     plt.axis('equal')
     plt.show()
     print('done')
  
 if __name__ == "__main__":
-    num_optimization_steps =4
-    learning_rate = 0.8
-    momentum_parameter = 0.9
+    num_optimization_steps =20
+    learning_rate = 1.5
+    momentum_parameter = 0.0
     grads=[]
     
     #Load the target state
     target_dir_path = "target_traj/"
-    target_filename = 'traj_50.h5'
+    target_filename = 'traj_100.h5'
     file_path_h5 = os.path.join(target_dir_path, target_filename)
     target_state = read_h5(file_path_h5)
     
+    target_state_init = read_h5(os.path.join(target_dir_path, "traj_000.h5"))
+    
     args = Args().args
     
-    offset_init = jnp.array([0.1, 0.2])
+    offset_init = jnp.array([0.1, 0.5])
     
     advance, init_state , neighbors, neighbor_fn, num_particles=optimization_case_setup(args, offset_init)
     state = copy.deepcopy(init_state) #init_state required for plotting
@@ -196,4 +223,4 @@ if __name__ == "__main__":
         print(f"\n Step {optimization_step}, Loss: {loss}")
   
    
-    jax.debug.callback(ploting, jnp.asarray(state["r"]), init_state, target_position)
+    jax.debug.callback(ploting, jnp.asarray(state["r"]), init_state, target_position, target_state_init, mask)
