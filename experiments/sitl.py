@@ -45,7 +45,9 @@ class SolverInTheLoop(hk.Module):
         self.normalization_stats = normalization_stats
 
         if ext_force_fn is None:
-            ext_force_fn = lambda r: jnp.zeros_like(r)
+
+            def ext_force_fn(r):
+                return jnp.zeros_like(r)
 
         rho_ref = 1.0
 

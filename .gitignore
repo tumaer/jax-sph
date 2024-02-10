@@ -10,5 +10,6 @@ __pycache__/
 *.out
 
 ckp/
+wandb/
 rollout/
 rollouts/
