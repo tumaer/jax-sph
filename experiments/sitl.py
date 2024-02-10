@@ -49,7 +49,7 @@ class SolverInTheLoop(hk.Module):
 
         rho_ref = 1.0
 
-        u_ref = 1.0 if not hasattr(self, "u_ref") else self.u_ref
+        u_ref = 1.0
         c_ref = 10.0 * u_ref
         gamma_eos = 1.0
         p_ref = rho_ref * c_ref**2 / gamma_eos
