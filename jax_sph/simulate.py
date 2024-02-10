@@ -9,11 +9,10 @@ from jax_md.partition import Sparse
 
 from cases import select_case
 from jax_sph import partition
-from jax_sph.integrator import kick_drift_kick_RIE
-from jax_sph.integrator import si_euler
+from jax_sph.integrator import kick_drift_kick_RIE, si_euler
 from jax_sph.io_state import io_setup, write_state
-from jax_sph.solver.sph_tvf import SPHTVF
 from jax_sph.solver.sph_riemann import SPHRIEMANN
+from jax_sph.solver.sph_tvf import SPHTVF
 from jax_sph.solver.ut import UTSimulator
 from jax_sph.utils import get_ekin, get_val_max
 
@@ -38,7 +37,6 @@ def simulate(args):
         box_size,
         r_cutoff=r_cut * args.dx,
         backend=args.nl_backend,
-        dr_threshold=r_cut * args.dx * 0.25,
         capacity_multiplier=1.25,
         mask_self=False,
         format=Sparse,
@@ -50,7 +48,7 @@ def simulate(args):
     neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
 
     # Solver setup
-    if args.solver == "SPH":
+    if args.solver == "SPH":  # TODO: make one solver
         model = SPHTVF(
             displacement_fn,
             eos_fn,
@@ -83,9 +81,9 @@ def simulate(args):
         model = UTSimulator(g_ext_fn)
 
     # Instantiate advance function for our use case
-    if args.solver == "RIE":
+    if args.solver == "RIE":  # TODO: make one integrator
         advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
-    else:    
+    else:
         advance = si_euler(args.tvf, model, shift_fn, bc_fn)
 
     advance = advance if args.no_jit else jit(advance)
@@ -128,4 +126,3 @@ def simulate(args):
             )
 
     print(f"time: {time.time() - start:.2f} s")
-    # render_data_dict(state)

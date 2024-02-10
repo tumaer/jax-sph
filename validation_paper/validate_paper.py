@@ -34,9 +34,8 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         tvf = "tgv3d_tvf/"
         Rie = "tgv3d_Rie/"
 
-
-    dirs_notvf = os.listdir(os.path.join(val_root, notvf))    
-    dirs_tvf = os.listdir(os.path.join(val_root, tvf)) 
+    dirs_notvf = os.listdir(os.path.join(val_root, notvf))
+    dirs_tvf = os.listdir(os.path.join(val_root, tvf))
     dirs_Rie = os.listdir(os.path.join(val_root, Rie))
     if dim == 2:
         dirs_notvf = [d for d in dirs_notvf if ("2D_TGV_SPH" in d)]
@@ -49,8 +48,6 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     dirs_notvf = sorted(dirs_notvf)
     dirs_tvf = sorted(dirs_tvf)
     dirs_Rie = sorted(dirs_Rie)
-       
-    
 
     # to each directory read the medatada file and store nx values
     nx_found_notvf = {}
@@ -110,68 +107,75 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         for i, filename in enumerate(files_h5_tvf):
             state = read_h5(os.path.join(val_root, tvf, dir_path_tvf, filename))
             if i == 1:
-                r0 = state['r']
-                u0 = state['u']
+                r0 = state["r"]
+                u0 = state["u"]
             elif i == 440:
-                rend = state['r']
-                uend = state['u']
+                rend = state["r"]
+                uend = state["u"]
             u_max_vec_tvf[i] = get_val_max(state, "v")
             e_kin_vec_tvf[i] = get_ekin(state, args_tvf.dx)
         e_kin_vec_tvf /= side_length**dim
-        dEdt_tvf = -(e_kin_vec_tvf[1:] - e_kin_vec_tvf[:-1]) / (args_tvf.dt * args_tvf.write_every)
+        dEdt_tvf = -(e_kin_vec_tvf[1:] - e_kin_vec_tvf[:-1]) / (
+            args_tvf.dt * args_tvf.write_every
+        )
 
         for i, filename in enumerate(files_h5_notvf):
             state = read_h5(os.path.join(val_root, notvf, dir_path_notvf, filename))
             u_max_vec_notvf[i] = get_val_max(state, "v")
             e_kin_vec_notvf[i] = get_ekin(state, args_notvf.dx)
         e_kin_vec_notvf /= side_length**dim
-        dEdt_notvf = -(e_kin_vec_notvf[1:] - e_kin_vec_notvf[:-1]) / (args_notvf.dt * args_notvf.write_every)
+        dEdt_notvf = -(e_kin_vec_notvf[1:] - e_kin_vec_notvf[:-1]) / (
+            args_notvf.dt * args_notvf.write_every
+        )
 
         for i, filename in enumerate(files_h5_Rie):
             state = read_h5(os.path.join(val_root, Rie, dir_path_Rie, filename))
             u_max_vec_Rie[i] = get_val_max(state, "v")
             e_kin_vec_Rie[i] = get_ekin(state, args_Rie.dx)
         e_kin_vec_Rie /= side_length**dim
-        dEdt_Rie = -(e_kin_vec_Rie[1:] - e_kin_vec_Rie[:-1]) / (args_Rie.dt * args_Rie.write_every)
-
+        dEdt_Rie = -(e_kin_vec_Rie[1:] - e_kin_vec_Rie[:-1]) / (
+            args_Rie.dt * args_Rie.write_every
+        )
 
         if dim == 2:
             if temp == 1:
-                x = '--'
+                x = "--"
             elif temp == 2:
-                x = '-'
+                x = "-"
         elif dim == 3:
             if temp == 1:
-                x = '-.'
+                x = "-."
             elif temp == 2:
-                x = '--'
+                x = "--"
             elif temp == 3:
-                x = '-'
+                x = "-"
 
-
-
-        cmap = matplotlib.colormaps['turbo']
-
+        cmap = matplotlib.colormaps["turbo"]
 
         # plot
         t_tvf = np.linspace(0.0, args_tvf.t_end, len(u_max_vec_tvf))
         t_notvf = np.linspace(0.0, args_notvf.t_end, len(u_max_vec_notvf))
         t_Rie = np.linspace(0.0, args_Rie.t_end, len(u_max_vec_Rie))
         if dim == 2:
-            axs1[0].plot(t_tvf, u_max_vec_tvf, x, color=cmap(0.65), label=f"SPH + tvf, dx={args_tvf.dx}")
-            axs1[0].plot(t_notvf, u_max_vec_notvf, x, color=cmap(0.1), label=f"SPH, dx={args_notvf.dx}")
-            axs1[0].plot(t_Rie, u_max_vec_Rie, x, color=cmap(0.9), label=f"Riemann, dx={args_Rie.dx}")
-            axs1[1].plot(t_tvf, e_kin_vec_tvf, x, color=cmap(0.65), label=f"SPH + tvf, dx={args_tvf.dx}")
-            axs1[1].plot(t_notvf, e_kin_vec_notvf, x, color=cmap(0.1), label=f"SPH, dx={args_notvf.dx}")
-            axs1[1].plot(t_Rie, e_kin_vec_Rie, x, color=cmap(0.9), label=f"Riemann, dx={args_Rie.dx}")
+            lbl1 = f"SPH + tvf, dx={args_tvf.dx}"
+            lbl2 = f"SPH, dx={args_notvf.dx}"
+            lbl3 = f"Riemann, dx={args_Rie.dx}"
+            axs1[0].plot(t_tvf, u_max_vec_tvf, x, color=cmap(0.65), label=lbl1)
+            axs1[0].plot(t_notvf, u_max_vec_notvf, x, color=cmap(0.1), label=lbl2)
+            axs1[0].plot(t_Rie, u_max_vec_Rie, x, color=cmap(0.9), label=lbl3)
+            axs1[1].plot(t_tvf, e_kin_vec_tvf, x, color=cmap(0.65), label=lbl1)
+            axs1[1].plot(t_notvf, e_kin_vec_notvf, x, color=cmap(0.1), label=lbl2)
+            axs1[1].plot(t_Rie, e_kin_vec_Rie, x, color=cmap(0.9), label=lbl3)
         elif dim == 3:
-            axs1[0].plot(t_tvf[:-1], dEdt_tvf, x, color=cmap(0.65), label=f"SPH + tvf, dx={np.round(args_tvf.dx, decimals=3)}")
-            axs1[0].plot(t_notvf[:-1], dEdt_notvf, x, color=cmap(0.1), label=f"SPH, dx={np.round(args_notvf.dx, decimals=3)}")
-            axs1[0].plot(t_Rie[:-1], dEdt_Rie, x, color=cmap(0.9), label=f"Riemann, dx={np.round(args_Rie.dx, decimals=3)}")
-            axs1[1].plot(t_tvf, e_kin_vec_tvf, x, color=cmap(0.65), label=f"SPH + tvf, dx={np.round(args_tvf.dx, decimals=3)}")
-            axs1[1].plot(t_notvf, e_kin_vec_notvf, x, color=cmap(0.1), label=f"SPH, dx={np.round(args_notvf.dx, decimals=3)}")
-            axs1[1].plot(t_Rie, e_kin_vec_Rie, x, color=cmap(0.9), label=f"Riemann, dx={np.round(args_Rie.dx, decimals=3)}")
-        
+            lbl1 = f"SPH + tvf, dx={np.round(args_tvf.dx, decimals=3)}"
+            lbl2 = f"SPH, dx={np.round(args_notvf.dx, decimals=3)}"
+            lbl3 = f"Riemann, dx={np.round(args_Rie.dx, decimals=3)}"
+            axs1[0].plot(t_tvf[:-1], dEdt_tvf, x, color=cmap(0.65), label=lbl1)
+            axs1[0].plot(t_notvf[:-1], dEdt_notvf, x, color=cmap(0.1), label=lbl2)
+            axs1[0].plot(t_Rie[:-1], dEdt_Rie, x, color=cmap(0.9), label=lbl3)
+            axs1[1].plot(t_tvf, e_kin_vec_tvf, x, color=cmap(0.65), label=lbl1)
+            axs1[1].plot(t_notvf, e_kin_vec_notvf, x, color=cmap(0.1), label=lbl2)
+            axs1[1].plot(t_Rie, e_kin_vec_Rie, x, color=cmap(0.9), label=lbl3)
 
     # reference solutions in 2D and 3D
     if dim == 2:
@@ -239,39 +243,43 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         plt.savefig(f"{val_root}/{str(dim)}D_TGV_{nxs_str}.pdf")
 
     plt.show()
-    
+
     if dim == 2:
         vel0 = jnp.linalg.norm(u0, axis=1)
         velend = jnp.linalg.norm(uend, axis=1)
 
         fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))
 
-        axs2[0].scatter(r0[:, 0], r0[:, 1], c=vel0, cmap="turbo", s=4, vmin=-0.0, vmax=1)
+        axs2[0].scatter(
+            r0[:, 0], r0[:, 1], c=vel0, cmap="turbo", s=4, vmin=-0.0, vmax=1
+        )
         axs2[0].set_xlim([0, 1])
         axs2[0].set_ylim([0, 1])
-        axs2[0].tick_params(left = False, right = False , labelleft = False , labelbottom = False, bottom = False) 
+        axs2[0].tick_params(
+            left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+        )
 
-        axs2[1].scatter(rend[:, 0], rend[:, 1], c=velend, cmap="turbo", s=4, vmin=-0.0, vmax=1)
+        axs2[1].scatter(
+            rend[:, 0], rend[:, 1], c=velend, cmap="turbo", s=4, vmin=-0.0, vmax=1
+        )
         axs2[1].set_xlim([0, 1])
         axs2[1].set_ylim([0, 1])
-        axs2[1].tick_params(left = False, right = False , labelleft = False , labelbottom = False, bottom = False) 
+        axs2[1].tick_params(
+            left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+        )
 
         fig2.tight_layout()
 
         if save_fig:
             os.makedirs(val_root, exist_ok=True)
-            plt.savefig(
-                f"{val_root}/2D_TGV_Scatter.pdf", dpi=300
-            )
+            plt.savefig(f"{val_root}/2D_TGV_Scatter.pdf", dpi=300)
 
         plt.show()
 
 
-
-
-
-
-def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save_fig=False):
+def val_2D_LDC(
+    val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save_fig=False
+):
     # get all existing directories with relevant statistics
     dirs_Rie = os.listdir(val_root_Rie)
     dirs_tvf = os.listdir(val_root_tvf)
@@ -306,12 +314,10 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
     files_notvf = [f for f in files_notvf if (".h5" in f)]
     files_notvf = sorted(files_notvf, key=lambda x: int(x.split("_")[1][:-3]))
 
-
     args = read_args(os.path.join(val_dir_path_Rie, "args.txt"))
     Re = 1 / args.viscosity  # Reynolds number
 
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-
 
     N = round(1 / args.dx) + 1
     for i, src_path in enumerate(files_Rie[-1:]):
@@ -349,28 +355,48 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
         u_val_tvf = interp_vel_fn(src_path_tvf, rs, "u", dim_ind=0)
         u_val_notvf = interp_vel_fn(src_path_notvf, rs, "u", dim_ind=0)
 
-        cmap = matplotlib.colormaps['turbo']
+        cmap = matplotlib.colormaps["turbo"]
 
-        
-        ax2.plot(np.asarray(x_axis - 3 * args.dx), np.asarray(v_val_tvf), color=cmap(0.65), label=f"SPH + tvf, dx={args.dx}")
-        ax2.plot(np.asarray(x_axis - 3 * args.dx), np.asarray(v_val_notvf), color=cmap(0.1), label=f"SPH, dx={args.dx}")
-        ax2.plot(np.asarray(x_axis - 3 * args.dx), np.asarray(v_val_Rie), color=cmap(0.9), label=f"Riemann, dx={args.dx}")
+        ax2.plot(
+            np.asarray(x_axis - 3 * args.dx),
+            np.asarray(v_val_tvf),
+            color=cmap(0.65),
+            label=f"SPH + tvf, dx={args.dx}",
+        )
+        ax2.plot(
+            np.asarray(x_axis - 3 * args.dx),
+            np.asarray(v_val_notvf),
+            color=cmap(0.1),
+            label=f"SPH, dx={args.dx}",
+        )
+        ax2.plot(
+            np.asarray(x_axis - 3 * args.dx),
+            np.asarray(v_val_Rie),
+            color=cmap(0.9),
+            label=f"Riemann, dx={args.dx}",
+        )
         ax2.set_xlim([0, 1])
         ax2.set_ylim([-0.6, 0.5])
         ax2.set_yticks(jnp.linspace(-0.6, 0.5, 12))
-        ax2.set_ylabel('V(x)')
-        ax2.set_xlabel('x')
+        ax2.set_ylabel("V(x)")
+        ax2.set_xlabel("x")
 
         ax3 = ax2.twinx().twiny()
         ax4 = ax2.twinx()
         ax3.set_xlim([-0.4, 1])
         ax3.set_ylim([0, 1])
-        ax3.set_xlabel('U(y)')
-        ax4.set_ylabel('y')
+        ax3.set_xlabel("U(y)")
+        ax4.set_ylabel("y")
 
-        ax3.plot(np.asarray(u_val_Rie), np.asarray(y_axis - 3 * args.dx), color=cmap(0.9))
-        ax3.plot(np.asarray(u_val_tvf), np.asarray(y_axis - 3 * args.dx), color=cmap(0.65))
-        ax3.plot(np.asarray(u_val_notvf), np.asarray(y_axis - 3 * args.dx), color=cmap(0.1))
+        ax3.plot(
+            np.asarray(u_val_Rie), np.asarray(y_axis - 3 * args.dx), color=cmap(0.9)
+        )
+        ax3.plot(
+            np.asarray(u_val_tvf), np.asarray(y_axis - 3 * args.dx), color=cmap(0.65)
+        )
+        ax3.plot(
+            np.asarray(u_val_notvf), np.asarray(y_axis - 3 * args.dx), color=cmap(0.1)
+        )
 
     # getting the reference data
     u_vel = pd.read_csv("validation/ref/ldc_data_u_vel.csv")
@@ -400,7 +426,6 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
         (v_vel.loc[:, "10,000"].values).astype(float),
     )
 
-
     if Re == 100.0:
         ax2.scatter(x, v_Re_100, color="k", marker="s")
         ax3.scatter(u_Re_100, y, color="k", marker="o")
@@ -411,29 +436,33 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
         ax2.scatter(x, v_Re_10000, color="C1", marker="s")
         ax2.scatter(u_Re_10000, y, color="C0", marker="o")
 
-
     ax2.grid()
-    ax2.legend(loc='lower right')
-    
+    ax2.legend(loc="lower right")
+
     velend = jnp.linalg.norm(state["u"], axis=1)
 
-    ax.scatter(state['r'][:, 0], state['r'][:, 1], c=velend, cmap="turbo", s=12, vmin=-0.0, vmax=1)
+    ax.scatter(
+        state["r"][:, 0],
+        state["r"][:, 1],
+        c=velend,
+        cmap="turbo",
+        s=12,
+        vmin=-0.0,
+        vmax=1,
+    )
     ax.set_xlim([0, 1.12])
     ax.set_ylim([0, 1.12])
-    ax.tick_params(left = False, right = False , labelleft = False , labelbottom = False, bottom = False) 
+    ax.tick_params(
+        left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+    )
 
     fig.tight_layout()
 
     if save_fig:
         os.makedirs(val_root_Rie, exist_ok=True)
-        plt.savefig(
-            f"{val_root_Rie}/2D_LCD.pdf", dpi=300
-        )
+        plt.savefig(f"{val_root_Rie}/2D_LCD.pdf", dpi=300)
 
     plt.show()
-
-
-
 
 
 def val_DB(val_root, save_fig=False):
@@ -493,8 +522,6 @@ def val_DB(val_root, save_fig=False):
     plt.close()
 
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--case", type=str, help="One of the above cases")
@@ -505,13 +532,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.case == "2D_LDC":
-        val_2D_LDC(args.src_dir_tvf, args.src_dir_notvf, args.src_dir_Rie, save_fig=True)
+        val_2D_LDC(
+            args.src_dir_tvf, args.src_dir_notvf, args.src_dir_Rie, save_fig=True
+        )
 
     elif args.case == "2D_TGV":
         val_TGV(args.src_dir, 2, [50, 100], True)
 
     elif args.case == "3D_TGV":
-        val_TGV(args.src_dir, 3, [20, 32, 50], True) 
+        val_TGV(args.src_dir, 3, [20, 32, 50], True)
 
     elif args.case == "2D_DB":
         val_DB(args.src_dir, save_fig=True)

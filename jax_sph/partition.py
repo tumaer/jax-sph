@@ -1,4 +1,7 @@
-"""Neighbors search backends"""
+"""Neighbors search backends
+Source:
+https://github.com/tumaer/lagrangebench/blob/main/lagrangebench/case_setup/partition.py
+"""
 
 from functools import partial
 from typing import Optional

@@ -2,7 +2,6 @@
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 from jax import ops, vmap
 from jax_md import partition, space
@@ -123,30 +122,6 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         u_val /= w_norm
 
         return u_val
-
-        plt.figure()
-        plt.plot(u_val)
-        plt.grid()
-        plt.show()
-
-        plt.figure()
-        plt.plot(w_norm)
-        plt.show()
-
-        r = state["r"]
-        mask_geom = np.where(
-            (r[:, 0] < 6 * args.dx) * (r[:, 1] > 0.5) * (r[:, 1] < 0.5 + 6 * args.dx),
-            True,
-            False,
-        )
-        r_subset = r[mask_geom]
-        vel_subset = vel[mask_geom]
-        fig, ax = plt.subplots()
-        plt.scatter(r_subset[:, 0], r_subset[:, 1], c=vel_subset[:, 1])
-        for i, txt in enumerate(vel_subset[:, 1]):
-            ax.annotate(txt, (r_subset[:, 0][i], r_subset[:, 1][i]))
-        plt.colorbar()
-        plt.show()
 
     def interp_scalar(src_path, r_target, prop="p"):
         #### SPH interpolate from "set_src" onto "set_dst"

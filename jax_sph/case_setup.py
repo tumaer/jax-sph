@@ -8,8 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import vmap
 
-from jax_sph.eos import TaitEoS
-from jax_sph.eos import RIEMANNEoS
+from jax_sph.eos import RIEMANNEoS, TaitEoS
 from jax_sph.utils import noise_masked, pos_init_cartesian_2d, pos_init_cartesian_3d
 
 EPS = jnp.finfo(float).eps
@@ -84,8 +83,6 @@ class SimulationSetup(ABC):
         # Equation of state
         if args.solver == "RIE":
             eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
-        elif args.solver == "RIE2":
-            eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
@@ -125,7 +122,7 @@ class SimulationSetup(ABC):
         # initialize accelerations for TGV
         if jnp.logical_and(args.case == "TGV", args.dim == 2):
             dvdt = vmap(self._init_acceleration2D)(r)
-            
+
             state = {
                 "r": r,
                 "tag": tag,
@@ -141,7 +138,7 @@ class SimulationSetup(ABC):
             }
 
         else:
-        # initialize the state dictionary
+            # initialize the state dictionary
             state = {
                 "r": r,
                 "tag": tag,
@@ -206,7 +203,7 @@ class SimulationSetup(ABC):
     @abstractmethod
     def _external_acceleration_fn(self, r):
         pass
-    
+
     @abstractmethod
     def _boundary_conditions_fn(self, state):
         pass
