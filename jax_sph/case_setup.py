@@ -1,6 +1,5 @@
 """Simulation setup"""
 
-import warnings
 from abc import ABC, abstractmethod
 
 import jax
@@ -65,10 +64,8 @@ class SimulationSetup(ABC):
         print("dt_body_force :", dt_body_force)
         print("dt_max        :", dt)
 
-        # assert dt > args.dt, ValueError("Explicit dt has to comply with CFL.")
+        assert dt > args.dt, ValueError("Explicit dt has to comply with CFL.")
         if args.dt != 0.0:
-            if args.dt > dt:
-                warnings.warn("Explicit dt should comply with CFL.", UserWarning)
             dt = args.dt
 
         print("dt_final      :", dt)

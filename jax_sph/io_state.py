@@ -36,7 +36,7 @@ def io_setup(args):
     dir = args.data_path
     if not dir.endswith("/"):
         dir += "/"
-    if (args.write_h5 or args.write_vtk) and args.case != "Rlx":
+    if (args.write_h5 or args.write_vtk) and not (args.case == "Rlx"):
         dir += str(dim) + "D_" + case + "_" + solver + "_" + str(args.seed)
         dir += "_" + time.strftime("%Y%m%d-%H%M%S")
 

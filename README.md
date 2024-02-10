@@ -101,20 +101,12 @@ This is the TODO list concerning different cases. Everything has to be in 3D; us
 9. (model) update RHS
 10. (model) if free surface -> density correction
 
+
 ## Installation
+If you want to use a GPU, you first need a running Cuda installation. See [here](https://github.com/google/jax#installation) for more details.
 
-### Using Poetry (recommended)
 
-```bash
-poetry config virtualenvs.in-project true
-poetry install
-source .venv/bin/activate
-```
-
-Later, you just need to `source .venv/bin/activate` to activate the environment.
-
-### Using Pip
-
+### Create and use a Pip virtual environment
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -123,27 +115,6 @@ pip install -e . # to install jax_sph in interactive mode
 ```
 
 Later, you just need to `source venv/bin/activate` to activate the environment.
-
-### GPU Support
-
-If you want to use a CUDA GPU, you first need a running Nvidia driver. And then just follow the instruction [here](https://jax.readthedocs.io/en/latest/installation.html). The whole process could look like:
-
-```bash
-source .venv/bin/activate
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-```
-
-## Usage and Contribution
-
-See the example scripts in `scripts/` on how to use the code.
-
-If you want to contribute, you should run
-
-```bash
-pre-commit install
-```
-
-upon istallation to automate the code linting and formatting checks.
 
 ## References
 
