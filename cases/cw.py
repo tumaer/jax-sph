@@ -17,7 +17,11 @@ class CW(SimulationSetup):
         self.H_wall = 1.0
         self.L = 0.3
         self.H = 0.3
-        self.cube_offset = np.array([0.5, 0.5])
+        if not hasattr(args, "cube_offset") or args.cube_offset is None:
+            args.cube_offset = [0.5, 0.5]
+        if isinstance(args.cube_offset, int):
+            args.cube_offset = [args.cube_offset] * 2
+        self.cube_offset = np.array(args.cube_offset)
         self.u_init = 0.5
 
         self.u_ref = 1  # TODO: 2 ** 0.5
