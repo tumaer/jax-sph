@@ -71,27 +71,3 @@ class WendlandC2Kernel:
         """Evaluates the 1D kernel gradient at the radial distance r."""
 
         return grad(self.w)(r)
-
-
-class M4PrimeKernel:
-    """The M'4 kernel"""
-
-    def __init__(self, h, dim=3):
-        self._one_over_h = 1.0 / h
-        self._normalized_cutoff = 2.0
-        self.cutoff = self._normalized_cutoff * h
-        
-    def w(self, r):
-        """Evaluates the kernel at the radial displacement vector r."""
-        q = r * self._one_over_h
-        q1 = 1 - 2.5 * q ** 2 + 1.5 * q ** 3
-        q2 = 0.5 * (1 - q) * (2 - q) ** 2
-
-        res = jnp.where(q < 1, q1, 0)
-        res = jnp.where((q >= 1)*(q < 2), q2, res)
-        return jnp.prod(res, axis=1)
-    
-    def grad_w(self, r):
-        """Evaluates the 1D kernel gradient at the radial distance r."""
-
-        return grad(self.w)(r)
