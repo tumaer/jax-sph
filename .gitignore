@@ -9,4 +9,6 @@ __pycache__/
 
 *.out
 
-ckp
+ckp/
+rollout/
+rollouts/
