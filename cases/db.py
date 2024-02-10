@@ -42,6 +42,7 @@ class DB(SimulationSetup):
 
         # TODO: check behavior with 1, sqrt(2), and 2 for u_ref
         self.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
+        args.Vmax = 2 * (self.args.g_ext_magnitude * self.H) ** 0.5
 
     def _box_size2D(self):
         dx, bo = self.args.dx, self.box_offset
@@ -58,7 +59,7 @@ class DB(SimulationSetup):
         dx6 = 6 * self.args.dx
         L_wall, H_wall = self.L_wall, self.H_wall
 
-        is_cartesian = False
+        is_cartesian = True
 
         if is_cartesian:
             r_fluid = dx3 + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
@@ -150,3 +151,6 @@ class DB(SimulationSetup):
         # pay attention to the shapes
         # state['p'] = jnp.where(mask_wall_1d, 0.0, state['p'])
         return state
+
+    def _init_acceleration2D(self, r):
+        pass

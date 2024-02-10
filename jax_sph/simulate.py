@@ -1,6 +1,5 @@
 """Core simulation loop"""
 
-
 import time
 
 import numpy as np
@@ -10,9 +9,11 @@ from jax_md.partition import Sparse
 
 from cases import select_case
 from jax_sph import partition
+from jax_sph.integrator import kick_drift_kick_RIE
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state, _plot
 from jax_sph.solver.sph_tvf import SPHTVF
+from jax_sph.solver.sph_riemann import SPHRIEMANN
 from jax_sph.solver.ut import UTSimulator
 from jax_sph.utils import get_ekin, get_val_max
 
@@ -35,7 +36,7 @@ def simulate(args):
     neighbor_fn = partition.neighbor_list(
         displacement_fn,
         box_size,
-        r_cutoff=3 * args.dx,
+        r_cutoff=r_cut * args.dx,
         backend=args.nl_backend,
         dr_threshold=r_cut * args.dx * 0.25,
         capacity_multiplier=1.25,
@@ -63,11 +64,30 @@ def simulate(args):
             args.free_slip,
             args.density_renormalize,
         )
+    elif args.solver == "RIE":
+        model = SPHRIEMANN(
+            displacement_fn,
+            eos_fn,
+            g_ext_fn,
+            args.dx,
+            args.dim,
+            args.dt,
+            args.Vmax,
+            args.eta_limiter,
+            args.is_limiter,
+            args.density_evolution,
+            args.is_bc_trick,
+            args.free_slip,
+        )
     elif args.solver == "UT":
         model = UTSimulator(g_ext_fn)
 
     # Instantiate advance function for our use case
-    advance = si_euler(args.tvf, model, shift_fn, bc_fn)
+    if args.solver == "RIE":
+        advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
+    else:    
+        advance = si_euler(args.tvf, model, shift_fn, bc_fn)
+
     advance = advance if args.no_jit else jit(advance)
 
     # create data directory and dump args.txt
