@@ -22,9 +22,9 @@ from jax_md.partition import (
     cell_list,
     is_format_valid,
     is_sparse,
+    space,
 )
 from jax_md.partition import neighbor_list as vmap_neighbor_list
-from jax_md.partition import space
 
 
 def get_particle_cells(idx, cl_capacity, N):
@@ -410,7 +410,7 @@ def _scan_neighbor_list(
                     if not is_sparse(format):
                         capacity_limit = N - 1 if mask_self else N
                     elif format is NeighborListFormat.Sparse:
-                        capacity_limit = N * (N - 1) if mask_self else N ** 2
+                        capacity_limit = N * (N - 1) if mask_self else N**2
                     else:
                         capacity_limit = N * (N - 1) // 2
                     if max_occupancy > capacity_limit:
@@ -528,7 +528,7 @@ def _scan_neighbor_list(
                     if not is_sparse(format):
                         capacity_limit = N - 1 if mask_self else N
                     elif format is NeighborListFormat.Sparse:
-                        capacity_limit = N * (N - 1) if mask_self else N ** 2
+                        capacity_limit = N * (N - 1) if mask_self else N**2
                     else:
                         capacity_limit = N * (N - 1) // 2
                     if max_occupancy > capacity_limit:
@@ -559,7 +559,7 @@ def _scan_neighbor_list(
                     if not is_sparse(format):
                         capacity_limit = N - 1 if mask_self else N
                     elif format is NeighborListFormat.Sparse:
-                        capacity_limit = N * (N - 1) if mask_self else N ** 2
+                        capacity_limit = N * (N - 1) if mask_self else N**2
                     else:
                         capacity_limit = N * (N - 1) // 2
                     if max_occupancy > capacity_limit:
