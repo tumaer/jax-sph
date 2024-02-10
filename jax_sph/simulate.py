@@ -10,9 +10,8 @@ from jax_md.partition import Sparse
 
 from cases import select_case
 from jax_sph import partition
-from jax_sph.integrator import si_euler_tvf
 from jax_sph.integrator import kick_drift_kick_RIE
-from jax_sph.integrator import si_euler_notvf
+from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver.sph_tvf import SPHTVF
 from jax_sph.solver.sph_riemann import SPHRIEMANN
@@ -88,7 +87,7 @@ def simulate(args):
     if args.solver == "RIE":
         advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
     else:    
-        advance = si_euler_tvf(args.tvf, model, shift_fn, bc_fn)
+        advance = si_euler(args.tvf, model, shift_fn, bc_fn)
 
     advance = advance if args.no_jit else jit(advance)
 
