@@ -9,7 +9,7 @@ import optax
 import matplotlib.cm as cm
 import matplotlib
 
-from io_state import read_h5
+from io_state import read_h5, write_h5
 from jax_sph.io_state import io_setup
 from jax_md import space
 from jax_sph.solver.sph_tvf import SPHTVF
@@ -139,7 +139,8 @@ def ploting(r_plt, init_state, target_final_position, target_state_init, mask):
     #print("Leftmost color in turbo colormap:", leftmost_color)
     #print("Rightmost color in turbo colormap:", rightmost_color)
 # Get the leftmost and rightmost colors
-    leftmost_color = turbo_map(0)
+    leftmost_color = turbo_map(0.5)
+    
     # plt.scatter(r_plt[:,0],r_plt[:,1], label='updated', s=5, c='')
     # plt.scatter(target_final_position[:,0], target_final_position[:,1], label='target 100', s=5, c='r')
     # plt.scatter(target_state_init["r"][:,0], target_state_init["r"][:,1], label='target 0', s=5, c='g')
@@ -150,7 +151,7 @@ def ploting(r_plt, init_state, target_final_position, target_state_init, mask):
     plt.scatter(target_state_init["r"][mask][:,0], target_state_init["r"][mask][:,1], label='target 0', s=5, c='green')
     plt.scatter(target_final_position[:,0], target_final_position[:,1], label='target 100', s=5, c='#003300')
     # #create a mask for the wall 
-    plt.scatter(init_state["r"][~mask][:,0], init_state["r"][~mask][:,1], label='wall', s=5, color=leftmost_color)
+    plt.scatter(init_state["r"][~mask][:,0], init_state["r"][~mask][:,1], label='wall', s=5, color=leftmost_color, alpha =0.5)
     #plt.legend(loc='upper right')
     #plt.axis('equal')
     
@@ -172,18 +173,18 @@ def ploting(r_plt, init_state, target_final_position, target_state_init, mask):
     print('done')
  
 if __name__ == "__main__":
-    num_optimization_steps =19
+    num_optimization_steps =15
     learning_rate = 1.5
     momentum_parameter = 0.0
     grads=[]
     
     #Load the target state
     target_dir_path = "target_traj/"
-    target_filename = 'traj_100_b.h5'
+    target_filename = 'traj_100_a.h5'
     file_path_h5 = os.path.join(target_dir_path, target_filename)
     target_state = read_h5(file_path_h5)
     
-    target_state_init = read_h5(os.path.join(target_dir_path, "traj_000_b.h5"))
+    target_state_init = read_h5(os.path.join(target_dir_path, "traj_000_a.h5"))
     
     args = Args().args
     
@@ -210,6 +211,9 @@ if __name__ == "__main__":
 
     #Main Optimization Loop:
     loss_fn = loss_fn_wrapper(advance,args)
+    
+    write_h5(init_state, "optim_a_init.h5")
+    
     for optimization_step in range(num_optimization_steps):
         
         loss, grad = jax.value_and_grad(fun=loss_fn, allow_int=True)(state, neighbors, neighbor_fn, num_particles,target_position)
@@ -230,6 +234,7 @@ if __name__ == "__main__":
         # state['r'] = state["r"].at[mask].set(optax.apply_updates(state['r'][mask], updates))
 
         print(f"\n Step {optimization_step}, Loss: {loss}")
-  
+        
+    write_h5(state, "optim_a_final.h5")
    
     jax.debug.callback(ploting, jnp.asarray(state["r"]), init_state, target_position, target_state_init, mask)
