@@ -11,7 +11,7 @@ from cases import select_case
 from jax_sph import partition
 from jax_sph.integrator import kick_drift_kick_RIE
 from jax_sph.integrator import si_euler
-from jax_sph.io_state import io_setup, write_state, _plot
+from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver.sph_tvf import SPHTVF
 from jax_sph.solver.sph_riemann import SPHRIEMANN
 from jax_sph.solver.ut import UTSimulator
@@ -97,8 +97,6 @@ def simulate(args):
     _state, _neighbors = advance(0.0, state, neighbors)
     _state["v"].block_until_ready()
 
-    _plot(state["r"], state["tag"], "initial state")
-
     start = time.time()
     for step in range(args.sequence_length + 2):
         # TODO: writing for the first time is not at zero. Why?
@@ -130,5 +128,3 @@ def simulate(args):
             )
 
     print(f"time: {time.time() - start:.2f} s")
-    _plot(state["r"], state["tag"], "final state")
-    # render_data_dict(state)
