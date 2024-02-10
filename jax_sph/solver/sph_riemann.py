@@ -34,6 +34,9 @@ def SPHRIEMANNv2(
 
     and: "A transport-velocity formulation for smoothed particle
     hydrodynamics", Adami, Hu, Adams, 2013
+
+    and. "A multi-phase SPH model based on Riemann solvers for 
+    simulation of jet breakup", Yang, Xu, Yang, Wang, 2020
     """
 
     # SPH kernel function
@@ -151,7 +154,7 @@ def SPHRIEMANNv2(
                     p_L = p_i
                     rho_L = rho_i
 
-                    u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.dot(v_j, -e_ij), jnp.dot(v_j, -e_ij))   # 2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
+                    u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.dot(v_j, n_w_j), jnp.dot(v_j, -e_ij)) #  u_w from eq. (15), Yang (2020)
                     p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
                     rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
 
@@ -229,7 +232,7 @@ def SPHRIEMANNv2(
                 p_L = p_i
                 rho_L = rho_i
 
-                u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.dot(v_j, -e_ij), jnp.dot(v_j, -e_ij))  #2 * jnp.linalg.norm(v_j, ord=2), jnp.dot(v_j, -e_ij))
+                u_R = jnp.where(wall_mask_j == 1, -u_L + 2 * jnp.dot(v_j, n_w_j), jnp.dot(v_j, -e_ij))  #  u_w from eq. (15), Yang (2020) 
                 p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
                 rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
 
@@ -243,6 +246,7 @@ def SPHRIEMANNv2(
                 
 
                 # Compute Riemann states eq. (7) and (10), Zhang (2017)
+                # u_R = jnp.where(wall_mask_j == 1, -u_L - 2 * jnp.dot(v_j, -n_w_j), jnp.dot(v_j, -e_ij))
                 P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
                 # pressure term with linear Riemann solver eq. (9), Zhang (2017)
