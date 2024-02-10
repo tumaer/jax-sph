@@ -1,4 +1,4 @@
-.vscode/
+# .vscode/
 .ruff_cache/
 .ipynb_checkpoints/
 venv*/
@@ -9,6 +9,7 @@ __pycache__/
 
 *.out
 
+datasets/
 ckp/
 wandb/
 rollout/

@@ -128,4 +128,3 @@ def simulate(args):
             )
 
     print(f"time: {time.time() - start:.2f} s")
-    # render_data_dict(state)
