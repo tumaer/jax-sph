@@ -1,11 +1,10 @@
 
 # Model settings
-model: sitl
+model: gns
 # Length of the position input sequence
 input_seq_length: 2
 # Number of message passing steps
 num_mp_steps: 10
-num_sitl_steps: 3
 # Number of MLP layers
 num_mlp_layers: 2
 # Hidden dimension

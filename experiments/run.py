@@ -10,7 +10,6 @@ import jax
 import jax.numpy as jnp
 import jmp
 import numpy as np
-import wandb
 import yaml
 from jax_md import space
 from jax_md.partition import Sparse
@@ -21,6 +20,7 @@ from lagrangebench.evaluate import averaged_metrics
 from lagrangebench.models.gns import GNS
 from lagrangebench.utils import PushforwardConfig
 
+import wandb
 from experiments.sitl import SolverInTheLoop
 from experiments.utils import setup_data
 from jax_sph import partition
@@ -265,6 +265,7 @@ if __name__ == "__main__":
     args = argparse.Namespace(
         config=argparse.Namespace(**args), info=argparse.Namespace()
     )
+    args.config.model_dir = cli_args.model_dir
     print("#" * 79, "\nStarting a LagrangeBench run with the following configs:")
     pprint.pprint(vars(args.config))
     print("#" * 79)
