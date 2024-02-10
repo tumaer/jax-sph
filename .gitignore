@@ -8,3 +8,8 @@ __pycache__/
 *.egg-info
 
 *.out
+
+ckp/
+wandb/
+rollout/
+rollouts/
