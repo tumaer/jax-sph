@@ -1,8 +1,8 @@
 """Integrator schemes"""
 from jax import numpy as jnp
 
-def si_euler(tvf, model, shift_fn, bc_fn):
-    """Semi-implicit Euler integrator"""
+def si_euler_tvf(tvf, model, shift_fn, bc_fn):
+    """Semi-implicit Euler integrator including tvf"""
 
     def advance(dt, state, neighbors):
         # 1. Twice 1/2dt integration of u and v
@@ -36,8 +36,8 @@ def si_euler(tvf, model, shift_fn, bc_fn):
 
     return advance
 
-def si_euler_RIE(model, shift_fn, bc_fn):
-    """Semi-implicit Euler integrator"""
+def si_euler_notvf(tvf, model, shift_fn, bc_fn):
+    """Semi-implicit Euler integrator without tvf"""
 
     def advance(dt, state, neighbors):
         # 1. Twice 1/2dt integration of u and v
@@ -71,10 +71,7 @@ def si_euler_RIE(model, shift_fn, bc_fn):
 
     return advance
 
-
-
-
-def kick_drift_kick_RIE2(model, shift_fn, bc_fn):
+def kick_drift_kick_RIE(tvf, model, shift_fn, bc_fn):
 
     def advance(dt, state, neighbors):
      
@@ -102,36 +99,3 @@ def kick_drift_kick_RIE2(model, shift_fn, bc_fn):
         return state, neighbors
 
     return advance
-
-
-'''
-def kick_drift_kick(model, shift_fn):
-
-    def advance(dt, state, neighbors):
-        # 1. 1/2dt integration of v
-        v_05 = state["v"] + 0.5 * dt * state["dvdt"]
-        state["v"] = v_05
-
-        rho_n = state["rho"]
-
-        # 2. Integrate position with velocity v
-        state["r"] = shift_fn(state["r"], 1.0 * dt * v_05)
-
-        # 3. Update neighbors list
-        num_particles = (state["tag"] != -1).sum()
-        neighbors = neighbors.update(state["r"], num_particles=num_particles)
-
-        # 4. Compute derivatives in "drift state"
-        state = model(state, neighbors)
-
-        # 5. Integrate density 
-        state["rho"] = rho_n + dt * state["drhodt"]
-
-        # 6 fully integrate v
-        state["v"] = v_05 + 0.5 * dt * state["dvdt"]
-
-
-        return state, neighbors
-
-    return advance
-'''

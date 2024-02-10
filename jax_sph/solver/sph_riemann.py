@@ -10,7 +10,7 @@ from jax_sph.kernels import WendlandC2Kernel
 EPS = jnp.finfo(float).eps
 
 
-def SPHRIEMANNv2(
+def SPHRIEMANN(
     displacement_fn,
     eos,
     g_ext_fn,

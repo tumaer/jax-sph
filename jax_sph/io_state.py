@@ -125,19 +125,11 @@ def write_vtks_from_h5s(dir_path, keep_h5=True):
 
 
 def render_data_dict(data_dict):
-    # data_pv = dict2pyvista(data_dict)
-
-    # data_pv.plot(render_points_as_spheres=True, point_size=20)
 
     pl = pyvista.Plotter()
-    # actor = pl.add_points(data_pv, render_points_as_spheres=True, point_size=20)
     pl.show_grid()
     pl.add_bounding_box()
     pl.add_axes()
-    # pl.remove_scalar_bar()
-    # pl.add_scalar_bar(vertical=True)
-    # pl.set_position([0, 0, 1])
-    # pl.render()
     pl.camera_position = "xy"
     pl.show()
 
@@ -166,20 +158,6 @@ def dict2pyvista(data_dict):
 
         data_pv[k] = np.asarray(v)
 
-    # data_dict = {}
-    # for k, v in data_dict.items():
-    #     if v.ndim != 1:
-    #         # when we look at vectorial quantities, e.g. coordinates with
-    #         # shape (num_points, dim), we have to split this data into dim
-    #         # vectors of shape (num_points,) to put them in a CSV file
-    #         # note: we expect the second shape value to be the dimension
-    #         dim = v.shape[1]
-    #         assert dim in [2, 3], "The dimension has to be 2 or 3."
-    #         for d in range(dim):
-    #             _data_dict[k + "_" + str(d)] = v[:,d]
-    #     else:
-    #         _data_dict[k] = v
-
     return data_pv
 
 
@@ -193,4 +171,4 @@ def _plot(r, x, ttl, vmin=None, vmax=None):
 
 if __name__ == "__main__":
     write_vtks_from_h5s("./3D_TGV_SPH_17_20221224-084051", False)
-    # write_vtks_from_h5s("./tgv3d_32_particles/frame_100", True)
+

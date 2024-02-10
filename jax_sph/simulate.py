@@ -10,15 +10,12 @@ from jax_md.partition import Sparse
 
 from cases import select_case
 from jax_sph import partition
-from jax_sph.integrator import si_euler
-#from jax_sph.integrator import kick_drift_kick
-from jax_sph.integrator import kick_drift_kick_RIE2
-from jax_sph.integrator import si_euler_RIE
+from jax_sph.integrator import si_euler_tvf
+from jax_sph.integrator import kick_drift_kick_RIE
+from jax_sph.integrator import si_euler_notvf
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver.sph_tvf import SPHTVF
-from jax_sph.solver.sph_riemann_backup import SPHRIEMANN
-from jax_sph.solver.sph_riemann import SPHRIEMANNv2
-from jax_sph.solver.sph_riemann_bc import SPHRIEMANN_Artur
+from jax_sph.solver.sph_riemann import SPHRIEMANN
 from jax_sph.solver.ut import UTSimulator
 from jax_sph.utils import get_ekin, get_val_max
 
@@ -30,7 +27,10 @@ def simulate(args):
 
     displacement_fn, shift_fn = space.periodic(side=box_size)
 
-    # render_data_dict(state)
+    if args.kernel == "QSK":
+        r_cut = 3
+    elif args.kernel == "WC2K":
+        r_cut = 2.6
 
     # Initialize a neighbors list for looping through the local neighborhood
     # cell_size = r_cutoff + dr_threshold
@@ -38,9 +38,9 @@ def simulate(args):
     neighbor_fn = partition.neighbor_list(
         displacement_fn,
         box_size,
-        r_cutoff=3 * args.dx,
+        r_cutoff=r_cut * args.dx,
         backend=args.nl_backend,
-        dr_threshold=3 * args.dx * 0.25,
+        dr_threshold=r_cut * args.dx * 0.25,
         capacity_multiplier=1.25,
         mask_self=False,
         format=Sparse,
@@ -78,50 +78,17 @@ def simulate(args):
             args.eta_limiter,
             args.is_limiter,
             args.density_evolution,
-        )
-    elif args.solver == "RIE2":
-        model = SPHRIEMANNv2(
-            displacement_fn,
-            eos_fn,
-            g_ext_fn,
-            args.dx,
-            args.dim,
-            args.dt,
-            args.Vmax,
-            args.eta_limiter,
-            args.is_limiter,
-            args.density_evolution,
             args.is_bc_trick,
             args.free_slip,
         )
-    elif args.solver == "RIE3":
-        model = SPHRIEMANN_Artur(
-            displacement_fn,
-            eos_fn,
-            g_ext_fn,
-            args.dx,
-            args.dim,
-            args.dt,
-            args.Vmax,
-            args.eta_limiter,
-            args.is_limiter,
-            args.density_evolution,
-            args.is_bc_trick,
-            args.free_slip,
-            args.density_renormalize,
-        )    
     elif args.solver == "UT":
         model = UTSimulator(g_ext_fn)
 
     # Instantiate advance function for our use case
     if args.solver == "RIE":
-        advance = kick_drift_kick_RIE2(model, shift_fn, bc_fn)
-    elif args.solver == "RIE2":
-        advance = kick_drift_kick_RIE2(model, shift_fn, bc_fn)
-    elif args.solver == "RIE3":
-        advance = si_euler_RIE(model, shift_fn, bc_fn)
+        advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
     else:    
-        advance = si_euler(args.tvf, model, shift_fn, bc_fn)
+        advance = si_euler_tvf(args.tvf, model, shift_fn, bc_fn)
 
     advance = advance if args.no_jit else jit(advance)
 

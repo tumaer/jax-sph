@@ -41,11 +41,11 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     if dim == 2:
         dirs_notvf = [d for d in dirs_notvf if ("2D_TGV_SPH" in d)]
         dirs_tvf = [d for d in dirs_tvf if ("2D_TGV_SPH" in d)]
-        dirs_Rie = [d for d in dirs_Rie if ("2D_TGV_RIE2" in d)]
+        dirs_Rie = [d for d in dirs_Rie if ("2D_TGV_RIE" in d)]
     elif dim == 3:
         dirs_notvf = [d for d in dirs_notvf if ("3D_TGV_SPH" in d)]
         dirs_tvf = [d for d in dirs_tvf if ("3D_TGV_SPH" in d)]
-        dirs_Rie = [d for d in dirs_Rie if ("3D_TGV_RIE2" in d)]
+        dirs_Rie = [d for d in dirs_Rie if ("3D_TGV_RIE" in d)]
     dirs_notvf = sorted(dirs_notvf)
     dirs_tvf = sorted(dirs_tvf)
     dirs_Rie = sorted(dirs_Rie)
@@ -277,7 +277,7 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
     dirs_tvf = os.listdir(val_root_tvf)
     dirs_notvf = os.listdir(val_root_notvf)
     if dim == 2:
-        dirs_Rie = [d for d in dirs_Rie if ("2D_LDC_RIE2" in d)]
+        dirs_Rie = [d for d in dirs_Rie if ("2D_LDC_RIE" in d)]
         dirs_tvf = [d for d in dirs_tvf if ("2D_LDC_SPH" in d)]
         dirs_notvf = [d for d in dirs_notvf if ("2D_LDC_SPH" in d)]
     elif dim == 3:
