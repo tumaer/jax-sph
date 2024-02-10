@@ -15,23 +15,27 @@ class CW(SimulationSetup):
 
         self.L_wall = 1.0
         self.H_wall = 1.0
-        self.L = 0.5
-        self.H = 0.5
+        self.L = 0.3
+        self.H = 0.3
+        if not hasattr(args, "cube_offset") or args.cube_offset is None:
+            args.cube_offset = [0.5, 0.5]
+        if isinstance(args.cube_offset, int):
+            args.cube_offset = [args.cube_offset] * 2
+        self.cube_offset = np.array(args.cube_offset)
+        self.u_init = 0.5
 
-        # a trick to reduce computation using PBC in z-direction
-        self.box_offset = 1.0
-
+        self.u_ref = 1  # TODO: 2 ** 0.5
         self.args.g_ext_magnitude = 1.0
         self.args.is_bc_trick = True
         if self.args.p_bg_factor is None:
-            self.args.p_bg_factor = 1.0
+            self.args.p_bg_factor = 0.0
 
     def _box_size2D(self):
-        return np.array([1.0, 3.0]) + 6 * self.args.dx
+        return np.array([self.L_wall, self.H_wall]) + 6 * self.args.dx
 
     def _box_size3D(self):
         dx6 = 6 * self.args.dx
-        return np.array([1 + dx6, 3 + dx6, 0.5])
+        return np.array([self.L_wall + dx6, self.H_wall + dx6, 0.5])
 
     def _init_pos2D(self, box_size, dx):
         dx3 = 3 * self.args.dx
@@ -49,14 +53,17 @@ class CW(SimulationSetup):
         wall_t = horiz.copy() + np.array([dx3, H_wall + dx3])
 
         r_fluid = dx3 + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
+        r_fluid += self.cube_offset
         res = np.concatenate([wall_l, wall_b, wall_r, wall_t, r_fluid])
         return res
 
     def _tag2D(self, r):
-        mask_left = jnp.where(r[:, 0] < 3 * self.args.dx, True, False)
-        mask_bottom = jnp.where(r[:, 1] < 3 * self.args.dx, True, False)
-        mask_right = jnp.where(r[:, 0] > 1 + 3 * self.args.dx, True, False)
-        mask_wall = mask_left + mask_bottom + mask_right
+        dx3 = 3 * self.args.dx
+        mask_left = jnp.where(r[:, 0] < dx3, True, False)
+        mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
+        mask_right = jnp.where(r[:, 0] > self.L_wall + dx3, True, False)
+        mask_top = jnp.where(r[:, 1] > self.H_wall + dx3, True, False)
+        mask_wall = mask_left + mask_bottom + mask_right + mask_top
 
         # tags: {'0': water, '1': solid wall, '2': moving wall}
         tag = jnp.zeros(len(r), dtype=int)
@@ -67,7 +74,8 @@ class CW(SimulationSetup):
         return self._tag2D(r)
 
     def _init_velocity2D(self, r):
-        return jnp.zeros_like(r)
+        res = jnp.array([0.0, -self.u_init])
+        return res
 
     def _init_velocity3D(self, r):
         return jnp.zeros_like(r)
