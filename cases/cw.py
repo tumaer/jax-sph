@@ -96,3 +96,6 @@ class CW(SimulationSetup):
         # pay attention to the shapes
         state["p"] = jnp.where(mask_wall_1d, 0.0, state["p"])
         return state
+    
+    def _init_acceleration2D(self, r):
+        pass

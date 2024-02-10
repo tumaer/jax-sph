@@ -10,3 +10,7 @@ __pycache__/
 *.out
 
 datasets/
+ckp/
+wandb/
+rollout/
+rollouts/

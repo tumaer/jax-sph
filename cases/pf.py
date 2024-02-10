@@ -108,3 +108,6 @@ class PF(SimulationSetup):
         state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
 
         return state
+
+    def _init_acceleration2D(self, r):
+        pass

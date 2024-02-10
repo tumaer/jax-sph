@@ -119,3 +119,6 @@ class LDC(SimulationSetup):
         state["dvdt"] = jnp.where(mask2, 0, state["dvdt"])
 
         return state
+    
+    def _init_acceleration2D(self, r):
+        pass
