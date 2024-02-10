@@ -51,7 +51,7 @@ class SimulationSetup(ABC):
         mass_ref = volume_ref * rho_ref
 
         # time integration step dt
-        CFL = 1.0
+        CFL = 0.25
         dt_convective = CFL * h / (c_ref + u_ref)
         dt_viscous = CFL * h**2 * rho_ref / eta_ref if eta_ref != 0.0 else 999
         dt_body_force = CFL * (h / (self.args.g_ext_magnitude + EPS)) ** 0.5
