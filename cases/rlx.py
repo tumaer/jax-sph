@@ -24,7 +24,7 @@ class Rlx(SimulationSetup):
 
         # custom variables related only to this Simulation
         self.args.g_ext_magnitude = 0.0
-        self.args.is_bc_trick = True if args.relax_pbc else False
+        self.args.is_bc_trick = bool(args.relax_pbc)
 
     def _box_size2D(self):
         wall = 0 if self.relax_pbc else 6
@@ -73,6 +73,6 @@ class Rlx(SimulationSetup):
             state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
 
         return state
-    
+
     def _init_acceleration2D(self, r):
         pass
