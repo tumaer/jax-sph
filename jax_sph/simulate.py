@@ -24,7 +24,10 @@ def simulate(args):
 
     displacement_fn, shift_fn = space.periodic(side=box_size)
 
-    # render_data_dict(state)
+    if args.kernel == "QSK":
+        r_cut = 3
+    elif args.kernel == "WC2K":
+        r_cut = 2.6
 
     # Initialize a neighbors list for looping through the local neighborhood
     # cell_size = r_cutoff + dr_threshold
@@ -34,7 +37,8 @@ def simulate(args):
         box_size,
         r_cutoff=3 * args.dx,
         backend=args.nl_backend,
-        capacity_multiplier=2.0,
+        dr_threshold=r_cut * args.dx * 0.25,
+        capacity_multiplier=1.25,
         mask_self=False,
         format=Sparse,
         num_particles_max=state["r"].shape[0],
