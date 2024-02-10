@@ -185,7 +185,6 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         Re = rho * u_ref * L / eta
         slope_u_max = -8 * np.pi**2 / Re
         u_max_theory = np.exp(slope_u_max * t)
-        # factor 0.25=int(int((sin(2pi x) cos(2pi y))^2, x from 0 to 1), y from 0 to 1)
         e_kin_theory = 0.25 * np.exp(2 * slope_u_max * t)
 
         axs1[0].plot(t, u_max_theory, "k", label="Theory")
@@ -312,8 +311,7 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
     Re = 1 / args.viscosity  # Reynolds number
 
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12, 6))
-    # ax=fig.add_subplot(111, label="1")
-    # ax2=fig.add_subplot(111, label="2", frame_on=False)
+
 
     N = round(1 / args.dx) + 1
     for i, src_path in enumerate(files_Rie[-1:]):
@@ -362,8 +360,7 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
         ax2.set_yticks(jnp.linspace(-0.6, 0.5, 12))
         ax2.set_ylabel('V(x)')
         ax2.set_xlabel('x')
-        # ax.plot(np.asarray(x_axis_dots - 3 * args.dx), np.asarray(v_val_dots),
-        #   color = "C2")
+
         ax3 = ax2.twinx().twiny()
         ax4 = ax2.twinx()
         ax3.set_xlim([-0.4, 1])
@@ -402,14 +399,7 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
         (v_vel.loc[:, 1000.0].values).astype(float),
         (v_vel.loc[:, "10,000"].values).astype(float),
     )
-    # Re=100, y-velocity, min at x=0.8 with -0.245, max at x=0.3 with 0.175
 
-    # for Re=100 the reference is:
-    # ref_x = np.array([0.0, 0.0625, 0.0703, 0.0781, 0.0938, 0.1563, 0.2266, 0.2344,
-    #   0.5000, 0.8047, 0.8594, 0.9063, 0.9453, 0.9531, 0.9609, 0.9688, 1.0000])
-    # ref_v_100 = np.array([0.0, 0.09233, 0.10091, 0.10890, 0.12317, 0.16077, 0.17507,
-    #   0.17527, 0.05454, -0.24533, -0.22445, -0.16914, -0.10313, -0.08864, -0.07391,
-    #   -0.05906, 0.0])
 
     if Re == 100.0:
         ax2.scatter(x, v_Re_100, color="k", marker="s")
@@ -421,36 +411,11 @@ def val_2D_LDC(val_root_tvf, val_root_notvf, val_root_Rie, dim=2, nxs=[50], save
         ax2.scatter(x, v_Re_10000, color="C1", marker="s")
         ax2.scatter(u_Re_10000, y, color="C0", marker="o")
 
-    # x_uni_sorted, v_x_sorted = zip(*sorted(zip(x_uni, v_x)))
-    # ax2.set_xlabel("x", color="C0")
-    # ax2.set_ylabel("$V_y(x)$", color="C1")
-    # ax2.tick_params(axis="x", colors="C1")
-    # ax2.tick_params(axis="y", colors="C1")
+
     ax2.grid()
     ax2.legend(loc='lower right')
-    # ax.set_xlim([0., 1.])
-    # ax.set_ylim([-0.6, 0.5])
-
-    # y_uni_sorted, u_y_sorted = zip(*sorted(zip(y_uni, u_y)))
-    # ax2.xaxis.tick_top()
-    # ax2.yaxis.tick_right()
-    # ax2.set_xlabel('$V_x(y)$', color="C0")
-    # ax2.set_ylabel('y', color="C1")
-    # ax2.xaxis.set_label_position('top')
-    # ax2.yaxis.set_label_position('right')
-    # ax2.tick_params(axis='x', colors="C0")
-    # ax2.tick_params(axis='y', colors="C0")
-    # ax2.set_xlim([-0.4, 1.])
-    # ax2.set_ylim([0., 1.])
-
-    # if save_fig:
-    #     plt.savefig(f"{val_root}/2D_LDC_Re_{str(Re)}.png")
-
-    # plt.show()
-
+    
     velend = jnp.linalg.norm(state["u"], axis=1)
-
-    #fig2, axs2 = plt.subplots(1, 2, figsize=(10, 5))
 
     ax.scatter(state['r'][:, 0], state['r'][:, 1], c=velend, cmap="turbo", s=12, vmin=-0.0, vmax=1)
     ax.set_xlim([0, 1.12])
@@ -529,116 +494,6 @@ def val_DB(val_root, save_fig=False):
 
 
 
-def val_2D_PF(
-    val_dir_path,
-    dim=2,
-    nxs=[
-        60,
-    ],
-    save_fig=False,
-):
-    def u_series_exp(y, t, n_max=10):
-        """Analytical solution to unsteady Poiseuille flow (low Re)
-
-        Based on Series expansion as shown in:
-        "Modeling Low Reynolds Number Incompressible Flows Using SPH"
-        ba Morris et al. 1997
-        """
-
-        eta = 100.0  # dynamic viscosity
-        rho = 1.0  # denstiy
-        nu = eta / rho  # kinematic viscosity
-        u_max = 1.25  # max velocity in middle of channel
-        d = 1.0  # channel width
-
-        Re = u_max * d / nu
-        print(f"Poiseuille flow at Re={Re}")
-
-        fx = -8 * nu * u_max / d**2
-        offset = fx / (2 * nu) * y * (y - d)
-
-        def term(n):
-            base = np.pi * (2 * n + 1) / d
-
-            prefactor = 4 * fx / (nu * base**3 * d)
-            sin_term = np.sin(base * y)
-            exp_term = np.exp(-(base**2) * nu * t)
-            return prefactor * sin_term * exp_term
-
-        res = offset
-        for i in range(n_max):
-            res += term(i)
-
-        return res
-
-    # analytical solution
-
-    y_axis = np.linspace(0, 1, 100)
-    t_axis = [
-        r"$0.02\times 10^{-2}$",
-        r"$0.10\times 10^{-2}$",
-        r"$0.20\times 10^{-2}$",
-        r"$1.00\times 10^{-2}$",
-    ]
-    t_dimless = [0.0002, 0.001, 0.002, 0.01]
-
-    for t_val, t_label in zip(t_dimless, t_axis):
-        plt.plot(y_axis, u_series_exp(y_axis, t_val), label=f"t={t_label}")
-
-    # extract points from our solution
-    dirs = os.listdir(val_dir_path)
-    dirs = [d for d in dirs if os.path.isdir(os.path.join(val_dir_path, d))]
-    assert len(dirs) == 1, f"Expected only one directory in {val_dir_path}"
-    args = read_args(os.path.join(val_dir_path, dirs[0], "args.txt"))
-    assert args.dt == 0.0000005
-    assert args.dx == 0.0166666
-
-    num_points = 21
-    dx_plot = 0.05
-    y_axis = jnp.array([dx_plot * i for i in range(num_points)]) + 3 * args.dx
-    rs = 0.2 * jnp.ones([y_axis.shape[0], 2])
-    rs = rs.at[:, 1].set(y_axis)
-
-    step_max = np.array(np.rint(args.t_end / args.dt), dtype=int)
-    digits = len(str(step_max))
-
-    for i, t_val in enumerate(t_dimless):
-        step = np.array(np.rint(t_val / args.dt), dtype=int)
-        file_name = "traj_" + str(step).zfill(digits) + ".h5"
-        src_path = os.path.join(val_dir_path, dirs[0], file_name)
-
-        if i == 0:
-            interp_vel_fn = sph_interpolator(args, src_path)
-
-        u_val = interp_vel_fn(src_path, rs, prop="u", dim_ind=0)
-
-        if i == 0:
-            plt.plot(
-                y_axis - 3 * args.dx, u_val, "ko", mfc="none", label=r"SPH, $r_c$=0.05"
-            )
-        else:
-            plt.plot(y_axis - 3 * args.dx, u_val, "ko", mfc="none")
-
-    # plot layout
-
-    plt.legend()
-    plt.ylim([0, 1.4])
-    plt.xlim([0, 1])
-    plt.xlabel(r"y [-]")
-    plt.ylabel(r"$u_x$ [-]")
-    # plt.title(f"{str(dim)}D Poiseuille Flow")
-    plt.grid()
-    plt.tight_layout()
-
-    ###### save or visualize
-
-    if save_fig:
-        os.makedirs(val_dir_path, exist_ok=True)
-        nxs_str = "_".join([str(i) for i in nxs])
-        plt.savefig(f"{val_dir_path}/{str(dim)}D_PF_{nxs_str}_new.png")
-
-    plt.show()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -649,10 +504,7 @@ if __name__ == "__main__":
     parser.add_argument("--src_dir_Rie", type=str, help="Source directory Riemann")
     args = parser.parse_args()
 
-    if args.case == "2D_PF":
-        val_2D_PF(args.src_dir, 2, [60], True)
-
-    elif args.case == "2D_LDC":
+    if args.case == "2D_LDC":
         val_2D_LDC(args.src_dir_tvf, args.src_dir_notvf, args.src_dir_Rie, save_fig=True)
 
     elif args.case == "2D_TGV":
