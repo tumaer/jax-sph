@@ -64,9 +64,9 @@ class SolverInTheLoop(hk.Module):
 
         rho_ref = 1.0
         c0 = 10.0
-        eta_limiter = 3,
-        solver = "SPH",
-        kernel = "QSK",
+        eta_limiter = 3
+        solver = "SPH"
+        kernel = "QSK"
 
         u_ref = 1.0
         c_ref = 10.0 * u_ref

@@ -42,8 +42,8 @@ class SimulationSetup(ABC):
         eta_ref = args.viscosity
         u_ref = 1.0 if not hasattr(self, "u_ref") else self.u_ref
         args.Vmax = 1.0 if not hasattr(self, "Vmax") else self.Vmax
-        args.c0 = 10 * args.Vmax # TODO: Check DB influence
-        gamma_eos = 1.0 # = 7.0 for HT
+        args.c0 = 10 * args.Vmax  # TODO: Check DB influence
+        gamma_eos = 1.0  # = 7.0 for HT
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
         c_ref = 10.0 * u_ref
@@ -128,7 +128,6 @@ class SimulationSetup(ABC):
         temp = jnp.ones(num_particles) * T_ref
         kappa = jnp.ones(num_particles) * kappa_ref
         Cp = jnp.ones(num_particles) * Cp_ref
-
 
         # initialize the state dictionary
         state = {

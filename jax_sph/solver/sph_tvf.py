@@ -4,8 +4,7 @@ import jax.numpy as jnp
 from jax import ops, vmap
 from jax_md import space
 
-from jax_sph.kernels import QuinticKernel
-from jax_sph.kernels import WendlandC2Kernel
+from jax_sph.kernels import QuinticKernel, WendlandC2Kernel
 
 EPS = jnp.finfo(float).eps
 
@@ -20,13 +19,24 @@ def rho_evol_fn(rho, mass, u, grad_w_dist, i_s, j_s, dt, N, **kwargs):
 
 
 def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c0):
-    def rho_evol_riemann_fn(e_s, rho_i, rho_j, m_j, u_i, u_j, p_i, p_j, r_ij, d_ij, wall_mask_j,
-        n_w_j, g_ext_i, **kwargs):
-
-
+    def rho_evol_riemann_fn(
+        e_s,
+        rho_i,
+        rho_j,
+        m_j,
+        u_i,
+        u_j,
+        p_i,
+        p_j,
+        r_ij,
+        d_ij,
+        wall_mask_j,
+        n_w_j,
+        g_ext_i,
+        **kwargs,
+    ):
         """Density evolution according to Zhang et al. 2017."""
 
-                
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij = e_s
 
@@ -34,9 +44,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c0):
         kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij)
 
         # Compute average states eq. (6)/(12)/(13), Zhang (2017)
-        u_L = jnp.where(
-            wall_mask_j == 1, jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij)
-        )
+        u_L = jnp.where(wall_mask_j == 1, jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij))
         p_L = p_i
         rho_L = rho_i
 
@@ -46,9 +54,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c0):
             -u_L + 2 * jnp.dot(u_j, n_w_j),
             jnp.dot(u_j, -e_ij),
         )
-        p_R = jnp.where(
-            wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j
-        )
+        p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
         rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
 
         U_avg = (u_L + u_R) / 2
@@ -60,11 +66,9 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c0):
         v_star = U_star * (-e_ij) + (v_avg - U_avg * (-e_ij))
 
         # Mass conservation with linear Riemann solver eq. (8), Zhang (2017)
-        eq_8 = (
-            2 * rho_i * m_j / rho_j * jnp.dot((u_i - v_star), kernel_grad)
-        )
+        eq_8 = 2 * rho_i * m_j / rho_j * jnp.dot((u_i - v_star), kernel_grad)
         return eq_8
-    
+
     return rho_evol_riemann_fn
 
 
@@ -83,7 +87,7 @@ def rho_summation_fn(mass, i_s, w_dist, N):
 
 
 def wall_phi_vec_wrapper(kernel_fn):
-    def wall_phi_vec(rho_j,  m_j, dr_ij, dist, tag_j, tag_i):
+    def wall_phi_vec(rho_j, m_j, dr_ij, dist, tag_j, tag_i):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij_w = dr_ij / (dist + EPS)
 
@@ -94,19 +98,12 @@ def wall_phi_vec_wrapper(kernel_fn):
         phi = -1.0 * m_j / rho_j * kernel_grad * tag_j * tag_i
 
         return phi
+
     return wall_phi_vec
 
 
 def acceleration_tvf_fn_wrapper(kernel_fn):
-    def acceleration_tvf_fn(
-        r_ij,
-        d_ij,
-        rho_i,
-        rho_j,
-        m_i,
-        m_j,
-        p_bg_i,
-    ):
+    def acceleration_tvf_fn(r_ij, d_ij, rho_i, rho_j, m_i, m_j, p_bg_i):
         # compute the common prefactor `_c`
         _weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
         _kernel_grad = kernel_fn.grad_w(d_ij)
@@ -189,9 +186,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         kernel_grad = kernel_part_diff * (e_ij)
 
         # Compute average states eq. (6)/(12)/(13), Zhang (2017)
-        u_L = jnp.where(
-            wall_mask_j == 1, jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij)
-        )
+        u_L = jnp.where(wall_mask_j == 1, jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij))
         p_L = p_i
         rho_L = rho_i
 
@@ -201,9 +196,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
             -u_L + 2 * jnp.dot(u_j, n_w_j),
             jnp.dot(u_j, -e_ij),
         )
-        p_R = jnp.where(
-            wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j
-        )
+        p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
         rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
 
         P_avg = (p_L + p_R) / 2
@@ -217,18 +210,15 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         # u_R = jnp.where(
         # wall_mask_j == 1, -u_L - 2 * jnp.dot(v_j, -n_w_j), jnp.dot(v_j, -e_ij)
         # )
-        P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(
-            u_L, u_R, eta_limiter
-        )
+        P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
         # pressure term with linear Riemann solver eq. (9), Zhang (2017)
         eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad
 
         # viscosity term eq. (6), Zhang (2019)
         v_ij = u_i - u_j
-        eq_6 = (2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS)
-            *kernel_part_diff * mask
-        )
+        eq_6 = 2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS)
+        eq_6 *= kernel_part_diff * mask
 
         # compute the prefactor `_c`
         _weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
@@ -359,22 +349,23 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
 
             temperature = t_wall
 
-
         return p, rho, u, v, temperature
 
     return gwbc_fn
 
 
 def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
-
     if is_free_slip:
+
         def free_weight(fluid_mask_i, tag_i):
             return fluid_mask_i
     else:
+
         def free_weight(fluid_mask_i, tag_i):
-            return jnp.ones_like(tag_i) 
+            return jnp.ones_like(tag_i)
 
     if is_heat_conduction:
+
         def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
             # mask_j_s_wall = jnp.where(tag[j_s] > 0, 1.0, 0.0)
             w_j_s_fluid = w_dist * mask_j_s_fluid
@@ -385,7 +376,8 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
             t_wall = jnp.where(tag == 1, t_wall, temperature)
             temperature = t_wall
             return temperature
-    else: 
+    else:
+
         def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
             return temperature
 
@@ -396,47 +388,45 @@ def limiter_fn_wrapper(eta_limiter, c0):
     """if != -1, introduce dissipation limiter eq. (11), Zhang (2017)"""
 
     if eta_limiter == -1:
+
         def beta_fn(u_L, u_R, eta_limiter):
             return c0
     else:
+
         def beta_fn(u_L, u_R, eta_limiter):
             temp = eta_limiter * jnp.maximum(u_L - u_R, jnp.zeros_like(u_L))
             beta = jnp.minimum(temp, jnp.full_like(temp, c0))
             return beta
-        
+
     return beta_fn
 
 
 def kernel_fn_wrapper(kernel, dx, dim):
-
-    if kernel == 'QSK':
+    if kernel == "QSK":
         kernel_fn = QuinticKernel(h=dx, dim=dim)
-    elif kernel == 'W2CK':
+    elif kernel == "W2CK":
         kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
 
     return kernel_fn
 
 
 def temperature_derivative_wrapper(kernel_fn):
-
     def temperature_derivative(
         e_s, r_ij, d_ij, rho_i, rho_j, m_j, kappa_i, kappa_j, Cp_i, T_i, T_j
-        ):
+    ):
         e_ij = e_s
         _kernel_grad = kernel_fn.grad_w(d_ij)
         _kernel_grad_vector = _kernel_grad * e_ij
 
         _effective_kappa = (kappa_i * kappa_j) / (kappa_i + kappa_j)
-        F_ab = jnp.dot(r_ij, _kernel_grad_vector) / (
-            (d_ij * d_ij) + EPS
-        )  # scalar
+        F_ab = jnp.dot(r_ij, _kernel_grad_vector) / ((d_ij * d_ij) + EPS)  # scalar
 
         dTdt = (4 * m_j * _effective_kappa * (T_i - T_j) * F_ab) / (
             Cp_i * rho_i * rho_j
         )
 
         return dTdt
-    
+
     return temperature_derivative
 
 
@@ -449,8 +439,8 @@ def WCSPH(
     dt,
     c0,
     eta_limiter=3,
-    solver='STD',
-    kernel='QSK',
+    solver="SPH",
+    kernel="QSK",
     is_bc_trick=False,
     is_rho_evol=False,
     artificial_alpha=0.0,
@@ -465,14 +455,14 @@ def WCSPH(
     _gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
     _free_weight, _heat_bc = gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction)
     _acceleration_tvf_fn = acceleration_tvf_fn_wrapper(_kernel_fn)
-    _acceleration_riemann_fn = acceleration_riemann_fn_wrapper(_kernel_fn, eos, _beta_fn, eta_limiter)
+    _acceleration_riemann_fn = acceleration_riemann_fn_wrapper(
+        _kernel_fn, eos, _beta_fn, eta_limiter
+    )
     _acceleration_fn = acceleration_standard_fn_wrapper(_kernel_fn)
     _artificial_viscosity_fn = artificial_viscosity_fn_wrapper(dx, artificial_alpha)
     _wall_phi_vec = wall_phi_vec_wrapper(_kernel_fn)
     _rho_evol_riemann_fn = rho_evol_riemann_fn_wrapper(_kernel_fn, eos, c0)
     _temperature_derivative = temperature_derivative_wrapper(_kernel_fn)
-
-    
 
     def forward(state, neighbors):
         """Update step of SPH solver
@@ -514,8 +504,8 @@ def WCSPH(
 
         # calculate normal vector of wall boundaries
         temp = vmap(_wall_phi_vec)(
-                rho[j_s],  mass[j_s], dr_i_j, dist, wall_mask[j_s], wall_mask[i_s]
-            )
+            rho[j_s], mass[j_s], dr_i_j, dist, wall_mask[j_s], wall_mask[i_s]
+        )
         phi = ops.segment_sum(temp, i_s, N)
 
         # compute normal vector for boundary particles eq. (15), Zhang (2017)
@@ -526,21 +516,31 @@ def WCSPH(
         )
         n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
 
-
-
         ##### Density summation or evolution
 
         # update evolution
 
-        if is_rho_evol and (solver == 'STD'):
+        if is_rho_evol and (solver == "SPH"):
             rho, drhodt = rho_evol_fn(rho, mass, u, grad_w_dist, i_s, j_s, dt, N)
 
             if is_rho_renorm:
                 rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
-        elif is_rho_evol and (solver == 'RIE'):
+        elif is_rho_evol and (solver == "RIE"):
             temp = vmap(_rho_evol_riemann_fn)(
-                e_s, rho[i_s], rho[j_s], mass[j_s], u[i_s], u[j_s], p[i_s], p[j_s], dr_i_j, dist, wall_mask[j_s], n_w[j_s], g_ext[i_s]
-                )
+                e_s,
+                rho[i_s],
+                rho[j_s],
+                mass[j_s],
+                u[i_s],
+                u[j_s],
+                p[i_s],
+                p[j_s],
+                dr_i_j,
+                dist,
+                wall_mask[j_s],
+                n_w[j_s],
+                g_ext[i_s],
+            )
             drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
             rho = rho + dt * drhodt
 
@@ -549,29 +549,28 @@ def WCSPH(
         else:
             rho = rho_summation_fn(mass, i_s, w_dist, N)
 
-
         ##### Compute primitives
 
         # pressure, and background pressure
         p = vmap(eos.p_fn)(rho)
         background_pressure_tvf = vmap(eos.p_fn)(jnp.zeros_like(p))
 
-
         #####  Apply BC trick
 
-        if is_bc_trick and (solver == 'STD'): 
+        if is_bc_trick and (solver == "SPH"):
             p, rho, u, v, temperature = _gwbc_fn(
                 temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
             )
-        elif is_bc_trick and (solver == 'RIE'):
+        elif is_bc_trick and (solver == "RIE"):
             mask = _free_weight(fluid_mask[i_s], tag[i_s])
-            temperature = _heat_bc(fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N)
-        elif (not is_bc_trick) and (solver == 'RIE'):
+            temperature = _heat_bc(
+                fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N
+            )
+        elif (not is_bc_trick) and (solver == "RIE"):
             mask = jnp.ones_like(tag[i_s])
 
-
         ##### compute heat conduction
-        
+
         if is_heat_conduction:
             out = vmap(_temperature_derivative)(
                 e_s,
@@ -590,12 +589,10 @@ def WCSPH(
         else:
             dTdt = jnp.zeros_like(drhodt)
         temperature = temperature + dt * dTdt
-        
-
 
         ##### Compute RHS
 
-        if solver == 'STD':
+        if solver == "SPH":
             out = vmap(_acceleration_fn)(
                 dr_i_j,
                 dist,
@@ -612,7 +609,7 @@ def WCSPH(
                 p[i_s],
                 p[j_s],
             )
-        elif solver == 'RIE':
+        elif solver == "RIE":
             out = vmap(_acceleration_riemann_fn)(
                 e_s,
                 dr_i_j,

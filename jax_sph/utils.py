@@ -72,7 +72,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         # eq. 23 from same paper
         x = jnp.where(state["tag"][:, None] > 0, 2 * x - x_wall, x)
         return x
-    
+
     # Set the wall particle tempertature or pressure the same as the neighbouring
     # fluid particles, so that the neighboring fluid particles get the full suport.
     def comp_bc_interm_scalar(x, i_s, j_s, w_j_s_fluid, w_i_sum):
@@ -83,7 +83,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         x_wall = x_wall_unnorm / (w_i_sum + EPS)
         # eq. 23 from same paper
         x = jnp.where(state["tag"] > 0, x_wall, x)
-        return x 
+        return x
 
     kernel_fn = QuinticKernel(h=args.dx, dim=args.dim)
 
