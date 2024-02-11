@@ -15,9 +15,7 @@ class HT(SimulationSetup):
 
         if self.args.g_ext_magnitude is None:
             self.args.g_ext_magnitude = 1.0
-        args.u_ref = 1.0
-        args.Vmax = args.u_ref
-        args.c0 = args.Vmax * 10
+
         # for top and bottom walls
         self.args.is_bc_trick = True
 
