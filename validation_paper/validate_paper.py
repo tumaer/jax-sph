@@ -38,12 +38,12 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     dirs_tvf = os.listdir(os.path.join(val_root, tvf))
     dirs_Rie = os.listdir(os.path.join(val_root, Rie))
     if dim == 2:
-        dirs_notvf = [d for d in dirs_notvf if ("2D_TGV_STD" in d)]
-        dirs_tvf = [d for d in dirs_tvf if ("2D_TGV_STD" in d)]
+        dirs_notvf = [d for d in dirs_notvf if ("2D_TGV_SPH" in d)]
+        dirs_tvf = [d for d in dirs_tvf if ("2D_TGV_SPH" in d)]
         dirs_Rie = [d for d in dirs_Rie if ("2D_TGV_RIE" in d)]
     elif dim == 3:
-        dirs_notvf = [d for d in dirs_notvf if ("3D_TGV_STD" in d)]
-        dirs_tvf = [d for d in dirs_tvf if ("3D_TGV_STD" in d)]
+        dirs_notvf = [d for d in dirs_notvf if ("3D_TGV_SPH" in d)]
+        dirs_tvf = [d for d in dirs_tvf if ("3D_TGV_SPH" in d)]
         dirs_Rie = [d for d in dirs_Rie if ("3D_TGV_RIE" in d)]
     dirs_notvf = sorted(dirs_notvf)
     dirs_tvf = sorted(dirs_tvf)
@@ -286,8 +286,8 @@ def val_2D_LDC(
     dirs_notvf = os.listdir(val_root_notvf)
     if dim == 2:
         dirs_Rie = [d for d in dirs_Rie if ("2D_LDC_RIE" in d)]
-        dirs_tvf = [d for d in dirs_tvf if ("2D_LDC_STD" in d)]
-        dirs_notvf = [d for d in dirs_notvf if ("2D_LDC_STD" in d)]
+        dirs_tvf = [d for d in dirs_tvf if ("2D_LDC_SPH" in d)]
+        dirs_notvf = [d for d in dirs_notvf if ("2D_LDC_SPH" in d)]
     elif dim == 3:
         raise NotImplementedError
 

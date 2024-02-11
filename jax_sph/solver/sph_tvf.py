@@ -567,7 +567,7 @@ def WCSPH(
             mask = _free_weight(fluid_mask[i_s], tag[i_s])
             temperature = _heat_bc(fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N)
         elif (not is_bc_trick) and (solver == 'RIE'):
-            mask = jnp.ones_like(tag)
+            mask = jnp.ones_like(tag[i_s])
 
 
         ##### compute heat conduction
