@@ -9,12 +9,11 @@ from jax_md.partition import Sparse
 
 from cases import select_case
 from jax_sph import partition
-from jax_sph.integrator import kick_drift_kick_RIE, si_euler
+from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
-from jax_sph.solver.sph_riemann import SPHRIEMANN
-from jax_sph.solver.sph_tvf import SPHTVF
-from jax_sph.solver.ut import UTSimulator
+from jax_sph.solver.sph_tvf import WCSPH
 from jax_sph.utils import get_ekin, get_val_max
+
 
 
 def simulate(args):
@@ -47,44 +46,31 @@ def simulate(args):
     num_particles = (state["tag"] != -1).sum()
     neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
 
-    # Solver setup
-    if args.solver == "SPH":  # TODO: make one solver
-        model = SPHTVF(
+    # Solver setup    
+    model = WCSPH(
             displacement_fn,
             eos_fn,
             g_ext_fn,
             args.dx,
             args.dim,
             args.dt,
+            args.c0,
+            args.eta_limiter,
+            args.solver,
+            args.kernel,
             args.is_bc_trick,
             args.density_evolution,
             args.artificial_alpha,
             args.free_slip,
             args.density_renormalize,
-        )
-    elif args.solver == "RIE":
-        model = SPHRIEMANN(
-            displacement_fn,
-            eos_fn,
-            g_ext_fn,
-            args.dx,
-            args.dim,
-            args.dt,
-            args.Vmax,
-            args.eta_limiter,
-            args.is_limiter,
-            args.density_evolution,
-            args.is_bc_trick,
-            args.free_slip,
-        )
-    elif args.solver == "UT":
-        model = UTSimulator(g_ext_fn)
-
+            args.heat_conduction,
+    )
     # Instantiate advance function for our use case
-    if args.solver == "RIE":  # TODO: make one integrator
-        advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
-    else:
-        advance = si_euler(args.tvf, model, shift_fn, bc_fn)
+    advance = si_euler(args.tvf, model, shift_fn, bc_fn)
+    # if args.solver == "RIE":  # TODO: make one integrator
+    #     advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
+    # else:
+    #     advance = si_euler(args.tvf, model, shift_fn, bc_fn)
 
     advance = advance if args.no_jit else jit(advance)
 
@@ -120,9 +106,17 @@ def simulate(args):
             t_ = (step + 1) * args.dt
             ekin_ = get_ekin(state, args.dx)
             u_max_ = get_val_max(state, "u")
-            print(
-                f"{step} / {args.sequence_length}, t = {t_:.4f} Ekin = {ekin_:.7f} "
-                f"u_max = {u_max_:.4f}"
-            )
+            temperature_max_ = get_val_max(state, "T")
+            if args.heat_conduction:
+                print(
+                    f"{step} / {args.sequence_length}, t = {t_:.4f} Ekin = {ekin_:.7f} "
+                    f"u_max = {u_max_:.4f} "
+                    f"T_max = {temperature_max_:.4f}"
+                )
+            else:
+                print(
+                    f"{step} / {args.sequence_length}, t = {t_:.4f} Ekin = {ekin_:.7f} "
+                    f"u_max = {u_max_:.4f} "
+                )
 
     print(f"time: {time.time() - start:.2f} s")

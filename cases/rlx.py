@@ -21,6 +21,9 @@ class Rlx(SimulationSetup):
         self.L, self.H, self.W = self.nx * dx, self.ny * dx, self.nz * dx
         self.relax_pbc = args.relax_pbc
         self.args.p_bg_factor = 0.0
+        args.c0 = 10 * args.Vmax
+        self.args.kappa = 0.0 
+        self.args.Cp = 0.0
 
         # custom variables related only to this Simulation
         self.args.g_ext_magnitude = 0.0
@@ -73,6 +76,3 @@ class Rlx(SimulationSetup):
             state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
 
         return state
-
-    def _init_acceleration2D(self, r):
-        pass

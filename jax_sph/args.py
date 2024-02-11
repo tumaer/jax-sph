@@ -14,14 +14,14 @@ class Args:
             "--case",
             type=str,
             default="TGV",
-            choices=["TGV", "RPF", "LDC", "PF", "CW", "DB", "Rlx", "UT"],
+            choices=["TGV", "RPF", "LDC", "PF", "CW", "DB", "Rlx", "UT", "HT"],
             help="Simulation setup",
         )
         self.parser.add_argument(
             "--solver",
             type=str,
-            default="SPH",
-            choices=["SPH", "GNS", "SEGNN", "UT", "RIE"],
+            default="STD",
+            choices=["STD", "RIE"],
             help="vanilla correspond to density transport",
         )
         self.parser.add_argument(
@@ -159,13 +159,24 @@ class Args:
             help="Estimatet max flow velocity to calculate artificial speed of sound",
         )
         self.parser.add_argument(
-            "--is-limiter",
-            action="store_true",
-            help="Dissipation limiter for Riemann solver",
-        )
-        self.parser.add_argument(
             "--eta-limiter",
             type=float,
             default=3,
-            help="Parameter to modulate the numeric dissipation of the Riemann solver",
+            help="Riemann dissipation limiter parameter, -1 = off",
+        )
+        self.parser.add_argument(
+            "--kappa",
+            type=float,
+            default=0,
+            help="Thermal conductivity (non-dimensional)",
+        )
+        self.parser.add_argument(
+            "--heat-conduction",
+            action="store_true",
+            help="Whether to apply the heat conduction term",
+        )
+        self.parser.add_argument(
+            "--outlet-temperature-derivative",
+            action="store_true",
+            help="Whether to set dT/dt near the outlet to 0",
         )

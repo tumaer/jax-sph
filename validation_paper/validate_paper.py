@@ -38,12 +38,12 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     dirs_tvf = os.listdir(os.path.join(val_root, tvf))
     dirs_Rie = os.listdir(os.path.join(val_root, Rie))
     if dim == 2:
-        dirs_notvf = [d for d in dirs_notvf if ("2D_TGV_SPH" in d)]
-        dirs_tvf = [d for d in dirs_tvf if ("2D_TGV_SPH" in d)]
+        dirs_notvf = [d for d in dirs_notvf if ("2D_TGV_STD" in d)]
+        dirs_tvf = [d for d in dirs_tvf if ("2D_TGV_STD" in d)]
         dirs_Rie = [d for d in dirs_Rie if ("2D_TGV_RIE" in d)]
     elif dim == 3:
-        dirs_notvf = [d for d in dirs_notvf if ("3D_TGV_SPH" in d)]
-        dirs_tvf = [d for d in dirs_tvf if ("3D_TGV_SPH" in d)]
+        dirs_notvf = [d for d in dirs_notvf if ("3D_TGV_STD" in d)]
+        dirs_tvf = [d for d in dirs_tvf if ("3D_TGV_STD" in d)]
         dirs_Rie = [d for d in dirs_Rie if ("3D_TGV_RIE" in d)]
     dirs_notvf = sorted(dirs_notvf)
     dirs_tvf = sorted(dirs_tvf)
@@ -195,7 +195,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         axs1[1].plot(t, e_kin_theory, "k", label="Theory")
     elif dim == 3:
         Re = 1 / args.viscosity
-        ref = np.loadtxt(f"./validation/ref/tgv3d_ref_{int(Re)}.txt", delimiter=",")
+        ref = np.loadtxt(f"./validation_paper/ref/tgv3d_ref_{int(Re)}.txt", delimiter=",")
         num_dots = 50
         every_n = max(len(ref) // num_dots, 1)
         axs1[0].scatter(
@@ -286,8 +286,8 @@ def val_2D_LDC(
     dirs_notvf = os.listdir(val_root_notvf)
     if dim == 2:
         dirs_Rie = [d for d in dirs_Rie if ("2D_LDC_RIE" in d)]
-        dirs_tvf = [d for d in dirs_tvf if ("2D_LDC_SPH" in d)]
-        dirs_notvf = [d for d in dirs_notvf if ("2D_LDC_SPH" in d)]
+        dirs_tvf = [d for d in dirs_tvf if ("2D_LDC_STD" in d)]
+        dirs_notvf = [d for d in dirs_notvf if ("2D_LDC_STD" in d)]
     elif dim == 3:
         raise NotImplementedError
 
@@ -399,7 +399,7 @@ def val_2D_LDC(
         )
 
     # getting the reference data
-    u_vel = pd.read_csv("validation/ref/ldc_data_u_vel.csv")
+    u_vel = pd.read_csv("validation_paper/ref/ldc_data_u_vel.csv")
     u_vel.columns = u_vel.iloc[0]
 
     u_vel = u_vel.drop(labels=0)
@@ -414,7 +414,7 @@ def val_2D_LDC(
         (u_vel.loc[:, "10,000"].values).astype(float),
     )
 
-    v_vel = pd.read_csv("validation/ref/ldc_data_v_vel.csv")
+    v_vel = pd.read_csv("validation_paper/ref/ldc_data_v_vel.csv")
     v_vel.columns = v_vel.iloc[0]
 
     v_vel = v_vel.drop(labels=0)  # had to make some corrections in the input data
@@ -431,10 +431,10 @@ def val_2D_LDC(
         ax3.scatter(u_Re_100, y, color="k", marker="o")
     elif Re == 1000.0:
         ax2.scatter(x, v_Re_1000, color="C1", marker="s")
-        ax2.scatter(u_Re_1000, y, color="C0", marker="o")
+        ax3.scatter(u_Re_1000, y, color="C0", marker="o")
     elif Re == 10000.0:
         ax2.scatter(x, v_Re_10000, color="C1", marker="s")
-        ax2.scatter(u_Re_10000, y, color="C0", marker="o")
+        ax3.scatter(u_Re_10000, y, color="C0", marker="o")
 
     ax2.grid()
     ax2.legend(loc="lower right")
