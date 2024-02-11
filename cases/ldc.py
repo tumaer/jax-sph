@@ -21,14 +21,10 @@ class LDC(SimulationSetup):
         elif args.dim == 3:
             self.u_lid = jnp.array([1.0, 0.0, 0.0])
 
-        args.Vmax = 1.0
-        args.c0 = 10 * args.Vmax
         self.args.g_ext_magnitude = 0.0
         self.args.is_bc_trick = True
         if self.args.p_bg_factor is None:
             self.args.p_bg_factor = 0.0
-        self.args.kappa = 0.0 
-        self.args.Cp = 0.0
 
     def _box_size2D(self):
         return np.ones((2,)) + 6 * self.args.dx

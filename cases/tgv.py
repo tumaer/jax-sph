@@ -17,14 +17,11 @@ class TGV(SimulationSetup):
 
         self.args.g_ext_magnitude = 0.0
         self.args.is_bc_trick = False
-        args.Vmax = 1.0
-        args.c0 = 10 * args.Vmax
         # args.Vmax = 1.0 if not hasattr(self, "u_ref") else self.u_ref
         if self.args.p_bg_factor is None:
             # p_bg introduces oscillations at low speed
             self.args.p_bg_factor = 0.0
-        args.kappa = 0.0 
-        args.Cp = 0.0
+    
 
     def _box_size2D(self):
         return np.array([1.0, 1.0])

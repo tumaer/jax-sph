@@ -34,13 +34,15 @@ class SimulationSetup(ABC):
 
         # reference temperature, kappa, cp
         T_ref = 1.0
-        kappa_ref = args.kappa
-        Cp_ref = args.Cp
+        kappa_ref = 0.0 if not hasattr(self, "kappa") else args.kappa
+        Cp_ref = 0.0 if not hasattr(self, "Cp") else args.Cp
 
         # Primal: reference density, dynamic viscosity, and velocity
         rho_ref = 1.00
         eta_ref = args.viscosity
         u_ref = 1.0 if not hasattr(self, "u_ref") else self.u_ref
+        args.Vmax = 1.0 if not hasattr(self, "Vmax") else self.Vmax
+        args.c0 = 10 * args.Vmax
         gamma_eos = 1.0 # = 7.0 for HT
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure

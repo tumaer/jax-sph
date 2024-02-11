@@ -20,8 +20,6 @@ class RPF(SimulationSetup):
         self.args.is_bc_trick = False
         if self.args.p_bg_factor is None:
             self.args.p_bg_factor = 0.05
-        self.args.kappa = 0.0 
-        self.args.Cp = 0.0
 
         print("g_ext_force = ", self.args.g_ext_magnitude)
 
