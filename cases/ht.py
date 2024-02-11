@@ -105,9 +105,10 @@ class HT(SimulationSetup):
         state["dudt"] = jnp.where(mask1, 0, state["dudt"])
         state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
 
-        mask0 = (state["tag"] == 0) * (state["r"][:, 0] > self.args.bounds[0][1] - 3 * self.args.dx)
-                # bounds[0][1] is the x-coordinate of the outlet
-        state["dTdt"]  = jnp.where(mask0, 0, state["dTdt"] )
-
+        mask0 = (state["tag"] == 0) * (
+            state["r"][:, 0] > self.args.bounds[0][1] - 3 * self.args.dx
+        )
+        # bounds[0][1] is the x-coordinate of the outlet
+        state["dTdt"] = jnp.where(mask0, 0, state["dTdt"])
 
         return state

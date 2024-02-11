@@ -15,7 +15,6 @@ from jax_sph.solver.sph_tvf import WCSPH
 from jax_sph.utils import get_ekin, get_val_max
 
 
-
 def simulate(args):
     # Case setup
     case = select_case(args.case)
@@ -46,24 +45,24 @@ def simulate(args):
     num_particles = (state["tag"] != -1).sum()
     neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
 
-    # Solver setup    
+    # Solver setup
     model = WCSPH(
-            displacement_fn,
-            eos_fn,
-            g_ext_fn,
-            args.dx,
-            args.dim,
-            args.dt,
-            args.c0,
-            args.eta_limiter,
-            args.solver,
-            args.kernel,
-            args.is_bc_trick,
-            args.density_evolution,
-            args.artificial_alpha,
-            args.free_slip,
-            args.density_renormalize,
-            args.heat_conduction,
+        displacement_fn,
+        eos_fn,
+        g_ext_fn,
+        args.dx,
+        args.dim,
+        args.dt,
+        args.c0,
+        args.eta_limiter,
+        args.solver,
+        args.kernel,
+        args.is_bc_trick,
+        args.density_evolution,
+        args.artificial_alpha,
+        args.free_slip,
+        args.density_renormalize,
+        args.heat_conduction,
     )
     # Instantiate advance function for our use case
     advance = si_euler(args.tvf, model, shift_fn, bc_fn)

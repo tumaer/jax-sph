@@ -22,7 +22,7 @@ class Args:
             type=str,
             default="SPH",
             choices=["SPH", "RIE"],
-            help="vanilla correspond to density transport",
+            help="SPH means standard SPH, and RIE the Riemann SPH algorithm",
         )
         self.parser.add_argument(
             "--kernel",

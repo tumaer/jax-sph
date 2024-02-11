@@ -21,7 +21,6 @@ class TGV(SimulationSetup):
         if self.args.p_bg_factor is None:
             # p_bg introduces oscillations at low speed
             self.args.p_bg_factor = 0.0
-    
 
     def _box_size2D(self):
         return np.array([1.0, 1.0])
@@ -88,4 +87,3 @@ class TGV(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         return state
-

@@ -108,5 +108,3 @@ class PF(SimulationSetup):
         state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
 
         return state
-
-

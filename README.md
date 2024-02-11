@@ -59,12 +59,12 @@ In the following a quick setup guide for differen cases is presented.
 ### Running a SPH Simulation
 - Standard SPH 2D Taylor Green Vortex 
 ```bash
-./venv/bin/python main.py --case=TGV --solver=STD --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+./venv/bin/python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
  ```
 
 - Transport velocity formulation SPH 2D Taylor Green Vortex
 ```bash
-./venv/bin/python main.py --case=TGV --tvf=1.0 --solver=STD --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+./venv/bin/python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
  ```
 - Riemann SPH 2D Taylor Green Vortex
 ```bash
@@ -76,13 +76,13 @@ In the following a quick setup guide for differen cases is presented.
 ```
 
 ### Solver in the Loop
-
+To train and test our Solver-in-the-Loop model, run the script in [./experiments/sitl.py](./experiments/sitl.py). This file relies on [LagrangeBench](https://github.com/tumaer/lagrangebench), which can be installed by `pip install lagrangebench`. For more information on the training and inference setup, visit the LagrangeBench website.
 
 ### Inverse Problem
+The presented inverse problem of finding the initial state of a 100-step long SPH simulation can be fully reproduced using the notebook [./experiments/inverse.ipynb](./experiments/inverse.ipynb).
 
 ### Gradient Validation
-In oder to see the differentiability of our solver, please take a look at the following notebook.\
-[Gradient validation notebook](experiments/grads.ipynb)
+The presented validation of the gradients through the solver can be fully reproduced using the notebook [./experiments/grads.ipynb](./experiments/grads.ipynb)
 
 ## Development and Contribution
 
