@@ -401,15 +401,6 @@ def limiter_fn_wrapper(eta_limiter, c0):
     return beta_fn
 
 
-def kernel_fn_wrapper(kernel, dx, dim):
-    if kernel == "QSK":
-        kernel_fn = QuinticKernel(h=dx, dim=dim)
-    elif kernel == "W2CK":
-        kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
-
-    return kernel_fn
-
-
 def temperature_derivative_wrapper(kernel_fn):
     def temperature_derivative(
         e_s, r_ij, d_ij, rho_i, rho_j, m_j, kappa_i, kappa_j, Cp_i, T_i, T_j
@@ -451,7 +442,11 @@ def WCSPH(
     """Weakly compressible SPH solver with transport velocity formulation."""
 
     _beta_fn = limiter_fn_wrapper(eta_limiter, c0)
-    _kernel_fn = kernel_fn_wrapper(kernel, dx, dim)
+    if kernel == "QSK":
+        _kernel_fn = QuinticKernel(h=dx, dim=dim)
+    elif kernel == "W2CK":
+        _kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
+
     _gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
     _free_weight, _heat_bc = gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction)
     _acceleration_tvf_fn = acceleration_tvf_fn_wrapper(_kernel_fn)
