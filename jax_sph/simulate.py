@@ -11,7 +11,7 @@ from cases import select_case
 from jax_sph import partition
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
-from jax_sph.solver.sph_tvf import WCSPH
+from jax_sph.solver import WCSPH
 from jax_sph.utils import get_ekin, get_val_max
 
 
