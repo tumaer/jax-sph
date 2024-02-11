@@ -17,13 +17,11 @@ class TGV(SimulationSetup):
 
         self.args.g_ext_magnitude = 0.0
         self.args.is_bc_trick = False
-        args.Vmax = 1.0
-        #args.Vmax = 1.0 if not hasattr(self, "u_ref") else self.u_ref
+        # args.Vmax = 1.0 if not hasattr(self, "u_ref") else self.u_ref
         if self.args.p_bg_factor is None:
             # p_bg introduces oscillations at low speed
             self.args.p_bg_factor = 0.0
-        if self.args.is_limiter is None:
-            self.args.is_limiter = False
+    
 
     def _box_size2D(self):
         return np.array([1.0, 1.0])
@@ -90,11 +88,4 @@ class TGV(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         return state
-    
-    def _init_acceleration2D(self, r):
-        x, y = r
-        # from Transport Veocity paper by Adami et al. 2013, here Re = 100
-        du = -1.0 * (-8) * jnp.pi ** 2 / 100 * jnp.cos(2.0 * jnp.pi * x) * jnp.sin(2.0 * jnp.pi * y)
-        dv = +1.0 * (-8) * jnp.pi ** 2 / 100 * jnp.sin(2.0 * jnp.pi * x) * jnp.cos(2.0 * jnp.pi * y)
 
-        return jnp.array([du, dv])

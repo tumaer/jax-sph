@@ -14,14 +14,14 @@ class Args:
             "--case",
             type=str,
             default="TGV",
-            choices=["TGV", "RPF", "LDC", "PF", "CW", "DB", "Rlx", "UT"],
+            choices=["TGV", "RPF", "LDC", "PF", "CW", "DB", "Rlx", "UT", "HT"],
             help="Simulation setup",
         )
         self.parser.add_argument(
             "--solver",
             type=str,
             default="SPH",
-            choices=["SPH", "GNS", "SEGNN", "UT", "RIE"],
+            choices=["SPH", "RIE"],
             help="vanilla correspond to density transport",
         )
         self.parser.add_argument(
@@ -48,11 +48,7 @@ class Args:
             help="Density renormalization when density evolution",
         )
         self.parser.add_argument(
-            "--dim", 
-            type=int, 
-            choices=[2, 3], 
-            default=3, 
-            help="Dimension"
+            "--dim", type=int, choices=[2, 3], default=3, help="Dimension"
         )
         self.parser.add_argument(
             "--dx",
@@ -60,11 +56,7 @@ class Args:
             default=0.05,
             help="Average distance between particles [0.001, 0.1]",
         )
-        self.parser.add_argument(
-            "--Nx", 
-            type=int, 
-            help="alternative to --dx"
-        )
+        self.parser.add_argument("--Nx", type=int, help="alternative to --dx")
         self.parser.add_argument(
             "--dt",
             type=float,
@@ -129,27 +121,15 @@ class Args:
             choices=["jaxmd_vmap", "jaxmd_scan", "matscipy"],
             help="Which backend to use for neighbor list",
         )
+        self.parser.add_argument("--num-partitions", type=int, default=1)
         self.parser.add_argument(
-            "--num-partitions", 
-            type=int, 
-            default=1
+            "--seed", type=int, default=123, help="Seed for random number generator"
         )
         self.parser.add_argument(
-            "--seed", 
-            type=int, 
-            default=123, 
-            help="Seed for random number generator"
+            "--no-jit", action="store_true", help="Disable jitting compilation"
         )
         self.parser.add_argument(
-            "--no-jit", 
-            action="store_true", 
-            help="Disable jitting compilation"
-        )
-        self.parser.add_argument(
-            "--write-h5", 
-            "-h5", 
-            action="store_true", 
-            help="Whether to write .h5 files."
+            "--write-h5", "-h5", action="store_true", help="Whether to write .h5 files."
         )
         self.parser.add_argument(
             "--write-vtk",
@@ -164,36 +144,39 @@ class Args:
             help="Every `write_every` step will be saved",
         )
         self.parser.add_argument(
-            "--data-path", 
-            type=str, 
-            default="./", 
-            help="Where to write and read data"
+            "--data-path", type=str, default="./", help="Where to write and read data"
         )
         self.parser.add_argument(
-            "--gpu", 
-            type=int, 
-            default=0, 
-            help="Which GPU to use. -1 for CPU"
+            "--gpu", type=int, default=0, help="Which GPU to use. -1 for CPU"
         )
         self.parser.add_argument(
-            "--no-f64", 
-            action="store_true", 
-            help="Whether to use 64 bit precision"
+            "--no-f64", action="store_true", help="Whether to use 64 bit precision"
         )
         self.parser.add_argument(
             "--Vmax",
             type=float,
             default=1,
             help="Estimatet max flow velocity to calculate artificial speed of sound",
-            )
-        self.parser.add_argument(
-            "--is-limiter",
-            action="store_true",
-            help="Dissipation limiter for Riemann solver",
         )
         self.parser.add_argument(
             "--eta-limiter",
             type=float,
             default=3,
-            help="Define parameter to modulate the numeric dissipation of the Riemann solver",
-            )
+            help="Riemann dissipation limiter parameter, -1 = off",
+        )
+        self.parser.add_argument(
+            "--kappa",
+            type=float,
+            default=0,
+            help="Thermal conductivity (non-dimensional)",
+        )
+        self.parser.add_argument(
+            "--heat-conduction",
+            action="store_true",
+            help="Whether to apply the heat conduction term",
+        )
+        self.parser.add_argument(
+            "--outlet-temperature-derivative",
+            action="store_true",
+            help="Whether to set dT/dt near the outlet to 0",
+        )

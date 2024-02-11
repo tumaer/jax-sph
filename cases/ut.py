@@ -23,6 +23,7 @@ class UTSetup(SimulationSetup):
         if self.args.p_bg_factor is None:
             self.args.p_bg_factor = 1.0
 
+
     def _box_size2D(self):
         return np.array([1.0, 1.0])
 
@@ -59,6 +60,3 @@ class UTSetup(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         return state
-    
-    def _init_acceleration2D(self, r):
-        pass

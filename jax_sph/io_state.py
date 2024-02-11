@@ -125,7 +125,6 @@ def write_vtks_from_h5s(dir_path, keep_h5=True):
 
 
 def render_data_dict(data_dict):
-
     pl = pyvista.Plotter()
     pl.show_grid()
     pl.add_bounding_box()
@@ -171,4 +170,3 @@ def _plot(r, x, ttl, vmin=None, vmax=None):
 
 if __name__ == "__main__":
     write_vtks_from_h5s("./3D_TGV_SPH_17_20221224-084051", False)
-

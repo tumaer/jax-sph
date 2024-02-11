@@ -86,6 +86,3 @@ class RPF(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         return state
-    
-    def _init_acceleration2D(self, r):
-        pass

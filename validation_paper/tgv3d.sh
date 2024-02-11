@@ -15,7 +15,7 @@ do
     ./venv/bin/python main.py --case=Rlx --solver=SPH --tvf=1.0 --dim=3 --dx=$dx --nxnynz=$nxnynz --seed=123 --write-h5 --write-vtk --write-every=1 --r0-noise-factor=0.25 --relax-pbc --data-path=data_relaxed --p-bg-factor=0.02 --nl-backend=jaxmd_vmap
     ./venv/bin/python main.py --case=TGV --solver=SPH --viscosity=0.02 --tvf=1.0 --dim=3 --dx=$dx --nxnynz=$nxnynz --t-end=10 --seed=123 --write-h5 --write-vtk --write-every=$write_every --data-path="data_valid/tgv3d_tvf" --gpu=0 
     ./venv/bin/python main.py --case=TGV --solver=SPH --viscosity=0.02 --tvf=0.0 --dim=3 --dx=$dx --nxnynz=$nxnynz --t-end=10 --seed=123 --write-h5 --write-vtk --write-every=$write_every --data-path="data_valid/tgv3d_notvf" --gpu=0 
-    ./venv/bin/python main.py --case=TGV --solver=RIE --viscosity=0.02 --tvf=0.0 --dim=3 --dx=$dx --nxnynz=$nxnynz --t-end=10 --seed=123 --write-h5 --write-vtk --write-every=$write_every --data-path="data_valid/tgv3d_Rie" --gpu=0 --density-evolution --is-limiter --eta-limiter=3
+    ./venv/bin/python main.py --case=TGV --solver=RIE --viscosity=0.02 --tvf=0.0 --dim=3 --dx=$dx --nxnynz=$nxnynz --t-end=10 --seed=123 --write-h5 --write-vtk --write-every=$write_every --data-path="data_valid/tgv3d_Rie" --gpu=0 --density-evolution --eta-limiter=3
 
 done
 
