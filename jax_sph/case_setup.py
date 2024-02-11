@@ -8,8 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax import vmap
 
-from jax_sph.eos import TaitEoS
-from jax_sph.eos import RIEMANNEoS
+from jax_sph.eos import RIEMANNEoS, TaitEoS
 from jax_sph.utils import noise_masked, pos_init_cartesian_2d, pos_init_cartesian_3d
 
 EPS = jnp.finfo(float).eps
@@ -33,11 +32,18 @@ class SimulationSetup(ABC):
 
         key_prng = jax.random.PRNGKey(args.seed)
 
+        # reference temperature, kappa, cp
+        T_ref = 1.0
+        kappa_ref = 0.0 if not hasattr(self, "kappa") else args.kappa
+        Cp_ref = 0.0 if not hasattr(self, "Cp") else args.Cp
+
         # Primal: reference density, dynamic viscosity, and velocity
         rho_ref = 1.00
         eta_ref = args.viscosity
         u_ref = 1.0 if not hasattr(self, "u_ref") else self.u_ref
-        gamma_eos = 1.0
+        args.Vmax = 1.0 if not hasattr(self, "Vmax") else self.Vmax
+        args.c0 = 10 * args.Vmax # TODO: Check DB influence
+        gamma_eos = 1.0 # = 7.0 for HT
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
         c_ref = 10.0 * u_ref
@@ -84,8 +90,6 @@ class SimulationSetup(ABC):
         # Equation of state
         if args.solver == "RIE":
             eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
-        elif args.solver == "RIE2":
-            eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
@@ -121,40 +125,29 @@ class SimulationSetup(ABC):
         rho = jnp.ones(num_particles) * rho_ref
         mass = jnp.ones(num_particles) * mass_ref
         eta = jnp.ones(num_particles) * eta_ref
+        temp = jnp.ones(num_particles) * T_ref
+        kappa = jnp.ones(num_particles) * kappa_ref
+        Cp = jnp.ones(num_particles) * Cp_ref
 
-        # initialize accelerations for TGV
-        if jnp.logical_and(args.case == "TGV", args.dim == 2):
-            dvdt = vmap(self._init_acceleration2D)(r)
-            
-            state = {
-                "r": r,
-                "tag": tag,
-                "u": v,
-                "v": v,
-                "dudt": dvdt,
-                "dvdt": dvdt,
-                "drhodt": jnp.zeros_like(rho),
-                "rho": rho,
-                "p": eos.p_fn(rho),
-                "mass": mass,
-                "eta": eta,
-            }
 
-        else:
         # initialize the state dictionary
-            state = {
-                "r": r,
-                "tag": tag,
-                "u": v,
-                "v": v,
-                "dudt": jnp.zeros_like(v),
-                "dvdt": jnp.zeros_like(v),
-                "drhodt": jnp.zeros_like(rho),
-                "rho": rho,
-                "p": eos.p_fn(rho),
-                "mass": mass,
-                "eta": eta,
-            }
+        state = {
+            "r": r,
+            "tag": tag,
+            "u": v,
+            "v": v,
+            "dudt": jnp.zeros_like(v),
+            "dvdt": jnp.zeros_like(v),
+            "drhodt": jnp.zeros_like(rho),
+            "rho": rho,
+            "p": eos.p_fn(rho),
+            "mass": mass,
+            "eta": eta,
+            "dTdt": jnp.zeros_like(rho),
+            "T": temp,
+            "kappa": kappa,
+            "Cp": Cp,
+        }
 
         args.dt, args.sequence_length = dt, sequence_length
         args.num_particles_max = num_particles
@@ -196,17 +189,13 @@ class SimulationSetup(ABC):
         pass
 
     @abstractmethod
-    def _init_acceleration2D(self, r):
-        pass
-
-    @abstractmethod
     def _init_velocity3D(self, r):
         pass
 
     @abstractmethod
     def _external_acceleration_fn(self, r):
         pass
-    
+
     @abstractmethod
     def _boundary_conditions_fn(self, state):
         pass

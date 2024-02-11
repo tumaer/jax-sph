@@ -33,7 +33,7 @@ class QuinticKernel:
         """Evaluates the 1D kernel gradient at the radial distance r."""
 
         return grad(self.w)(r)
-    
+
 
 class WendlandC2Kernel:
     """The 5th-order C2 kernel function of Wendland."""
@@ -65,7 +65,6 @@ class WendlandC2Kernel:
             q2 = 2.0 * q + 1.0
 
             return self._sigma * (q1**4 * q2)
-
 
     def grad_w(self, r):
         """Evaluates the 1D kernel gradient at the radial distance r."""

@@ -20,7 +20,7 @@ from lagrangebench.evaluate import averaged_metrics
 from jax_sph import partition
 from jax_sph.eos import TaitEoS
 from jax_sph.kernels import QuinticKernel
-from jax_sph.solver.sph_tvf import SPHTVF
+from jax_sph.solver.sph_tvf import WCSPH
 
 
 class SolverInTheLoop(hk.Module):
@@ -63,6 +63,10 @@ class SolverInTheLoop(hk.Module):
                 return jnp.zeros_like(r)
 
         rho_ref = 1.0
+        c0 = 10.0
+        eta_limiter = 3,
+        solver = "SPH",
+        kernel = "QSK",
 
         u_ref = 1.0
         c_ref = 10.0 * u_ref
@@ -75,13 +79,17 @@ class SolverInTheLoop(hk.Module):
             p_background=p_bg_factor * p_ref,
             gamma=gamma_eos,
         )
-        self.solver = SPHTVF(
+        self.solver = WCSPH(
             displacement_fn,
             self.eos,
             ext_force_fn,
             dx,
             dim,
             dt,
+            c0,
+            eta_limiter,
+            solver,
+            kernel,
         )
 
         self.shift_fn = shift_fn

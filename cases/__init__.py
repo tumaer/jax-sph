@@ -8,6 +8,7 @@ from cases.rlx import Rlx
 from cases.rpf import RPF
 from cases.tgv import TGV
 from cases.ut import UTSetup
+from cases.ht import HT
 
 
 def select_case(case_name):
@@ -21,5 +22,6 @@ def select_case(case_name):
         "DB": DB,
         "Rlx": Rlx,
         "UT": UTSetup,
+        "HT": HT,
     }
     return cases[case_name]

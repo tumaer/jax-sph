@@ -1,105 +1,14 @@
-# SPH Dataset using JAX-MD
+# JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework
 
-SPH solver in JAX. The main references are [1] and [2].
-## TODOs
+JAX-SPH is a differentiable weakly compressible SPH solver, that is currently under development at the Chair of Aerodynamics and Fluid Mechanics of the Technical University of Munich (TUM). The solver's framework utilizes Jax and depends on functions from the Jax-md library. The main references used for our solver are [1], [2] and [3]. 
 
-**Artur**
-- [x] write trajectory to 1) `.h5` and 2) `.vtk` files to visualize with ParaView
-- [x] add tags to main.py
-- [x] implement vanilla SPH integrator as in [1]
-- [x] implement LDC in 2D - based on [1]
-- [x] implement LDC in 3D
-- [x] dt condition based on external force
-- [x] implement Poiseuille flow
-- [ ] implement cube of water (CW) flying in random directions and hitting a wall (same simulation as DM)
-- [x] check why the system size does not scale to >20k particles in 3D dam break! -> allocating space for neighbors computation
-- [ ] result validation:
-    - [ ] TGV - analytical solution
-        - [x] kinetic energy over 6 sec.
-        - [x] velocity
-        - [x] oscillations in the beginning?
-		- [ ] force to get a driven TGV? To avoid oscillations and
-    - [x] PF - analytical solution for velocity in x
-    - [x] LDC - reference solution - see [2]
-- [x] compare u vs v in transport velocity formulation
-- [x] Dam break:
-	- [x] implement artificial viscosity
-	- [x] configure case as in generalized BC paper
-- [x] How is artificial viscosity different than just normal one? -> artif. visc is applied to only among water particles. Fow wall viscosity, use normal viscosity.
-- [x] run relaxation simulations to obtain multiple initial conditions for
-	- [x] TGV
-	- [x] Dam Break
-- [ ] extract dt computation and apply it at every iteration step as a sanity check! Especially relevant for RPF and other driven flows / flows with external force.
-- [ ] neighbors backends
-	- [x] jax-md scan
-	- [x] matscipy
-	- [ ] validate these implementations
-	- [ ] time these implementations
+The advantage of our solver is that you can combine all of the implemented SPH terms to your liking, or extract / solve only certain terms of the weakly compressible Navier-Stokes equations. Our solver includes the following SPH diskretizations:
 
-## Notes
+- Standard SPH [1]
+- Transport velocity formulation SPH [1]
+- Riemann SPH [3]
 
-**Dam break**
-- [x] How do you initialize the particles? With noise?
-- [x] Particles jump up in the beginning? -> use cartesian grid initialization. Alternatively, start a simulation from the positions of previous runs. Remove random noise! It introduces acoustic waves in the beginning!
-- [x] Inviscid dam break means either 1) free-slip at the wall + physical viscosity or artificial viscosity + no physical viscosity. If inviscid flow, then artificial viscosity is equivalent to setting physical one, except for wall interactions.
-- [x] role of exponent gamma in EoS?
-- [ ] Dam break particles fly away from the wall in the front of the wave.
-
-
-
-### Reference data
-'Case: name of file'
-
-- TGV: tgv_analytical_sol.py
-	- it has the analytic velocities u and v as per Adami2012
-	- the array 'y_axes' has the u_max values
-- LDC: ldc_data.py
-	- for three Reynolds Numbers: 100, 1000, 10000, reference data is available
-	- u_Re_100, u_Re_1000, u_Re_10000 and v_Re_100, v_Re_1000, v_Re_10000 are the respective u and v velocities for each of the Re values
-	- requires 2 csv files: ldc_data_u_vel.csv and ldc_data_v_vel.csv (obtained the tabular data from Ghia et al (https://www.sciencedirect.com/science/article/pii/0021999182900584))
-- RPF: poiseuille_data.py
-	- got digitized graph of analytic solution at t = 2, 10, 20 and 100 seconds
-	- requires 4 csv files: rpf_t_2.csv, rpf_t_10.csv, rpf_t_20.csv, rpf_t_100.csv
-- Dambreak: dambreak_data.py
-	- Obtained the reference data for time evolution of front and height from Martin and Moyce (https://royalsocietypublishing.org/doi/10.1098/rsta.1952.0006)
-	- Requires 1 csv file: Buchner_pressureProfile.csv, it is for comparing temporal pressure profile as per Fig 15 in Adami2012
-
-
-### Final goal
-
-This is the TODO list concerning different cases. Everything has to be in 3D; use 2D only for debugging.
-
-- [x] TGV:
-	- [x] increase Reynolds number to turbulence
-	- [x] Vanilla SPH
-	- [x] Transport velocity
-- [x] Reverse Poiseuille Flow
-	- [x] Vanilla SPH
-	- [x] Transport velocity
-- [x] LDC:
-	- [x] Vanilla SPH
-	- [x] Transport velocity - for dataset, run 10 Reynolds numbers between 100-1000. Time to stationary solution ~20s
-- [ ] Dab Break:
-	- [x] Vanilla SPH
-	- [ ] Transport velocity
-- [ ] Rayleigh-Taylor instability
-	- [ ] Vanilla SPH
-- [ ] Drop in shear flow
-	- [ ] Vanilla SPH
-
-
-## SPH Algorithm
-
-1. shift velocity (dt)
-2. shift transport velocity (0.5 dt)
-3. if free surface -> shift density (dt) # TODO: for now this is in the model
-4. shift position (dt)
-5. update cell list
-6. (model) if not free surface -> density summation
-7. (model) compute primitives
-8. (model) apply wall boundary conditions
-9. (model) update RHS
-10. (model) if free surface -> density correction
+Not only is it possible to combine, e.g. Riemann SPH with Transport velocity on top, but also to take the density evolution of Riemann SPH and pair it with Standard SPH for example.
 
 ## Installation
 
@@ -130,22 +39,79 @@ If you want to use a CUDA GPU, you first need a running Nvidia driver. And then 
 
 ```bash
 source .venv/bin/activate
-pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install --upgrade "jax[cuda12_pip]==0.4.23" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-## Usage and Contribution
 
-See the example scripts in `scripts/` on how to use the code.
+## SPH Solver Overview
 
-If you want to contribute, you should run
+### Standard SPH
+Standard SPH denotes the standard formulation, so to say the bare minimum of a SPH discretization, where the particel's position updates with their actual advection speed. While that being true, it does still include the possibility to use density summation, density evolution, the pressure term and the viscosity term of the momentum euation. However, as mentioned earlier, in our solver framework it is possible to interchange parts of the different solvers as you wish. For further informations, see [1][2].
+### Transport Velocity SPH
+The transport velocity term adds the so-called transport velocity that replaces the physical advection speed of the particles, leading to a less dissipative solver. Similar as before, every term of the weakyl compressible Navier-Stokes equations is included. However, in order to correct the physical velocity gradients, a correction term is added. On top, usually artifical velocity is added. For more details, see [1][2].
+### Riemann SPH
+Riemann SPH introduces a ondimensional Riemann problemm between every particle interaction counteracting the need of artificial viscosity. This leads to a vastly different formulation of the mass conservation's and the momentum equation's discretization. For a more detailed explanation and the derivation of the Riemann SPH discretization, see [3]. However, it is still possible to add every other term, e.g. transport velocity, on top of Riemann SPH.
+
+## Getting Started
+In the following a quick setup guide for differen cases is presented.
+
+
+### Running a SPH Simulation
+- Standard SPH 2D Taylor Green Vortex 
+```bash
+./venv/bin/python main.py --case=TGV --solver=STD --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+ ```
+
+- Transport velocity formulation SPH 2D Taylor Green Vortex
+```bash
+./venv/bin/python main.py --case=TGV --tvf=1.0 --solver=STD --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+ ```
+- Riemann SPH 2D Taylor Green Vortex
+```bash
+./venv/bin/python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+ ```
+-  Thermal Diffusion
+```bash
+./venv/bin/python main.py --case=HT --solver=SPH --density-evolution --heat-conduction --dim=2 --dx=0.02 --t-end=1.5 --write-h5 --write-vtk --r0-noise-factor=0.05 --outlet-temperature-derivative --data-path="data_valid/therm_diff/"
+```
+
+### Solver in the Loop
+
+
+### Inverse Problem
+
+### Gradient Validation
+In oder to see the differentiability of our solver, please take a look at the following notebook.\
+[Gradient validation notebook](experiments/grads.ipynb)
+
+## Development and Contribution
+
+As stated in the introduction, our code base is still under development and will be expanded with new features in the future.
+If you wish to contribute, please run
 
 ```bash
 pre-commit install
 ```
 
-upon istallation to automate the code linting and formatting checks.
+upon istallation to automate the code linting and formatting checks. 
+
+<!-- ## Citation
+If you wish to use our code or parts of our code in your reasearch, please cite the solver using the following .bib,
+
+```
+@misc{jaxsph2024,
+ author = {},
+ booktitle = {},
+ publisher = {},
+ title = {},
+ url = {},
+ volume = {},
+ year = {2024}
+}
+``` -->
 
 ## References
 
 * [1] - "A generalized wall boundary condition for smoothed particle hydrodynamics", Adami, Hu & Adams, 2012
 * [2] - "A transport-velocity formulation for smoothed particle hydrodynamics", Adami, Hu & Adams, 2013
+* [3] - "A weakly compressible SPH method based on a low-dissipation Riemann solver", Zhang, Hu, Adams, 2017
