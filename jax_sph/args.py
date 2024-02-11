@@ -20,8 +20,8 @@ class Args:
         self.parser.add_argument(
             "--solver",
             type=str,
-            default="STD",
-            choices=["STD", "RIE"],
+            default="SPH",
+            choices=["SPH", "RIE"],
             help="vanilla correspond to density transport",
         )
         self.parser.add_argument(
