@@ -43,6 +43,9 @@ class DB(SimulationSetup):
         # TODO: check behavior with 1, sqrt(2), and 2 for u_ref
         self.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
         args.Vmax = 2 * (self.args.g_ext_magnitude * self.H) ** 0.5
+        args.c0 = 10 * args.Vmax
+        self.args.kappa = 0.0 
+        self.args.Cp = 0.0
 
     def _box_size2D(self):
         dx, bo = self.args.dx, self.box_offset
@@ -152,5 +155,3 @@ class DB(SimulationSetup):
         # state['p'] = jnp.where(mask_wall_1d, 0.0, state['p'])
         return state
 
-    def _init_acceleration2D(self, r):
-        pass
