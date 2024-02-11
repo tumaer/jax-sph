@@ -42,7 +42,7 @@ class SimulationSetup(ABC):
         eta_ref = args.viscosity
         u_ref = 1.0 if not hasattr(self, "u_ref") else self.u_ref
         args.Vmax = 1.0 if not hasattr(self, "Vmax") else self.Vmax
-        args.c0 = 10 * args.Vmax
+        args.c0 = 10 * args.Vmax # TODO: Check DB influence
         gamma_eos = 1.0 # = 7.0 for HT
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
