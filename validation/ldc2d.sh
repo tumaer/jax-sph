@@ -11,4 +11,4 @@
 
 
 # Run validation script
-./venv/bin/python validation_paper/validate_paper.py --case=2D_LDC --src_dir_Rie="data_valid/ldc2d_Riemann" --src_dir_tvf="data_valid/ldc2d_tvf" --src_dir_notvf="data_valid/ldc2d_notvf"
+./venv/bin/python validation/validate.py --case=2D_LDC --src_dir_Rie="data_valid/ldc2d_Riemann" --src_dir_tvf="data_valid/ldc2d_tvf" --src_dir_notvf="data_valid/ldc2d_notvf"

@@ -1,0 +1,152 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "sph_riemann_debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--case=TGV",
+                "--solver=RIE", 
+                "--density-evolution", 
+                "--dim=2",
+                //"--dt=0.00005",
+                "--Vmax=1.0",
+                "--dx=0.05",
+                "--nxnynz=20_20_0",
+                "--t-end=0.03",
+                "--seed=123",
+                "--write-h5",
+                "--write-every=1",
+                "--write-vtk",
+                "--data-path=data_Riemann/test/",
+                "--no-jit",
+                "--gpu=0",
+                //"--p-bg-factor=0.5",
+            ],
+        },
+
+        {
+            "name": "sph_riemann_dam",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--case=DB",
+                "--solver=RIE",
+                "--tvf=0.0",
+                "--dim=2",
+                "--dx=0.02",
+                "--t-end=0.001",
+                "--dt=0.0002",
+                "--viscosity=0.0",
+                "--free-slip",
+                "--write-every=1",
+                "--write-vtk",
+                "--write-h5",
+                "--seed=123",
+                "--data-path=data_Riemann/db2d_notvf",
+                "--density-evolution",
+                //"--artificial-alpha=0.1",
+                //"--density-renormalize",
+                //"--no-jit",
+                "--eta-limiter=3",
+                "--gpu=0",
+            ],
+        },
+
+        {
+            "name": "sph_riemann_rlx",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--case=Rlx",
+                "--solver=SPH",
+                "--tvf=1.0",
+                "--dim=2",
+                "--dx=0.02",
+                "--nxnynz=100_50_0",
+                "--seed=123",
+                "--write-h5",
+                "--r0-noise-factor=0.25",
+                "--data-path=data_relaxed",
+                "--gpu=0",
+            ],
+        },
+
+        {
+            "name": "energy",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./jax_energy_spectrum/energy_spectrum.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--source_dir=./data_valid/tgv2d_Rie_lim/2D_TGV_RIE2_123_20240207-052948",
+                "--kernel=M4K",
+                "--time_step=5",
+                "--gpu=0"
+            ],
+        },
+
+        {
+            "name": "validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/jonas/Riemann/jax-sph/validation_paper/validate_paper.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--case=2D_DB",
+                "--src_dir=data_valid/db2d_Riemann",
+            ],
+        },
+
+        {
+            "name": "debug",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--case=TGV",
+                "--solver=RIE",
+                "--viscosity=0.01",
+                "--tvf=0.0 ",
+                "--dim=2",
+                "--dx=0.02",
+                "--viscosity=0.01",
+                "--nxnynz=20_20_0",
+                "--t-end=1",
+                "--seed=123",
+                "--write-h5",
+                "--write-every=10",
+                "--data-path=data_valid/tgv2d_Riemann",
+                "--density-evolution",
+                "--eta-limiter=3",
+                "--gpu=0"
+
+            ],
+        },
+
+        
+
+
+        
+
+
+        
+    ]
+}

@@ -5,7 +5,7 @@
 # "A Transport Velocty [...]", Adami 2012
 
 # Generate data
-for i in "0.314159265 20_20_20 10" # "0.157079633 40_40_40 20" "0.09817477 64_64_64 32" # "0.125663706 50_50_50 25"
+# "0.157079633 40_40_40 20" "0.09817477 64_64_64 32" # "0.125663706 50_50_50 25"
 for i in "0.314159265 20_20_20 10" "0.19634954 32_32_32 16" "0.125663706 50_50_50 25"  #"0.125663706 50_50_50 25" #"0.314159265 20_20_20 14" "0.157079633 40_40_40 28"
 do
     a=( $i )
@@ -20,5 +20,5 @@ do
 done
 
 # Run validation script
-./venv/bin/python validation_paper/validate_paper.py --case=3D_TGV --src_dir="data_valid/"
+./venv/bin/python validation/validate.py --case=3D_TGV --src_dir="data_valid/"
 

@@ -18,4 +18,4 @@ do
 done
 
 # Run validation script
-CUDA_VISIBLE_DEVICES=0 ./venv/bin/python validation_paper/validate_paper.py --case=2D_TGV --src_dir="data_valid/"
+CUDA_VISIBLE_DEVICES=0 ./venv/bin/python validation/validate.py --case=2D_TGV --src_dir="data_valid/"
