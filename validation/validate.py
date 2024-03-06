@@ -523,6 +523,115 @@ def val_DB(val_root, save_fig=False):
     plt.show()
     plt.close()
 
+def val_2D_PF(
+    val_dir_path,
+    dim=2,
+    nxs=[
+        60,
+    ],
+    save_fig=False,
+):
+    def u_series_exp(y, t, n_max=10):
+        """Analytical solution to unsteady Poiseuille flow (low Re)
+
+        Based on Series expansion as shown in:
+        "Modeling Low Reynolds Number Incompressible Flows Using SPH"
+        ba Morris et al. 1997
+        """
+
+        eta = 100.0  # dynamic viscosity
+        rho = 1.0  # denstiy
+        nu = eta / rho  # kinematic viscosity
+        u_max = 1.25  # max velocity in middle of channel
+        d = 1.0  # channel width
+
+        Re = u_max * d / nu
+        print(f"Poiseuille flow at Re={Re}")
+
+        fx = -8 * nu * u_max / d**2
+        offset = fx / (2 * nu) * y * (y - d)
+
+        def term(n):
+            base = np.pi * (2 * n + 1) / d
+
+            prefactor = 4 * fx / (nu * base**3 * d)
+            sin_term = np.sin(base * y)
+            exp_term = np.exp(-(base**2) * nu * t)
+            return prefactor * sin_term * exp_term
+
+        res = offset
+        for i in range(n_max):
+            res += term(i)
+
+        return res
+
+    # analytical solution
+
+    y_axis = np.linspace(0, 1, 100)
+    t_axis = [
+        r"$0.02\times 10^{-2}$",
+        r"$0.10\times 10^{-2}$",
+        r"$0.20\times 10^{-2}$",
+        r"$1.00\times 10^{-2}$",
+    ]
+    t_dimless = [0.0002, 0.001, 0.002, 0.01]
+
+    for t_val, t_label in zip(t_dimless, t_axis):
+        plt.plot(y_axis, u_series_exp(y_axis, t_val), label=f"t={t_label}")
+
+    # extract points from our solution
+    dirs = os.listdir(val_dir_path)
+    dirs = [d for d in dirs if os.path.isdir(os.path.join(val_dir_path, d))]
+    assert len(dirs) == 1, f"Expected only one directory in {val_dir_path}"
+    args = read_args(os.path.join(val_dir_path, dirs[0], "args.txt"))
+    assert args.dt == 0.0000005
+    assert args.dx == 0.0166666
+
+    num_points = 21
+    dx_plot = 0.05
+    y_axis = jnp.array([dx_plot * i for i in range(num_points)]) + 3 * args.dx
+    rs = 0.2 * jnp.ones([y_axis.shape[0], 2])
+    rs = rs.at[:, 1].set(y_axis)
+
+    step_max = np.array(np.rint(args.t_end / args.dt), dtype=int)
+    digits = len(str(step_max))
+
+    for i, t_val in enumerate(t_dimless):
+        step = np.array(np.rint(t_val / args.dt), dtype=int)
+        file_name = "traj_" + str(step).zfill(digits) + ".h5"
+        src_path = os.path.join(val_dir_path, dirs[0], file_name)
+
+        if i == 0:
+            interp_vel_fn = sph_interpolator(args, src_path)
+
+        u_val = interp_vel_fn(src_path, rs, prop="u", dim_ind=0)
+
+        if i == 0:
+            plt.plot(
+                y_axis - 3 * args.dx, u_val, "ko", mfc="none", label=r"SPH, $r_c$=0.05"
+            )
+        else:
+            plt.plot(y_axis - 3 * args.dx, u_val, "ko", mfc="none")
+
+    # plot layout
+
+    plt.legend()
+    plt.ylim([0, 1.4])
+    plt.xlim([0, 1])
+    plt.xlabel(r"y [-]")
+    plt.ylabel(r"$u_x$ [-]")
+    # plt.title(f"{str(dim)}D Poiseuille Flow")
+    plt.grid()
+    plt.tight_layout()
+
+    ###### save or visualize
+
+    if save_fig:
+        os.makedirs(val_dir_path, exist_ok=True)
+        nxs_str = "_".join([str(i) for i in nxs])
+        plt.savefig(f"{val_dir_path}/{str(dim)}D_PF_{nxs_str}_new.png")
+
+    plt.show()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -533,7 +642,10 @@ if __name__ == "__main__":
     parser.add_argument("--src_dir_Rie", type=str, help="Source directory Riemann")
     args = parser.parse_args()
 
-    if args.case == "2D_LDC":
+    if args.case == "2D_PF":
+        val_2D_PF(args.src_dir, 2, [60], True)
+
+    elif args.case == "2D_LDC":
         val_2D_LDC(
             args.src_dir_tvf, args.src_dir_notvf, args.src_dir_Rie, save_fig=True
         )
