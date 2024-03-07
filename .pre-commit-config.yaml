@@ -12,7 +12,6 @@ repos:
     hooks:
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: ['--maxkb=1000']
       - id: check-docstring-first
       - id: check-json
       - id: check-toml
