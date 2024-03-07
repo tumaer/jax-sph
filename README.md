@@ -1,29 +1,22 @@
 # JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework
 
-JAX-SPH is a differentiable weakly compressible SPH solver, that is currently under development at the Chair of Aerodynamics and Fluid Mechanics of the Technical University of Munich (TUM). The solver's framework utilizes Jax and depends on functions from the Jax-md library. The main references used for our solver are [1], [2] and [3]. 
-
-The advantage of our solver is that you can combine all of the implemented SPH terms to your liking, or extract/solve only certain terms of the weakly compressible Navier-Stokes equations. Our solver includes the following SPH discretizations:
-
-- Standard SPH [1]
-- Transport velocity formulation SPH [1]
-- Riemann SPH [3]
-
-Not only is it possible to combine, e.g. Riemann SPH with Transport velocity on top, but also to take the density evolution of Riemann SPH and pair it with Standard SPH for example.
+JAX-SPH [(Toshev et al., 2024)](https://openreview.net/forum?id=8X5PXVmsHW) is a modular JAX-based weakly compressible SPH framework, which implements the following SPH routines:
+- Standard SPH [(Adami et al., 2012)](https://www.sciencedirect.com/science/article/pii/S002199911200229X)
+- Transport velocity SPH [(Adami et al., 2013)](https://www.sciencedirect.com/science/article/pii/S002199911300096X)
+- Riemann SPH [(Zhang et al., 2017)](https://www.sciencedirect.com/science/article/abs/pii/S0021999117300438)
 
 ## Installation
+Currently, the code can only be installed by cloning this repository. We recommend using a Poetry or `python3-venv` environment.
 
 ### Using Poetry (recommended)
-
 ```bash
 poetry config virtualenvs.in-project true
 poetry install
 source .venv/bin/activate
 ```
-
 Later, you just need to `source .venv/bin/activate` to activate the environment.
 
-### Using Pip
-
+### Using `python3-venv`
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -34,84 +27,70 @@ pip install -e . # to install jax_sph in interactive mode
 Later, you just need to `source venv/bin/activate` to activate the environment.
 
 ### GPU Support
-
-If you want to use a CUDA GPU, you first need a running Nvidia driver. And then just follow the instructions [here](https://jax.readthedocs.io/en/latest/installation.html). The whole process could look like:
-
+If you want to use a CUDA GPU, you first need a running Nvidia driver. And then just follow the instructions [here](https://jax.readthedocs.io/en/latest/installation.html). The whole process could look like this:
 ```bash
 source .venv/bin/activate
 pip install --upgrade "jax[cuda12_pip]==0.4.23" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 ```
 
-
-## SPH Solver Overview
-
-### Standard SPH
-Standard SPH denotes the standard formulation, so to say the bare minimum of an SPH discretization, where the particle's position updates with their actual advection speed. While that is true, it does still include the possibility to use density summation, density evolution, the pressure term, and the viscosity term of the momentum evaluation. However, as mentioned earlier, in our solver framework it is possible to interchange parts of the different solvers as you wish. For further information, see [1][2].
-### Transport Velocity SPH
-The transport velocity term adds the so-called transport velocity that replaces the physical advection speed of the particles, leading to a less dissipative solver. Similar as before, every term of the weakly compressible Navier-Stokes equations is included. However, to correct the physical velocity gradients, a correction term is added. On top, usually, artificial velocity is added. For more details, see [1][2].
-### Riemann SPH
-Riemann SPH introduces a one-dimensional Riemann problem between every particle interaction counteracting the need for artificial viscosity. This leads to a vastly different formulation of the mass conservation and the momentum equation's discretization. For a more detailed explanation and the derivation of the Riemann SPH discretization, see [3]. However, it is still possible to add every other term, e.g. transport velocity, on top of Riemann SPH.
-
 ## Getting Started
+
 In the following, a quick setup guide for different cases is presented.
 
-
 ### Running an SPH Simulation
-- Standard SPH 2D Taylor Green Vortex 
+- Standard SPH 2D Taylor Green vortex
 ```bash
-./venv/bin/python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
-
-- Transport velocity formulation SPH 2D Taylor Green Vortex
+- Transport velocity SPH 2D Taylor Green vortex
 ```bash
-./venv/bin/python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
-- Riemann SPH 2D Taylor Green Vortex
+- Riemann SPH 2D Taylor Green vortex
 ```bash
-./venv/bin/python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data_valid/tgv2d_notvf/"
+python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
--  Thermal Diffusion
+-  Thermal diffusion
 ```bash
-./venv/bin/python main.py --case=HT --solver=SPH --density-evolution --heat-conduction --dim=2 --dx=0.02 --t-end=1.5 --write-h5 --write-vtk --r0-noise-factor=0.05 --outlet-temperature-derivative --data-path="data_valid/therm_diff/"
+python main.py --case=HT --solver=SPH --density-evolution --heat-conduction --dim=2 --dx=0.02 --t-end=1.5 --write-h5 --write-vtk --r0-noise-factor=0.05 --outlet-temperature-derivative --data-path="data/therm_diff/"
 ```
 
-### Solver in the Loop
+### Solver-in-the-Loop
 To train and test our Solver-in-the-Loop model, run the script in [./experiments/sitl.py](./experiments/sitl.py). This file relies on [LagrangeBench](https://github.com/tumaer/lagrangebench), which can be installed by `pip install lagrangebench`. For more information on the training and inference setup, visit the LagrangeBench website.
 
 ### Inverse Problem
-The presented inverse problem of finding the initial state of a 100-step long SPH simulation can be fully reproduced using the notebook [./experiments/inverse.ipynb](./experiments/inverse.ipynb).
+The presented inverse problem of finding the initial state of a 100-step-long SPH simulation can be fully reproduced using the notebook [./experiments/inverse.ipynb](./experiments/inverse.ipynb).
 
 ### Gradient Validation
 The presented validation of the gradients through the solver can be fully reproduced using the notebook [./experiments/grads.ipynb](./experiments/grads.ipynb)
 
 ## Development and Contribution
-
-As stated in the introduction, our code base is still under development and will be expanded with new features in the future.
 If you wish to contribute, please run
-
 ```bash
 pre-commit install
 ```
 
-upon installation to automate the code linting and formatting checks. 
+upon installation to automate the code linting and formatting checks.
 
-<!-- ## Citation
-If you wish to use our code or parts of our code in your research, please cite the solver using the following .bib,
+## Citation
 
-```
-@misc{jaxsph2024,
- author = {},
- booktitle = {},
- publisher = {},
- title = {},
- url = {},
- volume = {},
- year = {2024}
+The main reference for this code is `toshev2024jaxsph`. If you refer to the code used for dataset generation in LagrangeBench, please cite `toshev2023lagrangebench` directly.
+
+```bibtex
+@inproceedings{toshev2024jaxsph,
+title      = {JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework},
+author     = {Artur Toshev and Harish Ramachandran and Jonas A. Erbesdobler and Gianluca Galletti and Johannes Brandstetter and Nikolaus A. Adams},
+booktitle  = {ICLR 2024 Workshop on AI4DifferentialEquations In Science},
+year       = {2024},
+url        = {https://openreview.net/forum?id=8X5PXVmsHW}
 }
-``` -->
-
-## References
-
-* [1] - "A generalized wall boundary condition for smoothed particle hydrodynamics", Adami, Hu & Adams, 2012
-* [2] - "A transport-velocity formulation for smoothed particle hydrodynamics", Adami, Hu & Adams, 2013
-* [3] - "A weakly compressible SPH method based on a low-dissipation Riemann solver", Zhang, Hu, Adams, 2017
+```
+```bibtex
+@inproceedings{toshev2023lagrangebench,
+title      = {LagrangeBench: A Lagrangian Fluid Mechanics Benchmarking Suite},
+author     = {Artur P. Toshev and Gianluca Galletti and Fabian Fritz and Stefan Adami and Nikolaus A. Adams},
+year       = {2023},
+url        = {https://arxiv.org/abs/2309.16342},
+booktitle  = {37th Conference on Neural Information Processing Systems (NeurIPS 2023) Track on Datasets and Benchmarks},
+}
+```
