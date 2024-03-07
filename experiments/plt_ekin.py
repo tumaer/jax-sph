@@ -131,38 +131,4 @@ def main(src_dir):
 
 
 if __name__ == "__main__":
-    # main("datasets/2D_RPF_800_100kevery10/2D_RPF_SPH_0_20230525-233534")
-    # main("datasets/2D_RPF_2048_100kevery10/2D_RPF_SPH_0_20230526-002148")
-    # main("datasets/2D_RPF_3200_100kevery10/2D_RPF_SPH_0_20230525-233648")
-    # main("datasets/2D_RPF_12800_100kevery10/2D_RPF_SPH_0_20230525-234042")
-
-    # main("datasets/2D_RPF_3200_100kevery10/2D_RPF_SPH_123_20230526-143934")
-
-    # main("datasets/3D_TGV_8000_100every20/3D_TGV_SPH_0_20230526-021048")
-    # main("datasets/3D_TGV_32768_100every20/3D_TGV_SPH_0_20230526-120955")
-    # main("datasets/3D_TGV_64000_100every10/3D_TGV_SPH_0_20230526-125422")
-    # main("datasets/3D_TGV_64000_100every10/3D_TGV_SPH_999_20230526-130723")
-
-    # main("data_valid/pf3d_notvf_high_visc/3D_RPF_SPH_123_20230531-142247")
-    # main("data_valid/pf3d_notvf_less_pb/3D_RPF_SPH_123_20230531-142241")
-    # main("data_valid/pf3d_notvf_low_visc/3D_RPF_SPH_123_20230531-142250")
-    # main("data_valid/pf3d_notvf_more_pb/3D_RPF_SPH_123_20230531-141853")
-    # main("data_valid/pf3d_notvf_no_pb/3D_RPF_SPH_123_20230531-142236")
-    # main("datasets/2D_RPF_3200_20kevery100/2D_RPF_SPH_123_20230527-214608")
-
-    # main("datasets/3D_TGV_8000_100every20/3D_TGV_SPH_123_20230601-154627") # Re=10
-    # main("datasets/3D_TGV_8000_100every20/3D_TGV_SPH_123_20230601-154741") # Re=20
-    # main("datasets/3D_TGV_8000_100every20/3D_TGV_SPH_123_20230601-154858") # Re=50
-    # main("datasets/3D_TGV_8000_100every20/3D_TGV_SPH_123_20230602-025527") # Re=100
-    main(
-        "datasets/3D_TGV_64000_100every10/3D_TGV_SPH_999_20230602-013115"
-    )  # Re=50 40^3 with TV
-    # main(
-    #   "datasets/3D_TGV_64000_100every10/3D_TGV_SPH_999_20230602-013724"
-    # ) # Re=50 40^3 without TV
-    # main("datasets/3D_TGV_8000_100every20/3D_TGV_SPH_0_20230602-042019") # Re=50, 30s
-
-    # main("datasets/3D_LDC_4000_10kevery100/3D_LDC_SPH_0_20230603-014938")
-    # main("datasets/3D_LDC_8112_10kevery100/3D_LDC_SPH_0_20230603-022656")
-    # main("datasets/3D_LDC_32000_10kevery100/3D_LDC_SPH_0_20230603-015402")
-    pass
+    main("datasets/2D_RPF_800_100kevery10/2D_RPF_SPH_0_20230525-233534")

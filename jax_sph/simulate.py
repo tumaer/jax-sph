@@ -66,10 +66,6 @@ def simulate(args):
     )
     # Instantiate advance function for our use case
     advance = si_euler(args.tvf, model, shift_fn, bc_fn)
-    # if args.solver == "RIE":  # TODO: make one integrator
-    #     advance = kick_drift_kick_RIE(args.tvf, model, shift_fn, bc_fn)
-    # else:
-    #     advance = si_euler(args.tvf, model, shift_fn, bc_fn)
 
     advance = advance if args.no_jit else jit(advance)
 
@@ -82,7 +78,6 @@ def simulate(args):
 
     start = time.time()
     for step in range(args.sequence_length + 2):
-        # TODO: writing for the first time is not at zero. Why?
         write_state(step - 1, args.sequence_length, state, dir, args)
 
         state_, neighbors_ = advance(args.dt, state, neighbors)

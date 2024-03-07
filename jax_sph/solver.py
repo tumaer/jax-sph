@@ -318,7 +318,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
         # sheparding denominator
         w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, N)
 
-        if is_free_slip:  # TODO: implement reversal of normal velocity!
+        if is_free_slip:
             # free-slip boundary - ignore viscous interactions with wall
             u = free_slip_bc_fn(u)
             v = free_slip_bc_fn(v)

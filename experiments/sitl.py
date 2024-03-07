@@ -47,7 +47,6 @@ class SolverInTheLoop(hk.Module):
 
         self.model = GNS(dim, latent_size, blocks_per_step, num_mp_steps, 16, 9)
 
-        # TODO
         self.num_sitl_steps = num_sitl_steps
         self.effective_dt = dt
         self.stil_dt = dt / num_sitl_steps
