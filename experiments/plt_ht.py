@@ -67,7 +67,7 @@ def paper_plots(data_dir, plt_dir, steps):
 
 def docs_gif(data_dir, plt_dir):
     """Create a gif over all 3000 steps of the simulation."""
-    
+
     metadata = vars(read_args(f"{data_dir}/args.txt"))
     bounds = metadata["bounds"]
 
@@ -77,7 +77,7 @@ def docs_gif(data_dir, plt_dir):
     files.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
     files = files[::2]
 
-    fig = plt.figure(figsize=(bounds[0][1]*10, bounds[1][1]*10))
+    fig = plt.figure(figsize=(bounds[0][1] * 10, bounds[1][1] * 10))
     ax = plt.axes(xlim=(bounds[0]), ylim=(bounds[1]))
 
     # Function to plot a single frame
@@ -86,7 +86,7 @@ def docs_gif(data_dir, plt_dir):
         filename = os.path.join(data_dir, files[i])
         data_dict = read_h5(filename, array_type="numpy")
         r = data_dict["r"]
-        v = data_dict["T"] # temperature
+        v = data_dict["T"]  # temperature
         tags = data_dict["tag"]
         wall_mask = tags == 1
 
@@ -113,7 +113,7 @@ def docs_gif(data_dir, plt_dir):
     anim = animation.FuncAnimation(fig, update_plot, frames=len(files), interval=20)
 
     os.makedirs(plt_dir, exist_ok=True)
-    anim.save(f"{plt_dir}/anim.gif", writer='imagemagick', fps=30, dpi=50, savefig_kwargs={"transparent": True})
+    anim.save(f"{plt_dir}/anim.gif", writer="imagemagick", fps=30, dpi=50)
     plt.show()
     plt.close()
 
