@@ -41,9 +41,8 @@ class DB(SimulationSetup):
             self.args.p_bg_factor = 0.0
 
         # TODO: check behavior with 1, sqrt(2), and 2 for u_ref
-        self.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
-        args.Vmax = 2 * (self.args.g_ext_magnitude * self.H) ** 0.5
-        args.c0 = 10 * args.Vmax
+        self.args.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
+        self.args.Vmax = 2 * (self.args.g_ext_magnitude * self.H) ** 0.5
 
     def _box_size2D(self):
         dx, bo = self.args.dx, self.box_offset

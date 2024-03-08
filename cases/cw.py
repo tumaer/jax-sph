@@ -24,7 +24,7 @@ class CW(SimulationSetup):
         self.cube_offset = np.array(args.cube_offset)
         self.u_init = 0.5
 
-        self.u_ref = 1  # TODO: 2 ** 0.5
+        self.args.u_ref = 1  # TODO: 2 ** 0.5
         self.args.g_ext_magnitude = 1.0
         self.args.is_bc_trick = True
         if self.args.p_bg_factor is None:
