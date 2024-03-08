@@ -1,5 +1,7 @@
 # JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework
 
+![HT_T.gif](https://s9.gifyu.com/images/SUwUD.gif)
+
 JAX-SPH [(Toshev et al., 2024)](https://openreview.net/forum?id=8X5PXVmsHW) is a modular JAX-based weakly compressible SPH framework, which implements the following SPH routines:
 - Standard SPH [(Adami et al., 2012)](https://www.sciencedirect.com/science/article/pii/S002199911200229X)
 - Transport velocity SPH [(Adami et al., 2013)](https://www.sciencedirect.com/science/article/pii/S002199911300096X)
