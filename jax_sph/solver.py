@@ -345,7 +345,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
         if is_heat_conduction:
             t_wall_unnorm = ops.segment_sum(w_j_s_fluid * temperature[j_s], i_s, N)
             t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-            t_wall = jnp.where(tag == 1, t_wall, temperature)
+            t_wall = jnp.where((tag == 1) + (tag == 2), t_wall, temperature)
 
             temperature = t_wall
 
@@ -467,13 +467,11 @@ def WCSPH(
             neighbors (_type_): Neighbors object.
         """
 
-        r, tag, mass = state["r"], state["tag"], state["mass"]
+        r, tag, mass, eta = state["r"], state["tag"], state["mass"], state["eta"]
         u, v, dudt, dvdt = state["u"], state["v"], state["dudt"], state["dvdt"]
-        rho, eta, p = state["rho"], state["eta"], state["p"]
-        drhodt = state["drhodt"]
-        kappa = state["kappa"]
-        Cp = state["Cp"]
-        temperature = state["T"]
+        rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
+        kappa, Cp = state["kappa"], state["Cp"]
+        temperature, dTdt = state["T"], state["dTdt"]
         N = len(r)
 
         # precompute displacements `dr` and distances `dist`
@@ -567,6 +565,10 @@ def WCSPH(
         ##### compute heat conduction
 
         if is_heat_conduction:
+            # integrate the incomming temperature derivative
+            temperature += dt * dTdt
+
+            # compute temperature derivative for next step
             out = vmap(_temperature_derivative)(
                 e_s,
                 dr_i_j,
@@ -581,9 +583,6 @@ def WCSPH(
                 temperature[j_s],
             )
             dTdt = ops.segment_sum(out, i_s, N)
-        else:
-            dTdt = jnp.zeros_like(drhodt)
-        temperature = temperature + dt * dTdt
 
         ##### Compute RHS
 

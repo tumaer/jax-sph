@@ -75,40 +75,33 @@ class HT(SimulationSetup):
         return res * self.args.g_ext_magnitude
 
     def _boundary_conditions_fn(self, state):
-        # set incoming fluid temperature to T0 (reference temperature)
-        mask0 = (state["tag"] == 0) * (state["r"][:, 0] < 3 * self.args.dx)
-        state["T"] = jnp.where(mask0, self.args.reference_temperature, state["T"])
-        # set the fixed wall at reference_temperature.
-        state["dTdt"] = jnp.where(
-            mask0, 0, state["dTdt"]
-        )  # no change in temperature for the fixed wall
+        # set incoming fluid temperature to reference_temperature
+        mask_inflow = (state["tag"] == 0) * (state["r"][:, 0] < 3 * self.args.dx)
+        state["T"] = jnp.where(mask_inflow, self.args.reference_temperature, state["T"])
+        state["dTdt"] = jnp.where(mask_inflow, 0, state["dTdt"])
 
+        # set the hot wall to hot_wall_temperature.
         mask3 = state["tag"] == 3  # hot wall
-        # set the hot wall at hot_wall_temperature.
         state["T"] = jnp.where(mask3, self.args.hot_wall_temperature, state["T"])
-        state["dTdt"] = jnp.where(
-            mask3, 0, state["dTdt"]
-        )  # no change in temperature for the hot wall
+        state["dTdt"] = jnp.where(mask3, 0, state["dTdt"])
 
+        # set the fixed wall to reference_temperature.
         mask1 = state["tag"] == 1  # fixed wall
-        # set the fixed wall at reference_temperature.
         state["T"] = jnp.where(mask1, self.args.reference_temperature, state["T"])
-        state["dTdt"] = jnp.where(
-            mask1, 0, state["dTdt"]
-        )  # no change in temperature for the fixed wall
+        state["dTdt"] = jnp.where(mask1, 0, state["dTdt"])
 
-        mask1 = (state["tag"][:, None] == 1) + (
-            state["tag"][:, None] == 3
-        )  # for paraview (fixed and hot)
-        state["u"] = jnp.where(mask1, 0, state["u"])
-        state["v"] = jnp.where(mask1, 0, state["v"])
-        state["dudt"] = jnp.where(mask1, 0, state["dudt"])
-        state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
+        # ensure static walls have no velocity or acceleration
+        mask = state["tag"][:, None] > 0
+        state["u"] = jnp.where(mask, 0, state["u"])
+        state["v"] = jnp.where(mask, 0, state["v"])
+        state["dudt"] = jnp.where(mask, 0, state["dudt"])
+        state["dvdt"] = jnp.where(mask, 0, state["dvdt"])
 
-        mask0 = (state["tag"] == 0) * (
+        # set outlet temperature gradients to zero to avoid interaction with inflow
+        # bounds[0][1] is the x-coordinate of the outlet
+        mask_outflow = (state["tag"] == 0) * (
             state["r"][:, 0] > self.args.bounds[0][1] - 3 * self.args.dx
         )
-        # bounds[0][1] is the x-coordinate of the outlet
-        state["dTdt"] = jnp.where(mask0, 0, state["dTdt"])
+        state["dTdt"] = jnp.where(mask_outflow, 0, state["dTdt"])
 
         return state

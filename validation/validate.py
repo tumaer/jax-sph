@@ -523,6 +523,7 @@ def val_DB(val_root, save_fig=False):
     plt.show()
     plt.close()
 
+
 def val_2D_PF(
     val_dir_path,
     dim=2,
@@ -632,6 +633,7 @@ def val_2D_PF(
         plt.savefig(f"{val_dir_path}/{str(dim)}D_PF_{nxs_str}_new.png")
 
     plt.show()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
