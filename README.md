@@ -96,3 +96,14 @@ url        = {https://arxiv.org/abs/2309.16342},
 booktitle  = {37th Conference on Neural Information Processing Systems (NeurIPS 2023) Track on Datasets and Benchmarks},
 }
 ```
+
+## Acknowledgements
+
+The initial idea for JAX-SPH is due to Fabian Fritz and Ludger Paehler, which has led to a first validated JAX implementation of the 3D Taylor-Green vortex simulated with the transport velocity SPH formulation. Since then, Artur Toshev has maintained the codebase and extended it in various ways. The people who have provided useful feedback include, but are not limited to: Stefan Adami, Xiangyu Hu, Fabian Fritz, Christopher Zöller, Fabien Thiery, Johannes Brandstetter, and Ludger Paehler. Special thanks to Nikolaus Adams, who has supervised the project from the beginning.
+
+### Contributors
+- [Artur Toshev](https://github.com/arturtoshev) - developed and maintains the codebase; selected the SPH algorithms and validated most of them; designed the simulation cases and ML experiments.
+- [Fabian Fritz](https://github.com/orgs/tumaer/people/fritzio) - provided the first validated transport velocity SPH implementation of the 3D Taylor-Green vortex in JAX.
+- [Jonas Erbesdobler](https://github.com/JonasErbesdobler) - implemented Riemann SPH; improved and added solver validation scripts; contributed to refactoring the codebase.
+- [Harish Ramachandran](https://github.com/harish6696) - implemented thermal diffusion and the inverse problem; helped in the initial phase of Solver-in-the-Loop. 
+- [Gianluca Galletti](https://github.com/gerkone) - validated the gradients through the solver; implemented Solver-in-the-Loop, and tuned its parameters.
