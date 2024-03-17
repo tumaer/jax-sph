@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from jax_sph.io_state import read_args, read_h5
-from jax_sph.utils import Tag, get_ekin, get_val_max, sph_interpolator
+from jax_sph.utils import get_ekin, get_val_max, sph_interpolator, wall_tags
 
 EPS = jnp.finfo(float).eps
 
@@ -500,7 +500,7 @@ def val_DB(val_root, save_fig=False):
         p = state["p"]
 
         # pressure at wall to zero
-        mask_wall = jnp.isin(tag, Tag.WALL)
+        mask_wall = jnp.isin(tag, wall_tags)
         p = np.where(mask_wall, 0.0, p)
 
         mask_lower = r[:, 1] < 2.0 + 3 * args.dx

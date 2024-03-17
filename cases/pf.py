@@ -18,7 +18,7 @@ class PF(SimulationSetup):
 
         # Setup from "A generalized wall boundary condition [...]", Adami 2012
         # custom variables related only to this Simulation
-        self.args.args.u_ref = 1.25
+        self.args.u_ref = 1.25
 
         if self.args.g_ext_magnitude is None:
             self.args.g_ext_magnitude = 1000

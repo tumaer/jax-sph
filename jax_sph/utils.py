@@ -22,7 +22,9 @@ class Tag(enum.IntEnum):
     SOLID_WALL = 1
     MOVING_WALL = 2
     DIRICHLET_WALL = 3  # for temperature boundary condition
-    WALL = [1, 2, 3]  # for wall boundary conditions
+
+
+wall_tags = jnp.array([tag.value for tag in Tag if "WALL" in tag.name])
 
 
 def pos_init_cartesian_2d(box_size, dx):
@@ -75,7 +77,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
     N = len(state["r"])
     dim = args.dim
 
-    mask_bc = jnp.isin(state["tag"], jnp.array(Tag.WALL))
+    mask_bc = jnp.isin(state["tag"], wall_tags)
 
     # invert velocity for boundary particles
     def comp_bc_interm(x, i_s, j_s, w_j_s_fluid, w_i_sum):

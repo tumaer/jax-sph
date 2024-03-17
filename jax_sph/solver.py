@@ -5,7 +5,7 @@ from jax import ops, vmap
 from jax_md import space
 
 from jax_sph.kernels import QuinticKernel, WendlandC2Kernel
-from jax_sph.utils import Tag
+from jax_sph.utils import Tag, wall_tags
 
 EPS = jnp.finfo(float).eps
 
@@ -279,7 +279,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
         particle hydrodynamics", Adami, Hu, Adams, 2012
         """
 
-        mask_bc = jnp.isin(tag, jnp.array(Tag.WALL))
+        mask_bc = jnp.isin(tag, wall_tags)
 
         def no_slip_bc_fn(x):
             # for boundary particles, sum over fluid velocities
@@ -499,7 +499,7 @@ def WCSPH(
         g_ext = g_ext_fn(r)  # e.g. np.array([[0, -1], [0, -1], ...])
 
         # masks
-        wall_mask = jnp.where(jnp.isin(tag, jnp.array(Tag.WALL)), 1.0, 0.0)
+        wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
         fluid_mask = jnp.where(tag == Tag.FLUID, 1.0, 0.0)
 
         # calculate normal vector of wall boundaries
