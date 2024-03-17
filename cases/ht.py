@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
+from jax_sph.utils import Tag
 
 
 class HT(SimulationSetup):
@@ -40,8 +41,7 @@ class HT(SimulationSetup):
     def _tag2D(self, r):
         dx3 = 3 * self.args.dx
         _box_size = self._box_size2D()
-        # tags: {'0': water, '1': solid wall, '2': moving wall, '3': hot wall}
-        tag = jnp.zeros(len(r), dtype=int)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
 
         mask_no_slip_wall = (r[:, 1] < dx3) + (
             r[:, 1] > (_box_size[1] - 6 * self.args.dx) + dx3
@@ -51,8 +51,8 @@ class HT(SimulationSetup):
             * (r[:, 0] < (_box_size[0] / 2) + self.args.hot_wall_half_width)
             * (r[:, 0] > (_box_size[0] / 2) - self.args.hot_wall_half_width)
         )
-        tag = jnp.where(mask_no_slip_wall, 1, tag)
-        tag = jnp.where(mask_hot_wall, 3, tag)
+        tag = jnp.where(mask_no_slip_wall, Tag.SOLID_WALL, tag)
+        tag = jnp.where(mask_hot_wall, Tag.DIRICHLET_WALL, tag)
         return tag
 
     def _tag3D(self, r):
@@ -75,33 +75,35 @@ class HT(SimulationSetup):
         return res * self.args.g_ext_magnitude
 
     def _boundary_conditions_fn(self, state):
+        mask_fluid = state["tag"] == Tag.FLUID
+
         # set incoming fluid temperature to reference_temperature
-        mask_inflow = (state["tag"] == 0) * (state["r"][:, 0] < 3 * self.args.dx)
+        mask_inflow = mask_fluid * (state["r"][:, 0] < 3 * self.args.dx)
         state["T"] = jnp.where(mask_inflow, self.args.reference_temperature, state["T"])
-        state["dTdt"] = jnp.where(mask_inflow, 0, state["dTdt"])
+        state["dTdt"] = jnp.where(mask_inflow, 0.0, state["dTdt"])
 
         # set the hot wall to hot_wall_temperature.
-        mask3 = state["tag"] == 3  # hot wall
-        state["T"] = jnp.where(mask3, self.args.hot_wall_temperature, state["T"])
-        state["dTdt"] = jnp.where(mask3, 0, state["dTdt"])
+        mask_hot = state["tag"] == Tag.DIRICHLET_WALL  # hot wall
+        state["T"] = jnp.where(mask_hot, self.args.hot_wall_temperature, state["T"])
+        state["dTdt"] = jnp.where(mask_hot, 0.0, state["dTdt"])
 
         # set the fixed wall to reference_temperature.
-        mask1 = state["tag"] == 1  # fixed wall
-        state["T"] = jnp.where(mask1, self.args.reference_temperature, state["T"])
-        state["dTdt"] = jnp.where(mask1, 0, state["dTdt"])
+        mask_solid = state["tag"] == Tag.SOLID_WALL  # fixed wall
+        state["T"] = jnp.where(mask_solid, self.args.reference_temperature, state["T"])
+        state["dTdt"] = jnp.where(mask_solid, 0, state["dTdt"])
 
         # ensure static walls have no velocity or acceleration
-        mask = state["tag"][:, None] > 0
-        state["u"] = jnp.where(mask, 0, state["u"])
-        state["v"] = jnp.where(mask, 0, state["v"])
-        state["dudt"] = jnp.where(mask, 0, state["dudt"])
-        state["dvdt"] = jnp.where(mask, 0, state["dvdt"])
+        mask_static = (mask_hot + mask_solid)[:, None]
+        state["u"] = jnp.where(mask_static, 0.0, state["u"])
+        state["v"] = jnp.where(mask_static, 0.0, state["v"])
+        state["dudt"] = jnp.where(mask_static, 0.0, state["dudt"])
+        state["dvdt"] = jnp.where(mask_static, 0.0, state["dvdt"])
 
         # set outlet temperature gradients to zero to avoid interaction with inflow
         # bounds[0][1] is the x-coordinate of the outlet
-        mask_outflow = (state["tag"] == 0) * (
+        mask_outflow = mask_fluid * (
             state["r"][:, 0] > self.args.bounds[0][1] - 3 * self.args.dx
         )
-        state["dTdt"] = jnp.where(mask_outflow, 0, state["dTdt"])
+        state["dTdt"] = jnp.where(mask_outflow, 0.0, state["dTdt"])
 
         return state

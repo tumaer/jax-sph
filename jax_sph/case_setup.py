@@ -9,7 +9,12 @@ import numpy as np
 from jax import vmap
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
-from jax_sph.utils import noise_masked, pos_init_cartesian_2d, pos_init_cartesian_3d
+from jax_sph.utils import (
+    Tag,
+    noise_masked,
+    pos_init_cartesian_2d,
+    pos_init_cartesian_3d,
+)
 
 EPS = jnp.finfo(float).eps
 
@@ -94,7 +99,6 @@ class SimulationSetup(ABC):
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
         # initialize box and regular grid positions of particles
-        # Tag particle: 0 - fluid, 1 - solid wall, 2 - moving wall
         if args.dim == 2:
             box_size = self._box_size2D()
             r = self._init_pos2D(box_size, args.dx)
@@ -107,11 +111,11 @@ class SimulationSetup(ABC):
         num_particles = len(r)
         print("Total number of particles = ", num_particles)
 
-        # add noise to the fluid particles (tag=0) to break symmetry
+        # add noise to the fluid particles to break symmetry
         key, subkey = jax.random.split(key_prng)
         if args.r0_noise_factor != 0.0:
             noise_std = args.r0_noise_factor * args.dx
-            r = noise_masked(r, tag == 0, subkey, std=noise_std)
+            r = noise_masked(r, tag == Tag.FLUID, subkey, std=noise_std)
             # PBC: move all particles to the box limits after noise addition
             r = r % jnp.array(box_size)
 

@@ -21,6 +21,7 @@ from jax_sph import partition
 from jax_sph.eos import TaitEoS
 from jax_sph.kernels import QuinticKernel
 from jax_sph.solver import WCSPH
+from jax_sph.utils import Tag
 
 
 class SolverInTheLoop(hk.Module):
@@ -210,7 +211,7 @@ class SolverInTheLoop(hk.Module):
         features, tag = sample
         r0 = state["r"].copy()
         u0 = state["u"].copy()
-        N = (state["tag"] != -1).sum()
+        N = (state["tag"] != Tag.PAD_VALUE).sum()
 
         for _ in range(self.num_sitl_steps):
             # solver step and neighbors list

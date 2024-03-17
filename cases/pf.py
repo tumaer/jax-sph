@@ -7,7 +7,7 @@ import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
 from jax_sph.io_state import read_h5
-from jax_sph.utils import pos_init_cartesian_2d
+from jax_sph.utils import Tag, pos_init_cartesian_2d
 
 
 class PF(SimulationSetup):
@@ -62,7 +62,7 @@ class PF(SimulationSetup):
         state = read_h5(init_path)
         # r_fluid = state['r'] + np.array([0, 3 * dx])
         r_fluid = state["r"] + np.array([-3 * dx, 0])
-        r_fluid = r_fluid[state["tag"] == 0]
+        r_fluid = r_fluid[state["tag"] == Tag.FLUID]
 
         # wall: bottom and top
         wall_b = pos_init_cartesian_2d(np.array([box_size[0], 3 * dx]), dx)
@@ -72,12 +72,11 @@ class PF(SimulationSetup):
         return res
 
     def _tag2D(self, r):
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
-        tag = jnp.zeros(len(r), dtype=int)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
         dx3 = 3 * self.args.dx
 
         mask_wall = (r[:, 1] < dx3) + (r[:, 1] > 1 + dx3)
-        tag = jnp.where(mask_wall, 1, tag)
+        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
         return tag
 
     def _tag3D(self, r):
@@ -99,7 +98,7 @@ class PF(SimulationSetup):
         return res * self.args.g_ext_magnitude
 
     def _boundary_conditions_fn(self, state):
-        mask1 = state["tag"][:, None] == 1
+        mask1 = state["tag"][:, None] == Tag.SOLID_WALL
 
         state["u"] = jnp.where(mask1, 0, state["u"])
         state["v"] = jnp.where(mask1, 0, state["v"])

@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import pos_init_cartesian_2d
+from jax_sph.utils import Tag, pos_init_cartesian_2d
 
 
 class CW(SimulationSetup):
@@ -65,9 +65,8 @@ class CW(SimulationSetup):
         mask_top = jnp.where(r[:, 1] > self.H_wall + dx3, True, False)
         mask_wall = mask_left + mask_bottom + mask_right + mask_top
 
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
-        tag = jnp.zeros(len(r), dtype=int)
-        tag = jnp.where(mask_wall, 1, tag)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
         return tag
 
     def _tag3D(self, r):
@@ -86,13 +85,11 @@ class CW(SimulationSetup):
         return res
 
     def _boundary_conditions_fn(self, state):
-        mask_wall = state["tag"][:, None] == 1
-        mask_wall_1d = state["tag"] == 1
+        mask_wall = state["tag"] == Tag.SOLID_WALL
 
-        state["u"] = jnp.where(mask_wall, 0.0, state["u"])
-        state["v"] = jnp.where(mask_wall, 0.0, state["v"])
-        state["dudt"] = jnp.where(mask_wall, 0.0, state["dudt"])
-        state["dvdt"] = jnp.where(mask_wall, 0.0, state["dvdt"])
-        # pay attention to the shapes
-        state["p"] = jnp.where(mask_wall_1d, 0.0, state["p"])
+        state["u"] = jnp.where(mask_wall[:, None], 0.0, state["u"])
+        state["v"] = jnp.where(mask_wall[:, None], 0.0, state["v"])
+        state["dudt"] = jnp.where(mask_wall[:, None], 0.0, state["dudt"])
+        state["dvdt"] = jnp.where(mask_wall[:, None], 0.0, state["dvdt"])
+        state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state

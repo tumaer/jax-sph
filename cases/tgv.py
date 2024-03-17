@@ -7,6 +7,7 @@ import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
 from jax_sph.io_state import read_h5
+from jax_sph.utils import Tag
 
 
 class TGV(SimulationSetup):
@@ -59,8 +60,7 @@ class TGV(SimulationSetup):
         return self._init_pos2D(box_size, dx)
 
     def _tag2D(self, r):
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
-        tag = jnp.zeros(len(r), dtype=int)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
         return tag
 
     def _tag3D(self, r):

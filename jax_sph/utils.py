@@ -1,5 +1,7 @@
 """General jax-sph utils"""
 
+import enum
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -10,6 +12,17 @@ from jax_sph.io_state import read_h5
 from jax_sph.kernels import QuinticKernel
 
 EPS = jnp.finfo(float).eps
+
+
+class Tag(enum.IntEnum):
+    """Particle types."""
+
+    PAD_VALUE = -1  # when number of particles varies
+    FLUID = 0
+    SOLID_WALL = 1
+    MOVING_WALL = 2
+    DIRICHLET_WALL = 3  # for temperature boundary condition
+    WALL = [1, 2, 3]  # for wall boundary conditions
 
 
 def pos_init_cartesian_2d(box_size, dx):
@@ -35,7 +48,7 @@ def noise_masked(r, mask, key, std):
 
 def get_ekin(state, dx):
     v = state["v"]
-    v_water = jnp.where(state["tag"][:, None] == 0, v, 0)
+    v_water = jnp.where(state["tag"][:, None] == Tag.FLUID, v, 0.0)
     ekin = jnp.square(v_water).sum().item()
     return 0.5 * ekin * dx ** v.shape[1]
 
@@ -62,6 +75,8 @@ def sph_interpolator(args, src_path, prop_type="vector"):
     N = len(state["r"])
     dim = args.dim
 
+    mask_bc = jnp.isin(state["tag"], jnp.array(Tag.WALL))
+
     # invert velocity for boundary particles
     def comp_bc_interm(x, i_s, j_s, w_j_s_fluid, w_i_sum):
         # for boundary particles, sum over fluid velocities
@@ -70,7 +85,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         # eq. 22 from "A Generalized Wall boundary condition for SPH", 2012
         x_wall = x_wall_unnorm / (w_i_sum[:, None] + EPS)
         # eq. 23 from same paper
-        x = jnp.where(state["tag"][:, None] > 0, 2 * x - x_wall, x)
+        x = jnp.where(mask_bc[:, None], 2 * x - x_wall, x)
         return x
 
     # Set the wall particle tempertature or pressure the same as the neighbouring
@@ -82,7 +97,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         # eq. 22 from "A Generalized Wall boundary condition for SPH", 2012
         x_wall = x_wall_unnorm / (w_i_sum + EPS)
         # eq. 23 from same paper
-        x = jnp.where(state["tag"] > 0, x_wall, x)
+        x = jnp.where(mask_bc, x_wall, x)
         return x
 
     kernel_fn = QuinticKernel(h=args.dx, dim=args.dim)
@@ -120,7 +135,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         w_dist = vmap(kernel_fn.w)(dist)
 
         # require operations with sender fluid and receiver wall/lid
-        w_j_s_fluid = w_dist * jnp.where(state["tag"][j_s] == 0, 1.0, 0.0)
+        w_j_s_fluid = w_dist * jnp.where(state["tag"][j_s] == Tag.FLUID, 1.0, 0.0)
         # sheparding denominator
         w_i_sum = ops.segment_sum(w_j_s_fluid, i_s, N)
 
@@ -153,7 +168,7 @@ def sph_interpolator(args, src_path, prop_type="vector"):
         w_dist = vmap(kernel_fn.w)(dist)
 
         # require operations with sender fluid and receiver wall/lid
-        w_j_s_fluid = w_dist * jnp.where(state["tag"][j_s] == 0, 1.0, 0.0)
+        w_j_s_fluid = w_dist * jnp.where(state["tag"][j_s] == Tag.FLUID, 1.0, 0.0)
         # sheparding denominator
         w_i_sum = ops.segment_sum(w_j_s_fluid, i_s, N)
 

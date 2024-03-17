@@ -7,7 +7,7 @@ import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
 from jax_sph.io_state import read_h5
-from jax_sph.utils import pos_init_cartesian_2d
+from jax_sph.utils import Tag, pos_init_cartesian_2d
 
 
 class DB(SimulationSetup):
@@ -85,7 +85,7 @@ class DB(SimulationSetup):
                 raise FileNotFoundError(f"First execute this: \n{message}")
 
             state = read_h5(init_path)
-            r_fluid = state["r"][state["tag"] == 0]
+            r_fluid = state["r"][state["tag"] == Tag.FLUID]
 
         # horizontal and vertical blocks
         vertical = pos_init_cartesian_2d(np.array([dx3, H_wall + dx6]), dx)
@@ -121,9 +121,8 @@ class DB(SimulationSetup):
 
         mask_wall = mask_left + mask_bottom + mask_right + mask_top
 
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
-        tag = jnp.zeros(len(r), dtype=int)
-        tag = jnp.where(mask_wall, 1, tag)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
         return tag
 
     def _tag3D(self, r):
@@ -141,13 +140,11 @@ class DB(SimulationSetup):
         return res
 
     def _boundary_conditions_fn(self, state):
-        mask_wall = state["tag"][:, None] == 1
-        # mask_wall_1d = state["tag"] == 1
+        mask_wall = state["tag"] == Tag.SOLID_WALL
 
-        state["u"] = jnp.where(mask_wall, 0.0, state["u"])
-        state["v"] = jnp.where(mask_wall, 0.0, state["v"])
-        state["dudt"] = jnp.where(mask_wall, 0.0, state["dudt"])
-        state["dvdt"] = jnp.where(mask_wall, 0.0, state["dvdt"])
-        # pay attention to the shapes
-        # state['p'] = jnp.where(mask_wall_1d, 0.0, state['p'])
+        state["u"] = jnp.where(mask_wall[:, None], 0.0, state["u"])
+        state["v"] = jnp.where(mask_wall[:, None], 0.0, state["v"])
+        state["dudt"] = jnp.where(mask_wall[:, None], 0.0, state["dudt"])
+        state["dvdt"] = jnp.where(mask_wall[:, None], 0.0, state["dvdt"])
+        state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state

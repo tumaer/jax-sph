@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from jax_sph.io_state import read_args, read_h5
+from jax_sph.utils import Tag
 
 
 def paper_plots(data_dir, plt_dir, steps):
@@ -19,8 +20,8 @@ def paper_plots(data_dir, plt_dir, steps):
         data_dict = read_h5(filename, array_type="numpy")
         r = data_dict["r"]
         v = data_dict["T"]
-        tags = data_dict["tag"]
-        wall_mask = tags == 1
+        tag = data_dict["tag"]
+        wall_mask = tag == Tag.SOLID_WALL
         fig, ax = plt.subplots(figsize=(10, 3))
         ax.scatter(
             r[~wall_mask][:, 0],
@@ -87,8 +88,8 @@ def docs_gif(data_dir, plt_dir):
         data_dict = read_h5(filename, array_type="numpy")
         r = data_dict["r"]
         v = data_dict["T"]  # temperature
-        tags = data_dict["tag"]
-        wall_mask = tags == 1
+        tag = data_dict["tag"]
+        wall_mask = tag == Tag.SOLID_WALL
 
         # plot data
         ax.clear()

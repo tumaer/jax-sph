@@ -1,5 +1,6 @@
 """Utility to plot kinetic enery from h5 simulation trajectories"""
 
+import enum
 import json
 import os
 
@@ -13,9 +14,19 @@ import numpy as np
 # from src.io_state import read_h5, render_data_dict, _plot, write_vtk
 
 
+class Tag(enum.IntEnum):
+    """Particle types."""
+
+    PAD_VALUE = -1
+    FLUID = 0
+    SOLID_WALL = 1
+    MOVING_WALL = 2
+    DIRICHLET_WALL = 3
+
+
 def get_ekin(state, dx):
     v = state["v"]
-    v_water = np.where(state["tag"][:, None] == 0, v, 0)
+    v_water = np.where(state["tag"][:, None] == Tag.FLUID, v, 0)
     ekin = np.square(v_water).sum().item()
     return 0.5 * ekin * dx ** v.shape[1]
 

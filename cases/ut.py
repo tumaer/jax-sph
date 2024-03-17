@@ -40,7 +40,6 @@ class UTSetup(SimulationSetup):
         return offset + pos_init_cartesian_3d(cube, dx)
 
     def _tag2D(self, r):
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
         return jnp.zeros(len(r), dtype=int)
 
     def _tag3D(self, r):

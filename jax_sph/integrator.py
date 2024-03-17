@@ -1,6 +1,9 @@
 """Integrator schemes"""
 
 
+from jax_sph.utils import Tag
+
+
 def si_euler(tvf, model, shift_fn, bc_fn):
     """Semi-implicit Euler integrator including tvf"""
 
@@ -23,7 +26,7 @@ def si_euler(tvf, model, shift_fn, bc_fn):
         # r = shift_fn(r, dr) = r + dr
         # respecting PBC, i.e. new r in [0, box_size]
 
-        num_particles = (state["tag"] != -1).sum()
+        num_particles = (state["tag"] != Tag.PAD_VALUE).sum()
         neighbors = neighbors.update(state["r"], num_particles=num_particles)
 
         # 4. Compute accelerations

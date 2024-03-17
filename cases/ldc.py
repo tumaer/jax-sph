@@ -7,6 +7,7 @@ import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
 from jax_sph.io_state import read_h5
+from jax_sph.utils import Tag
 
 
 class LDC(SimulationSetup):
@@ -62,7 +63,7 @@ class LDC(SimulationSetup):
         if len(box_size) == 3:
             # remove walls in z-direction from relaxation in a box
             res = res - np.array([0, 0, 3 * dx])
-            mask_wall = state["tag"] == 1
+            mask_wall = state["tag"] == Tag.SOLID_WALL
             mask_wall_z = (res[:, 2] < 0) + (res[:, 2] > nz * dx)
             res = res[jnp.logical_not(mask_wall * mask_wall_z)]
 
@@ -75,10 +76,9 @@ class LDC(SimulationSetup):
         mask_lid = jnp.where(r[:, 1] > 1 + 3 * self.args.dx, True, False)
         r_centered_abs = jnp.abs(r - r.mean(axis=0))
         mask_water = jnp.where(r_centered_abs.max(axis=1) < 0.5, True, False)
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
-        tag = jnp.ones(len(r), dtype=int)
-        tag = jnp.where(mask_water, 0, tag)
-        tag = jnp.where(mask_lid, 2, tag)
+        tag = jnp.full(len(r), Tag.SOLID_WALL, dtype=int)
+        tag = jnp.where(mask_water, Tag.FLUID, tag)
+        tag = jnp.where(mask_lid, Tag.MOVING_WALL, tag)
         return tag
 
     def _tag3D(self, r):
@@ -105,17 +105,17 @@ class LDC(SimulationSetup):
         return jnp.zeros_like(r)
 
     def _boundary_conditions_fn(self, state):
-        mask1 = state["tag"][:, None] == 1
-        mask2 = state["tag"][:, None] == 2
+        mask1 = state["tag"][:, None] == Tag.SOLID_WALL
+        mask2 = state["tag"][:, None] == Tag.MOVING_WALL
 
-        state["u"] = jnp.where(mask1, 0, state["u"])
-        state["v"] = jnp.where(mask1, 0, state["v"])
+        state["u"] = jnp.where(mask1, 0.0, state["u"])
+        state["v"] = jnp.where(mask1, 0.0, state["v"])
         state["u"] = jnp.where(mask2, self.u_lid, state["u"])
         state["v"] = jnp.where(mask2, self.u_lid, state["v"])
 
-        state["dudt"] = jnp.where(mask1, 0, state["dudt"])
-        state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
-        state["dudt"] = jnp.where(mask2, 0, state["dudt"])
-        state["dvdt"] = jnp.where(mask2, 0, state["dvdt"])
+        state["dudt"] = jnp.where(mask1, 0.0, state["dudt"])
+        state["dvdt"] = jnp.where(mask1, 0.0, state["dvdt"])
+        state["dudt"] = jnp.where(mask2, 0.0, state["dudt"])
+        state["dvdt"] = jnp.where(mask2, 0.0, state["dvdt"])
 
         return state

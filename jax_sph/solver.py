@@ -5,6 +5,7 @@ from jax import ops, vmap
 from jax_md import space
 
 from jax_sph.kernels import QuinticKernel, WendlandC2Kernel
+from jax_sph.utils import Tag
 
 EPS = jnp.finfo(float).eps
 
@@ -250,8 +251,9 @@ def artificial_viscosity_fn_wrapper(dx, artificial_alpha, u_ref=1.0):
         numerator = numerator[:, None] * grad_w_dist
         denominator = (rho_ab * (dist**2 + 0.01 * h_ab**2))[:, None]
 
-        water_mask = jnp.where((tag[j_s] == 0) * (tag[i_s] == 0), 1.0, 0.0)
-        res = water_mask[:, None] * numerator / denominator
+        mask_fluid = tag == Tag.FLUID
+        mask_fluid_edges = mask_fluid[j_s] * mask_fluid[i_s]
+        res = mask_fluid_edges[:, None] * numerator / denominator
         dudt_artif = ops.segment_sum(res, i_s, N)
         return dudt_artif
 
@@ -277,6 +279,8 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
         particle hydrodynamics", Adami, Hu, Adams, 2012
         """
 
+        mask_bc = jnp.isin(tag, jnp.array(Tag.WALL))
+
         def no_slip_bc_fn(x):
             # for boundary particles, sum over fluid velocities
             x_wall_unnorm = ops.segment_sum(w_j_s_fluid[:, None] * x[j_s], i_s, N)
@@ -284,7 +288,8 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
             # eq. 22 from "A Generalized Wall boundary condition for SPH", 2012
             x_wall = x_wall_unnorm / (w_i_sum_wf[:, None] + EPS)
             # eq. 23 from same paper
-            x = jnp.where(tag[:, None] > 0, 2 * x - x_wall, x)
+
+            x = jnp.where(mask_bc[:, None], 2 * x - x_wall, x)
             return x
 
         def free_slip_bc_fn(x):
@@ -296,7 +301,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
 
             normalization = jnp.sqrt((wall_inner**2).sum(axis=1, keepdims=True))
             wall_inner_normals = wall_inner / (normalization + EPS)
-            wall_inner_normals = jnp.where(tag[:, None] > 0, wall_inner_normals, 0.0)
+            wall_inner_normals = jnp.where(mask_bc[:, None], wall_inner_normals, 0.0)
 
             # for boundary particles, sum over fluid velocities
             x_wall_unnorm = ops.segment_sum(w_j_s_fluid[:, None] * x[j_s], i_s, N)
@@ -308,12 +313,11 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
             )
 
             # eq. 23 from same paper
-            x = jnp.where(tag[:, None] > 0, 2 * x - x_wall, x)
+            x = jnp.where(mask_bc[:, None], 2 * x - x_wall, x)
             return x
 
         # require operations with sender fluid and receiver wall/lid
-        mask_j_s_fluid = jnp.where(tag[j_s] == 0, 1.0, 0.0)
-        # mask_j_s_wall = jnp.where(tag[j_s] > 0, 1.0, 0.0)
+        mask_j_s_fluid = jnp.where(tag[j_s] == Tag.FLUID, 1.0, 0.0)
         w_j_s_fluid = w_dist * mask_j_s_fluid
         # sheparding denominator
         w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, N)
@@ -338,14 +342,17 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
 
         # normalize with sheparding
         p_wall = (p_wall_unnorm + p_wall_ext) / (w_i_sum_wf + EPS)
-        p = jnp.where(tag > 0, p_wall, p)
+        p = jnp.where(mask_bc, p_wall, p)
 
         rho = vmap(eos.rho_fn)(p)
 
         if is_heat_conduction:
+            # wall particles without temperature boundary condition obtain the adjacent
+            # fluid temperature
             t_wall_unnorm = ops.segment_sum(w_j_s_fluid * temperature[j_s], i_s, N)
             t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-            t_wall = jnp.where((tag == 1) + (tag == 2), t_wall, temperature)
+            mask = jnp.isin(tag, jnp.array([Tag.SOLID_WALL, Tag.MOVING_WALL]))
+            t_wall = jnp.where(mask, t_wall, temperature)
 
             temperature = t_wall
 
@@ -367,13 +374,13 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
     if is_heat_conduction:
 
         def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
-            # mask_j_s_wall = jnp.where(tag[j_s] > 0, 1.0, 0.0)
             w_j_s_fluid = w_dist * mask_j_s_fluid
             # sheparding denominator
             w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, N)
             t_wall_unnorm = ops.segment_sum(w_j_s_fluid * temperature[j_s], i_s, N)
             t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-            t_wall = jnp.where(tag == 1, t_wall, temperature)
+            mask = jnp.isin(tag, jnp.array([Tag.SOLID_WALL, Tag.MOVING_WALL]))
+            t_wall = jnp.where(mask, t_wall, temperature)
             temperature = t_wall
             return temperature
     else:
@@ -492,8 +499,8 @@ def WCSPH(
         g_ext = g_ext_fn(r)  # e.g. np.array([[0, -1], [0, -1], ...])
 
         # masks
-        wall_mask = jnp.where(tag > 0, 1.0, 0.0)
-        fluid_mask = jnp.where(tag == 0, 1.0, 0.0)
+        wall_mask = jnp.where(jnp.isin(tag, jnp.array(Tag.WALL)), 1.0, 0.0)
+        fluid_mask = jnp.where(tag == Tag.FLUID, 1.0, 0.0)
 
         # calculate normal vector of wall boundaries
         temp = vmap(_wall_phi_vec)(

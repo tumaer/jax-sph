@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
+from jax_sph.utils import Tag
 
 
 class Rlx(SimulationSetup):
@@ -35,8 +36,7 @@ class Rlx(SimulationSetup):
         return (np.array([self.nx, self.ny, self.nz]) + wall) * self.args.dx
 
     def _tag2D(self, r):
-        # tags: {'0': water, '1': solid wall, '2': moving wall}
-        tag = jnp.zeros(len(r), dtype=int)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
 
         if not self.relax_pbc:
             dx3 = 3 * self.args.dx
@@ -47,7 +47,7 @@ class Rlx(SimulationSetup):
                 cond_z = (r[:, 2] < dx3) + (r[:, 2] > self.W + dx3)
             mask_wall = jnp.where(cond_x + cond_y + cond_z, True, False)
 
-            tag = jnp.where(mask_wall, 1, tag)
+            tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
         return tag
 
     def _tag3D(self, r):
@@ -64,12 +64,12 @@ class Rlx(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         if not self.relax_pbc:
-            mask1 = state["tag"][:, None] == 1
+            mask1 = state["tag"][:, None] == Tag.SOLID_WALL
 
-            state["u"] = jnp.where(mask1, 0, state["u"])
-            state["v"] = jnp.where(mask1, 0, state["v"])
+            state["u"] = jnp.where(mask1, 0.0, state["u"])
+            state["v"] = jnp.where(mask1, 0.0, state["v"])
 
-            state["dudt"] = jnp.where(mask1, 0, state["dudt"])
-            state["dvdt"] = jnp.where(mask1, 0, state["dvdt"])
+            state["dudt"] = jnp.where(mask1, 0.0, state["dudt"])
+            state["dvdt"] = jnp.where(mask1, 0.0, state["dvdt"])
 
         return state

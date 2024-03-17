@@ -12,7 +12,7 @@ from jax_sph import partition
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver import WCSPH
-from jax_sph.utils import get_ekin, get_val_max
+from jax_sph.utils import Tag, get_ekin, get_val_max
 
 
 def simulate(args):
@@ -42,7 +42,7 @@ def simulate(args):
         num_partitions=args.num_partitions,
         pbc=np.array(args.periodic_boundary_conditions),
     )
-    num_particles = (state["tag"] != -1).sum()
+    num_particles = (state["tag"] != Tag.PAD_VALUE).sum()
     neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
 
     # Solver setup
