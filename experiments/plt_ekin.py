@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # copy-paste functions to avoid importing JAX
-# from utils import SPH, TGV, PF, RPF, LDC, CW, DB, Rlx, get_ekin, get_val_max
+# from utils import SPH, TGV, PF, RPF, LDC, CW, DB, get_ekin, get_val_max
 # from src.io_state import read_h5, render_data_dict, _plot, write_vtk
 
 

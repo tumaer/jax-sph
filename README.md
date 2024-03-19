@@ -42,15 +42,15 @@ In the following, a quick setup guide for different cases is presented.
 ### Running an SPH Simulation
 - Standard SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
 - Transport velocity SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
 - Riemann SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
 -  Thermal diffusion
 ```bash

@@ -1,13 +1,10 @@
 """Dam break case setup"""
 
-import os
-
 import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.io_state import read_h5
-from jax_sph.utils import Tag, pos_init_cartesian_2d
+from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
 
 
 class DB(SimulationSetup):
@@ -15,6 +12,12 @@ class DB(SimulationSetup):
 
     def __init__(self, args):
         super().__init__(args)
+
+        if self.args.g_ext_magnitude is None:
+            self.args.g_ext_magnitude = 1.0
+        self.args.is_bc_trick = True
+        if self.args.p_bg_factor is None:
+            self.args.p_bg_factor = 0.0
 
         # height and length are as presented in
         # A. Colagrossi, "Numerical simulation of interfacial flows by smoothed
@@ -28,76 +31,42 @@ class DB(SimulationSetup):
 
         self.L_wall = 5.366
         self.H_wall = 2.0
-        self.L = 2.0
-        self.H = 1.0
+        self.L = 2.0  # length
+        self.H = 1.0  # height
+        self.W = 0.2  # width
 
         # a trick to reduce computation using PBC in z-direction
         self.box_offset = 0.1
-
-        if self.args.g_ext_magnitude is None:
-            self.args.g_ext_magnitude = 1.0
-        self.args.is_bc_trick = True
-        if self.args.p_bg_factor is None:
-            self.args.p_bg_factor = 0.0
 
         # TODO: check behavior with 1, sqrt(2), and 2 for u_ref
         self.args.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
         self.args.Vmax = 2 * (self.args.g_ext_magnitude * self.H) ** 0.5
 
+        # relaxation configurations
+        if self.args.mode == "rlx":
+            self.L_wall = self.L
+            self.H_wall = self.H
+            self._set_default_rlx()
+
+        if args.r0_type == "relaxed":
+            self._load_only_fluid = True
+
     def _box_size2D(self):
         dx, bo = self.args.dx, self.box_offset
-        L_wall, H_wall = self.L_wall, self.H_wall
-        return np.array([L_wall + 6 * dx + bo, H_wall + 6 * dx + bo])
+        return np.array([self.L_wall + 6 * dx + bo, self.H_wall + 6 * dx + bo])
 
     def _box_size3D(self):
         dx, bo = self.args.dx, self.box_offset
-        L_wall, H_wall = self.L_wall, self.H_wall
-        return np.array([L_wall + 6 * dx + bo, H_wall + 6 * dx + bo, 0.2])
+        return np.array([self.L_wall + 6 * dx + bo, self.H_wall + 6 * dx + bo, self.W])
 
     def _init_pos2D(self, box_size, dx):
-        dx3 = 3 * self.args.dx
-        dx6 = 6 * self.args.dx
-        L_wall, H_wall = self.L_wall, self.H_wall
-
-        is_cartesian = True
-
-        if is_cartesian:
-            r_fluid = dx3 + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
+        if self.args.r0_type == "cartesian":
+            r_fluid = 3 * dx + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
         else:
-            if len(box_size) == 2:
-                nx, ny = np.array((np.array([self.L, self.H]) / dx).round(), dtype=int)
-                nz = 0
-            else:
-                raise NotImplementedError
+            r_fluid = self._get_relaxed_r0(None, dx)
 
-            nxnynz = "_".join([str(s) for s in [nx, ny, nz]])
-            name = "_".join([str(s) for s in [nxnynz, dx, self.args.seed, ""]])
-            init_path = "data_relaxed/" + name + ".h5"
-
-            if not os.path.isfile(init_path):
-                message = (
-                    f"./venv/bin/python main.py --case=Rlx --solver=SPH "
-                    f"--tvf=1.0 --dim={str(self.args.dim)} "
-                    f"--dx={str(dx)} --nxnynz={nxnynz} "
-                    f"--seed={str(self.args.seed)} --write-h5 "
-                    f"--r0-noise-factor=0.25 --data-path=data_relaxed"
-                )
-                raise FileNotFoundError(f"First execute this: \n{message}")
-
-            state = read_h5(init_path)
-            r_fluid = state["r"][state["tag"] == Tag.FLUID]
-
-        # horizontal and vertical blocks
-        vertical = pos_init_cartesian_2d(np.array([dx3, H_wall + dx6]), dx)
-        horiz = pos_init_cartesian_2d(np.array([L_wall, dx3]), dx)
-
-        # wall: left, bottom, right, top
-        wall_l = vertical.copy()
-        wall_b = horiz.copy() + np.array([dx3, 0.0])
-        wall_r = vertical.copy() + np.array([L_wall + dx3, 0.0])
-        wall_t = horiz.copy() + np.array([dx3, H_wall + dx3])
-
-        res = np.concatenate([wall_l, wall_b, wall_r, wall_t, r_fluid])
+        walls = pos_box_2d(self.L_wall, self.H_wall, dx)
+        res = np.concatenate([walls, r_fluid])
         return res
 
     def _init_pos3D(self, box_size, dx):

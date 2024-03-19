@@ -1,12 +1,10 @@
 """Taylor-Green case setup"""
 
-import os
 
 import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.io_state import read_h5
 from jax_sph.utils import Tag
 
 
@@ -18,46 +16,24 @@ class TGV(SimulationSetup):
 
         self.args.g_ext_magnitude = 0.0
         self.args.is_bc_trick = False
-        # args.Vmax = 1.0 if not hasattr(self, "u_ref") else self.u_ref
         if self.args.p_bg_factor is None:
             # p_bg introduces oscillations at low speed
             self.args.p_bg_factor = 0.0
+
+        # relaxation configurations
+        if self.args.mode == "rlx":
+            self._set_default_rlx()
+
+        if args.r0_type == "relaxed":
+            self._load_only_fluid = False
+            self._init_pos2D = self._get_relaxed_r0
+            self._init_pos3D = self._get_relaxed_r0
 
     def _box_size2D(self):
         return np.array([1.0, 1.0])
 
     def _box_size3D(self):
         return 2 * np.pi * np.array([1.0, 1.0, 1.0])
-
-    def _init_pos2D(self, box_size, dx):
-        if len(box_size) == 2:
-            nx, ny = np.array((box_size / dx).round(), dtype=int)
-            nz = 0
-        else:
-            nx, ny, nz = np.array((box_size / dx).round(), dtype=int)
-
-        nxnynz = "_".join([str(s) for s in [nx, ny, nz]])
-        name = "_".join([str(s) for s in [nxnynz, dx, self.args.seed, "pbc"]])
-        init_path = "data_relaxed/" + name + ".h5"
-
-        if not os.path.isfile(init_path):
-            message = (
-                f"./venv/bin/python main.py --case=Rlx --solver=SPH "
-                f"--tvf=1.0 --dim={str(self.args.dim)} "
-                f"--dx={str(self.args.dx)} --nxnynz={nxnynz} "
-                f"--seed={str(self.args.seed)} --write-h5  --relax-pbc "
-                f"--r0-noise-factor=0.25 --data-path=data_relaxed"
-            )
-            raise FileNotFoundError(f"First execute this: \n{message}")
-
-        state = read_h5(init_path)
-        return state["r"]
-
-    def _init_pos3D(self, box_size, dx):
-        # check if relaxed state for this seed exists
-        # if no, run special relaxation in a box
-        # independen of if, load the initial state
-        return self._init_pos2D(box_size, dx)
 
     def _tag2D(self, r):
         tag = jnp.full(len(r), Tag.FLUID, dtype=int)

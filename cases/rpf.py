@@ -1,12 +1,9 @@
 """Reverse-Poiseuille flow case setup"""
 
-import os
-
 import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.io_state import read_h5
 from jax_sph.utils import Tag
 
 
@@ -22,40 +19,20 @@ class RPF(SimulationSetup):
         if self.args.p_bg_factor is None:
             self.args.p_bg_factor = 0.05
 
-        print("g_ext_force = ", self.args.g_ext_magnitude)
+        # relaxation configurations
+        if self.args.mode == "rlx":
+            self._set_default_rlx()
+
+        if args.r0_type == "relaxed":
+            self._load_only_fluid = False
+            self._init_pos2D = self._get_relaxed_r0
+            self._init_pos3D = self._get_relaxed_r0
 
     def _box_size2D(self):
         return np.array([1.0, 2.0])
 
     def _box_size3D(self):
         return np.array([1.0, 2.0, 0.5])
-
-    def _init_pos2D(self, box_size, dx):
-        if len(box_size) == 2:
-            nx, ny = np.array((box_size / dx).round(), dtype=int)
-            nz = 0
-        else:
-            nx, ny, nz = np.array((box_size / dx).round(), dtype=int)
-
-        nxnynz = "_".join([str(s) for s in [nx, ny, nz]])
-        name = "_".join([str(s) for s in [nxnynz, dx, self.args.seed, "pbc"]])
-        init_path = "data_relaxed/" + name + ".h5"
-
-        if not os.path.isfile(init_path):
-            message = (
-                f"./venv/bin/python main.py --case=Rlx --solver=SPH "
-                f"--tvf=1.0 --dim={str(self.args.dim)} "
-                f"--dx={str(self.args.dx)} --nxnynz={nxnynz} "
-                f"--seed={str(self.args.seed)} --write-h5  --relax-pbc"
-                f"--r0-noise-factor=0.25 --data-path=data_relaxed"
-            )
-            raise FileNotFoundError(f"First execute this: \n{message}")
-
-        state = read_h5(init_path)
-        return state["r"]
-
-    def _init_pos3D(self, box_size, dx):
-        return self._init_pos2D(box_size, dx)
 
     def _tag2D(self, r):
         tag = jnp.full(len(r), Tag.FLUID, dtype=int)
@@ -66,12 +43,6 @@ class RPF(SimulationSetup):
 
     def _init_velocity2D(self, r):
         u = jnp.zeros_like(r)
-
-        # # try to initialize with the analytical solution
-        # u_x_lower = + 4 * (0.25 - (r[1] - 0.5) ** 2)
-        # u_x_upper = - 4 * (0.25 - (r[1] - 1.5) ** 2)
-        # u_x = 11.3 * jnp.where(r[1] > 1, u_x_upper, u_x_lower)
-        # u = u.at[0].set(u_x)
         return u
 
     def _init_velocity3D(self, r):

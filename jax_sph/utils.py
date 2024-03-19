@@ -41,6 +41,23 @@ def pos_init_cartesian_3d(box_size, dx):
     return r
 
 
+def pos_box_2d(L, H, dx, num_wall_layers=3):
+    """Create an empty box of particles in 2D"""
+    dx3 = num_wall_layers * dx
+    # horizontal and vertical blocks
+    vertical = pos_init_cartesian_2d(np.array([dx3, H + 2 * dx3]), dx)
+    horiz = pos_init_cartesian_2d(np.array([L, dx3]), dx)
+
+    # wall: left, bottom, right, top
+    wall_l = vertical.copy()
+    wall_b = horiz.copy() + np.array([dx3, 0.0])
+    wall_r = vertical.copy() + np.array([L + dx3, 0.0])
+    wall_t = horiz.copy() + np.array([dx3, H + dx3])
+
+    res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
+    return res
+
+
 def noise_masked(r, mask, key, std):
     noise = std * jax.random.normal(key, r.shape)
     masked_noise = jnp.where(mask[:, None], noise, 0.0)

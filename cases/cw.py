@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag, pos_init_cartesian_2d
+from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
 
 
 class CW(SimulationSetup):
@@ -12,6 +12,11 @@ class CW(SimulationSetup):
 
     def __init__(self, args):
         super().__init__(args)
+
+        self.args.g_ext_magnitude = 1.0
+        self.args.is_bc_trick = True
+        if self.args.p_bg_factor is None:
+            self.args.p_bg_factor = 0.0
 
         self.L_wall = 1.0
         self.H_wall = 1.0
@@ -23,12 +28,11 @@ class CW(SimulationSetup):
             args.cube_offset = [args.cube_offset] * 2
         self.cube_offset = np.array(args.cube_offset)
         self.u_init = 0.5
-
         self.args.u_ref = 1  # TODO: 2 ** 0.5
-        self.args.g_ext_magnitude = 1.0
-        self.args.is_bc_trick = True
-        if self.args.p_bg_factor is None:
-            self.args.p_bg_factor = 0.0
+
+        # relaxation configurations
+        if self.args.mode == "rlx" or args.r0_type == "relaxed":
+            raise NotImplementedError("Relaxation not implemented for CW")
 
     def _box_size2D(self):
         return np.array([self.L_wall, self.H_wall]) + 6 * self.args.dx
@@ -39,22 +43,11 @@ class CW(SimulationSetup):
 
     def _init_pos2D(self, box_size, dx):
         dx3 = 3 * self.args.dx
-        dx6 = 6 * self.args.dx
-        L_wall, H_wall = self.L_wall, self.H_wall
-
-        # horizontal and vertical blocks
-        vertical = pos_init_cartesian_2d(np.array([dx3, H_wall + dx6]), dx)
-        horiz = pos_init_cartesian_2d(np.array([L_wall, dx3]), dx)
-
-        # wall: left, bottom, right, top
-        wall_l = vertical.copy()
-        wall_b = horiz.copy() + np.array([dx3, 0.0])
-        wall_r = vertical.copy() + np.array([L_wall + dx3, 0.0])
-        wall_t = horiz.copy() + np.array([dx3, H_wall + dx3])
+        walls = pos_box_2d(self.L_wall, self.H_wall, dx)
 
         r_fluid = dx3 + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
         r_fluid += self.cube_offset
-        res = np.concatenate([wall_l, wall_b, wall_r, wall_t, r_fluid])
+        res = np.concatenate([walls, r_fluid])
         return res
 
     def _tag2D(self, r):

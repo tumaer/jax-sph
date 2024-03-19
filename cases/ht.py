@@ -15,28 +15,34 @@ class HT(SimulationSetup):
         super().__init__(args)
 
         if self.args.g_ext_magnitude is None:
-            self.args.g_ext_magnitude = 1.0
-
-        # for top and bottom walls
+            self.args.g_ext_magnitude = 2.3
         self.args.is_bc_trick = True
-
         if self.args.p_bg_factor is None:
             self.args.p_bg_factor = 0.05  # same as RPF
-        print("g_ext_force = ", self.args.g_ext_magnitude)
 
+        # custom variables related only to this simulation
         self.args.kappa = 7.313  # thermal conductivity value at 50°C
         self.args.Cp = 305.27  # specific heat at constant pressure value at 50°C
         self.args.hot_wall_temperature = 1.23  # temp corresponding to 100°C
         self.args.reference_temperature = 1.0
         self.args.hot_wall_half_width = 0.25
 
+        # relaxation configurations
+        if self.args.mode == "rlx":
+            self._set_default_rlx()
+
+        if args.r0_type == "relaxed":
+            self._load_only_fluid = False
+            self._init_pos2D = self._get_relaxed_r0
+            self._init_pos3D = self._get_relaxed_r0
+
     def _box_size2D(self):
         dx = self.args.dx
-        return np.array([1, 0.2 + (6 * dx)])
+        return np.array([1, 0.2 + 6 * dx])
 
     def _box_size3D(self):
         dx = self.args.dx
-        return np.array([1, 0.2 + (6 * dx), 0.5])
+        return np.array([1, 0.2 + 6 * dx, 0.5])
 
     def _tag2D(self, r):
         dx3 = 3 * self.args.dx
@@ -59,17 +65,17 @@ class HT(SimulationSetup):
         return self._tag2D(r)
 
     def _init_velocity2D(self, r):
-        u = jnp.zeros_like(r)
-        return u
+        return jnp.zeros_like(r)
 
     def _init_velocity3D(self, r):
-        return self._init_velocity2D(r)
+        return jnp.zeros_like(r)
 
     def _external_acceleration_fn(self, r):
         dx3 = 3 * self.args.dx
         res = jnp.zeros_like(r)
-        x_force = jnp.ones((len(r))) * 2.3  # magnitude of external force field
-        fluid_mask = (r[:, 1] < 1 + dx3) * (r[:, 1] > dx3)
+        x_force = jnp.ones((len(r)))
+        box_size = self._box_size2D()
+        fluid_mask = (r[:, 1] < box_size[1] - dx3) * (r[:, 1] > dx3)
         x_force = jnp.where(fluid_mask, x_force, 0)
         res = res.at[:, 0].set(x_force)
         return res * self.args.g_ext_magnitude
