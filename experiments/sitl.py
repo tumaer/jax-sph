@@ -63,7 +63,7 @@ class SolverInTheLoop(hk.Module):
                 return jnp.zeros_like(r)
 
         rho_ref = 1.0
-        c0 = 10.0
+        c_ref = 10.0
         eta_limiter = 3
         solver = "SPH"
         kernel = "QSK"
@@ -86,7 +86,7 @@ class SolverInTheLoop(hk.Module):
             dx,
             dim,
             dt,
-            c0,
+            c_ref,
             eta_limiter,
             solver,
             kernel,

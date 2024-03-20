@@ -8,12 +8,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import vmap
+from jax_md import space
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
 from jax_sph.io_state import read_h5
 from jax_sph.utils import (
     Tag,
-    noise_masked,
+    get_noise_masked,
     pos_init_cartesian_2d,
     pos_init_cartesian_3d,
     wall_tags,
@@ -48,14 +49,12 @@ class SimulationSetup(ABC):
         # Primal: reference density, dynamic viscosity, and velocity
         rho_ref = 1.00
         eta_ref = args.viscosity
-        u_ref = 1.0 if not hasattr(args, "u_ref") else args.u_ref
-        args.Vmax = 1.0 if not hasattr(args, "Vmax") else args.Vmax
-        args.c0 = 10 * args.Vmax  # TODO: Check DB influence
-        gamma_eos = 1.0  # = 7.0 for HT
+        args.u_ref = 1.0 if not hasattr(args, "u_ref") else args.u_ref
+        gamma_eos = 1.0
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
-        c_ref = 10.0 * u_ref
-        p_ref = rho_ref * c_ref**2 / gamma_eos
+        args.c_ref = 10.0 * args.u_ref
+        p_ref = rho_ref * args.c_ref**2 / gamma_eos
         # for free surface simulation p_background has to be 0
         p_bg = args.p_bg_factor * p_ref
 
@@ -66,13 +65,11 @@ class SimulationSetup(ABC):
 
         # time integration step dt
         CFL = 0.25
-        dt_convective = CFL * h / (c_ref + u_ref)
+        dt_convective = CFL * h / (args.c_ref + args.u_ref)
         dt_viscous = CFL * h**2 * rho_ref / eta_ref if eta_ref != 0.0 else 999
         dt_body_force = CFL * (h / (self.args.g_ext_magnitude + EPS)) ** 0.5
         dt = np.amin([dt_convective, dt_viscous, dt_body_force])
-        # TODO: this computation could be applied at each time step as the
-        # convective term changes with the current u (not u_ref)
-        # Especially relevant for RPF
+        # TODO: consider adaptive time step sizes
 
         print("dt_convective :", dt_convective)
         print("dt_viscous    :", dt_viscous)
@@ -80,7 +77,7 @@ class SimulationSetup(ABC):
         print("dt_max        :", dt)
 
         # assert dt > args.dt, ValueError("Explicit dt has to comply with CFL.")
-        if args.dt != 0.0:
+        if args.dt is not None:
             if args.dt > dt:
                 warnings.warn("Explicit dt should comply with CFL.", UserWarning)
             dt = args.dt
@@ -97,7 +94,7 @@ class SimulationSetup(ABC):
 
         # Equation of state
         if args.solver == "RIE":
-            eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
+            eos = RIEMANNEoS(rho_ref, p_bg, args.u_ref)
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
@@ -110,6 +107,7 @@ class SimulationSetup(ABC):
             box_size = self._box_size3D()
             r = self._init_pos3D(box_size, args.dx)
             tag = self._tag3D(r)
+        displacement_fn, shift_fn = space.periodic(side=box_size)
 
         num_particles = len(r)
         print("Total number of particles = ", num_particles)
@@ -118,10 +116,9 @@ class SimulationSetup(ABC):
         key, subkey = jax.random.split(key_prng)
         if args.r0_noise_factor != 0.0:
             noise_std = args.r0_noise_factor * args.dx
-            # TODO: give the shift_fn to this noising procedure
-            r = noise_masked(r, tag == Tag.FLUID, subkey, std=noise_std)
+            noise = get_noise_masked(r.shape, tag == Tag.FLUID, subkey, std=noise_std)
             # PBC: move all particles to the box limits after noise addition
-            r = r % jnp.array(box_size)
+            r = shift_fn(r, noise)
 
         # initialize the velocity given the coordinates r with the noise
         if args.dim == 2:
@@ -168,9 +165,9 @@ class SimulationSetup(ABC):
                 )
                 state[k] = _state[k]
 
+        # the following arguments are needed for dataset generation
         args.dt, args.sequence_length = dt, sequence_length
         args.num_particles_max = num_particles
-        # TODO: embed this in the code - for dataset generation
         args.periodic_boundary_conditions = [True, True, True]
         args.bounds = np.array([np.zeros_like(box_size), box_size]).T.tolist()
 
@@ -179,7 +176,17 @@ class SimulationSetup(ABC):
         g_ext_fn = self._external_acceleration_fn
         bc_fn = self._boundary_conditions_fn
 
-        return args, box_size, state, g_ext_fn, bc_fn, eos, key
+        return (
+            args,
+            box_size,
+            state,
+            g_ext_fn,
+            bc_fn,
+            eos,
+            key,
+            displacement_fn,
+            shift_fn,
+        )
 
     @abstractmethod
     def _box_size2D(self, args):

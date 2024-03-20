@@ -58,11 +58,10 @@ def pos_box_2d(L, H, dx, num_wall_layers=3):
     return res
 
 
-def noise_masked(r, mask, key, std):
-    noise = std * jax.random.normal(key, r.shape)
+def get_noise_masked(shape, mask, key, std):
+    noise = std * jax.random.normal(key, shape)
     masked_noise = jnp.where(mask[:, None], noise, 0.0)
-    r += masked_noise
-    return r
+    return masked_noise
 
 
 def get_ekin(state, dx):

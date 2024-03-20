@@ -19,7 +19,7 @@ def rho_evol_fn(rho, mass, u, grad_w_dist, i_s, j_s, dt, N, **kwargs):
     return rho, drhodt
 
 
-def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c0):
+def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
     def rho_evol_riemann_fn(
         e_s,
         rho_i,
@@ -63,7 +63,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c0):
         rho_avg = (rho_L + rho_R) / 2
 
         # Compute Riemann states eq. (7) and below eq. (9), Zhang (2017)
-        U_star = U_avg + 0.5 * (p_L - p_R) / (rho_avg * c0)
+        U_star = U_avg + 0.5 * (p_L - p_R) / (rho_avg * c_ref)
         v_star = U_star * (-e_ij) + (v_avg - U_avg * (-e_ij))
 
         # Mass conservation with linear Riemann solver eq. (8), Zhang (2017)
@@ -391,18 +391,18 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
     return free_weight, heat_bc
 
 
-def limiter_fn_wrapper(eta_limiter, c0):
+def limiter_fn_wrapper(eta_limiter, c_ref):
     """if != -1, introduce dissipation limiter eq. (11), Zhang (2017)"""
 
     if eta_limiter == -1:
 
         def beta_fn(u_L, u_R, eta_limiter):
-            return c0
+            return c_ref
     else:
 
         def beta_fn(u_L, u_R, eta_limiter):
             temp = eta_limiter * jnp.maximum(u_L - u_R, jnp.zeros_like(u_L))
-            beta = jnp.minimum(temp, jnp.full_like(temp, c0))
+            beta = jnp.minimum(temp, jnp.full_like(temp, c_ref))
             return beta
 
     return beta_fn
@@ -435,7 +435,7 @@ def WCSPH(
     dx,
     dim,
     dt,
-    c0,
+    c_ref,
     eta_limiter=3,
     solver="SPH",
     kernel="QSK",
@@ -448,7 +448,7 @@ def WCSPH(
 ):
     """Weakly compressible SPH solver with transport velocity formulation."""
 
-    _beta_fn = limiter_fn_wrapper(eta_limiter, c0)
+    _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
     if kernel == "QSK":
         _kernel_fn = QuinticKernel(h=dx, dim=dim)
     elif kernel == "W2CK":
@@ -463,7 +463,7 @@ def WCSPH(
     _acceleration_fn = acceleration_standard_fn_wrapper(_kernel_fn)
     _artificial_viscosity_fn = artificial_viscosity_fn_wrapper(dx, artificial_alpha)
     _wall_phi_vec = wall_phi_vec_wrapper(_kernel_fn)
-    _rho_evol_riemann_fn = rho_evol_riemann_fn_wrapper(_kernel_fn, eos, c0)
+    _rho_evol_riemann_fn = rho_evol_riemann_fn_wrapper(_kernel_fn, eos, c_ref)
     _temperature_derivative = temperature_derivative_wrapper(_kernel_fn)
 
     def forward(state, neighbors):
@@ -489,9 +489,8 @@ def WCSPH(
         dist = space.distance(dr_i_j)
         w_dist = vmap(_kernel_fn.w)(dist)
 
-        # TODO: related to density evolution. Optimize implementation
-        # norm because we don't have the directions e_s
         e_s = dr_i_j / (dist[:, None] + EPS)
+        # currently only for density evolution and with artificial viscosity
         grad_w_dist_norm = vmap(_kernel_fn.grad_w)(dist)
         grad_w_dist = grad_w_dist_norm[:, None] * e_s
 

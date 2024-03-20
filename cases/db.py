@@ -18,6 +18,8 @@ class DB(SimulationSetup):
         self.args.is_bc_trick = True
         if self.args.p_bg_factor is None:
             self.args.p_bg_factor = 0.0
+        if self.args.u_ref is None:
+            self.args.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
 
         # height and length are as presented in
         # A. Colagrossi, "Numerical simulation of interfacial flows by smoothed
@@ -37,10 +39,6 @@ class DB(SimulationSetup):
 
         # a trick to reduce computation using PBC in z-direction
         self.box_offset = 0.1
-
-        # TODO: check behavior with 1, sqrt(2), and 2 for u_ref
-        self.args.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
-        self.args.Vmax = 2 * (self.args.g_ext_magnitude * self.H) ** 0.5
 
         # relaxation configurations
         if self.args.mode == "rlx":

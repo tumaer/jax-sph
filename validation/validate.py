@@ -299,7 +299,6 @@ def val_2D_LDC(
         raise ValueError(f"More than one directory found in {val_root_notvf}")
     elif len(dirs_Rie) > 1:
         raise ValueError(f"More than one directory found in {val_root_Rie}")
-        # TODO: implement influence of discretization?
 
     val_dir_path_Rie = os.path.join(val_root_Rie, dirs_Rie[0])
     files_Rie = os.listdir(val_dir_path_Rie)

@@ -5,7 +5,6 @@ import time
 
 import numpy as np
 from jax import jit
-from jax_md import space
 from jax_md.partition import Sparse
 
 from cases import select_case
@@ -26,9 +25,17 @@ def simulate(args):
     elif args.mode == "sim":
         case = Case(args)
 
-    args, box_size, state, g_ext_fn, bc_fn, eos_fn, key = case.initialize()
-
-    displacement_fn, shift_fn = space.periodic(side=box_size)
+    (
+        args,
+        box_size,
+        state,
+        g_ext_fn,
+        bc_fn,
+        eos_fn,
+        key,
+        displacement_fn,
+        shift_fn,
+    ) = case.initialize()
 
     if args.kernel == "QSK":
         r_cut = 3
@@ -61,7 +68,7 @@ def simulate(args):
         args.dx,
         args.dim,
         args.dt,
-        args.c0,
+        args.c_ref,
         args.eta_limiter,
         args.solver,
         args.kernel,

@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
+# TODO: move plt_ekin to jax_sph/visualize.py
 # copy-paste functions to avoid importing JAX
 # from utils import SPH, TGV, PF, RPF, LDC, CW, DB, get_ekin, get_val_max
 # from src.io_state import read_h5, render_data_dict, _plot, write_vtk
@@ -102,7 +103,6 @@ def main(src_dir):
             f"./validation/ref/tgv3d_ref_{int(Re)}.txt", delimiter=","
         )
         every_n = max(len(dEdt_ref) // 50, 1)
-        # TODO: rescale x axis alltogether
         x_ref = (
             dEdt_ref[::every_n, 0]
             / dEdt_ref[::every_n, 0].max()

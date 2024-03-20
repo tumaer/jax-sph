@@ -14,7 +14,6 @@ class Args:
             "--case",
             type=str,
             default="TGV",
-            choices=["TGV", "RPF", "LDC", "PF", "CW", "DB", "UT", "HT"],
             help="Simulation setup",
         )
         self.parser.add_argument(
@@ -67,7 +66,7 @@ class Args:
         self.parser.add_argument(
             "--dt",
             type=float,
-            default=0.0,
+            default=None,
             help="If the user wants to specify the time step explicitly",
         )
         self.parser.add_argument(
@@ -116,6 +115,12 @@ class Args:
             help="Magnitude of external force field",
         )
         self.parser.add_argument(
+            "--u_ref",
+            type=float,
+            default=None,
+            help="Estimatet max flow velocity to calculate artificial speed of sound",
+        )
+        self.parser.add_argument(
             "--artificial-alpha",
             type=float,
             default=0.0,
@@ -162,12 +167,6 @@ class Args:
         )
         self.parser.add_argument(
             "--no-f64", action="store_true", help="Whether to use 64 bit precision"
-        )
-        self.parser.add_argument(
-            "--Vmax",
-            type=float,
-            default=1,
-            help="Estimatet max flow velocity to calculate artificial speed of sound",
         )
         self.parser.add_argument(
             "--eta-limiter",
