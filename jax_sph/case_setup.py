@@ -49,7 +49,7 @@ class SimulationSetup(ABC):
         # Primal: reference density, dynamic viscosity, and velocity
         rho_ref = 1.00
         eta_ref = args.viscosity
-        args.u_ref = 1.0 if not hasattr(args, "u_ref") else args.u_ref
+        args.u_ref = 1.0 if args.u_ref is None else args.u_ref
         gamma_eos = 1.0
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
