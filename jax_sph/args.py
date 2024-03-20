@@ -63,7 +63,6 @@ class Args:
             default=0.05,
             help="Average distance between particles [0.001, 0.1]",
         )
-        self.parser.add_argument("--Nx", type=int, help="alternative to --dx")
         self.parser.add_argument(
             "--dt",
             type=float,

@@ -4,10 +4,10 @@
 # "A transport-velocity formulation [...]", Adami 2013
 
 # Generate data
-python main.py --case=LDC --mode=rlx --solver=SPH --tvf=1.0 --dim=2 --dx=0.02 --seed=123 --write-h5 --write-every=10 --r0-noise-factor=0.25 --data-path=data_relaxed --p-bg-factor=0.0
-python main.py --case=LDC --solver=SPH --viscosity=0.01 --tvf=1.0 --dim=2 --dx=0.02 --dt=0.0004 --t-end=20.0 --seed=123 --write-h5 --write-every=100 --write-vtk --data-path="data_valid/ldc2d_tvf"
-python main.py --case=LDC --solver=SPH --viscosity=0.01 --tvf=0.0 --dim=2 --dx=0.02 --dt=0.0004 --t-end=20.0 --seed=123 --write-h5 --write-every=100 --write-vtk --data-path="data_valid/ldc2d_notvf" --p-bg-factor=0.01
-python main.py --case=LDC --solver=RIE --viscosity=0.01 --tvf=0.0 --dim=2 --dx=0.02 --dt=0.0004 --t-end=20.0 --seed=123 --write-h5 --write-every=100 --write-vtk --data-path="data_valid/ldc2d_Riemann" --density-evolution --eta-limiter=3
+python main.py --case=LDC --mode=rlx --solver=SPH --tvf=1.0 --dim=2 --dx=0.02 --seed=123 --write-h5 --write-every=10 --r0-noise-factor=0.25 --data-path=data_relaxed --p-bg-factor=0.0 
+python main.py --case=LDC --solver=SPH --viscosity=0.01 --tvf=1.0 --dim=2 --dx=0.02 --dt=0.0004 --t-end=20.0 --seed=123 --write-h5 --write-every=100 --data-path="data_valid/ldc2d_tvf" --r0-type=cartesian
+python main.py --case=LDC --solver=SPH --viscosity=0.01 --tvf=0.0 --dim=2 --dx=0.02 --dt=0.0004 --t-end=20.0 --seed=123 --write-h5 --write-every=100 --data-path="data_valid/ldc2d_notvf" --p-bg-factor=0.01 --r0-type=cartesian
+python main.py --case=LDC --solver=RIE --viscosity=0.01 --tvf=0.0 --dim=2 --dx=0.02 --dt=0.0004 --t-end=20.0 --seed=123 --write-h5 --write-every=100 --data-path="data_valid/ldc2d_Riemann" --density-evolution --eta-limiter=3 --r0-type=cartesian
 
 
 # Run validation script
