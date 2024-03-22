@@ -33,6 +33,16 @@ class QuinticKernel:
         """Evaluates the 1D kernel gradient at the radial distance r."""
 
         return grad(self.w)(r)
+    
+    def grad_w_analytical(self, r):
+        """Evaluates the 1D kernel gradient at the radial distance r analytically."""
+
+        q = r * self._one_over_h
+        q1 = jnp.maximum(0.0, 1.0 - q)
+        q2 = jnp.maximum(0.0, 2.0 - q)
+        q3 = jnp.maximum(0.0, 3.0 - q)
+
+        return self._sigma * (-5.0 * q3**4 + 6.0 * 5 * q2**4 - 15.0 * 5 * q1**4)
 
 
 class WendlandC2Kernel:
@@ -53,6 +63,7 @@ class WendlandC2Kernel:
 
     def w(self, r):
         """Evaluates the kernel at the radial distance r."""
+
         if self.dim == 1:
             q = r * self._one_over_h
             q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
@@ -70,3 +81,19 @@ class WendlandC2Kernel:
         """Evaluates the 1D kernel gradient at the radial distance r."""
 
         return grad(self.w)(r)
+    
+    def grad_w_analytical(self, r):
+        """Evaluates the 1D kernel gradient at the radial distance r analytically."""
+
+        if self.dim == 1:
+            q = r * self._one_over_h
+            q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
+            q2 = -3.0 * q
+
+            return self._sigma * (q1**2 * q2)
+        else:
+            q = r * self._one_over_h
+            q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
+            q2 = -5.0 * q
+
+            return self._sigma * (q1**3 * q2)

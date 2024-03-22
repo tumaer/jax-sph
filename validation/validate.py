@@ -196,7 +196,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     elif dim == 3:
         Re = 1 / args.viscosity
         ref = np.loadtxt(
-            f"./validation_paper/ref/tgv3d_ref_{int(Re)}.txt", delimiter=","
+            f"./validation/ref/tgv3d_ref_{int(Re)}.txt", delimiter=","
         )
         num_dots = 50
         every_n = max(len(ref) // num_dots, 1)
@@ -401,7 +401,7 @@ def val_2D_LDC(
         )
 
     # getting the reference data
-    u_vel = pd.read_csv("validation_paper/ref/ldc_data_u_vel.csv")
+    u_vel = pd.read_csv("validation/ref/ldc_data_u_vel.csv")
     u_vel.columns = u_vel.iloc[0]
 
     u_vel = u_vel.drop(labels=0)
@@ -416,7 +416,7 @@ def val_2D_LDC(
         (u_vel.loc[:, "10,000"].values).astype(float),
     )
 
-    v_vel = pd.read_csv("validation_paper/ref/ldc_data_v_vel.csv")
+    v_vel = pd.read_csv("validation/ref/ldc_data_v_vel.csv")
     v_vel.columns = v_vel.iloc[0]
 
     v_vel = v_vel.drop(labels=0)  # had to make some corrections in the input data
