@@ -451,7 +451,7 @@ def WCSPH(
     _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
     if kernel == "QSK":
         _kernel_fn = QuinticKernel(h=dx, dim=dim)
-    elif kernel == "W2CK":
+    elif kernel == "WC2K":
         _kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
 
     _gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
