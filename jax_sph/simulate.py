@@ -1,14 +1,15 @@
 """Core simulation loop"""
 
+import pprint
 import time
 
 import numpy as np
 from jax import jit
-from jax_md import space
 from jax_md.partition import Sparse
 
 from cases import select_case
 from jax_sph import partition
+from jax_sph.case_setup import set_relaxation
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver import WCSPH
@@ -17,10 +18,24 @@ from jax_sph.utils import Tag, get_ekin, get_val_max
 
 def simulate(args):
     # Case setup
-    case = select_case(args.case)
-    args, box_size, state, g_ext_fn, bc_fn, eos_fn, key = case(args).initialize()
+    Case = select_case(args.case)
+    # if in relaxation mode, wrap the case with the relaxation case
+    if args.mode == "rlx":
+        case = set_relaxation(Case, args)
+    elif args.mode == "sim":
+        case = Case(args)
 
-    displacement_fn, shift_fn = space.periodic(side=box_size)
+    (
+        args,
+        box_size,
+        state,
+        g_ext_fn,
+        bc_fn,
+        eos_fn,
+        key,
+        displacement_fn,
+        shift_fn,
+    ) = case.initialize()
 
     if args.kernel == "QSK":
         r_cut = 3
@@ -53,7 +68,7 @@ def simulate(args):
         args.dx,
         args.dim,
         args.dt,
-        args.c0,
+        args.c_ref,
         args.eta_limiter,
         args.solver,
         args.kernel,
@@ -64,6 +79,7 @@ def simulate(args):
         args.density_renormalize,
         args.heat_conduction,
     )
+    pprint.pprint(vars(args))
     # Instantiate advance function for our use case
     advance = si_euler(args.tvf, model, shift_fn, bc_fn)
 
@@ -76,6 +92,7 @@ def simulate(args):
     _state, _neighbors = advance(0.0, state, neighbors)
     _state["v"].block_until_ready()
 
+    digits = len(str(args.sequence_length))
     start = time.time()
     for step in range(args.sequence_length + 2):
         write_state(step - 1, args.sequence_length, state, dir, args)
@@ -103,14 +120,14 @@ def simulate(args):
             temperature_max_ = get_val_max(state, "T")
             if args.heat_conduction:
                 print(
-                    f"{step} / {args.sequence_length}, t = {t_:.4f} Ekin = {ekin_:.7f} "
-                    f"u_max = {u_max_:.4f} "
+                    f"{str(step).zfill(digits)}/{args.sequence_length}, t = {t_:.4f}, "
+                    f"Ekin = {ekin_:.7f}, u_max = {u_max_:.4f}, "
                     f"T_max = {temperature_max_:.4f}"
                 )
             else:
                 print(
-                    f"{step} / {args.sequence_length}, t = {t_:.4f} Ekin = {ekin_:.7f} "
-                    f"u_max = {u_max_:.4f} "
+                    f"{str(step).zfill(digits)}/{args.sequence_length}, t = {t_:.4f}, "
+                    f"Ekin = {ekin_:.7f}, u_max = {u_max_:.4f} "
                 )
 
     print(f"time: {time.time() - start:.2f} s")

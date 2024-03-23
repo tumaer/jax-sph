@@ -1,5 +1,6 @@
 """Simulation setup"""
 
+import os
 import warnings
 from abc import ABC, abstractmethod
 
@@ -7,13 +8,16 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import vmap
+from jax_md import space
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
+from jax_sph.io_state import read_h5
 from jax_sph.utils import (
     Tag,
-    noise_masked,
+    get_noise_masked,
     pos_init_cartesian_2d,
     pos_init_cartesian_3d,
+    wall_tags,
 )
 
 EPS = jnp.finfo(float).eps
@@ -45,14 +49,12 @@ class SimulationSetup(ABC):
         # Primal: reference density, dynamic viscosity, and velocity
         rho_ref = 1.00
         eta_ref = args.viscosity
-        u_ref = 1.0 if not hasattr(args, "u_ref") else args.u_ref
-        args.Vmax = 1.0 if not hasattr(args, "Vmax") else args.Vmax
-        args.c0 = 10 * args.Vmax  # TODO: Check DB influence
-        gamma_eos = 1.0  # = 7.0 for HT
+        args.u_ref = 1.0 if args.u_ref is None else args.u_ref
+        gamma_eos = 1.0
         print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
-        c_ref = 10.0 * u_ref
-        p_ref = rho_ref * c_ref**2 / gamma_eos
+        args.c_ref = 10.0 * args.u_ref
+        p_ref = rho_ref * args.c_ref**2 / gamma_eos
         # for free surface simulation p_background has to be 0
         p_bg = args.p_bg_factor * p_ref
 
@@ -63,13 +65,11 @@ class SimulationSetup(ABC):
 
         # time integration step dt
         CFL = 0.25
-        dt_convective = CFL * h / (c_ref + u_ref)
+        dt_convective = CFL * h / (args.c_ref + args.u_ref)
         dt_viscous = CFL * h**2 * rho_ref / eta_ref if eta_ref != 0.0 else 999
         dt_body_force = CFL * (h / (self.args.g_ext_magnitude + EPS)) ** 0.5
         dt = np.amin([dt_convective, dt_viscous, dt_body_force])
-        # TODO: this computation has to be applied at each time step as the
-        # convective term changes with the current u (not u_ref)
-        # Especially relevant for RPF
+        # TODO: consider adaptive time step sizes
 
         print("dt_convective :", dt_convective)
         print("dt_viscous    :", dt_viscous)
@@ -77,14 +77,14 @@ class SimulationSetup(ABC):
         print("dt_max        :", dt)
 
         # assert dt > args.dt, ValueError("Explicit dt has to comply with CFL.")
-        if args.dt != 0.0:
+        if args.dt is not None:
             if args.dt > dt:
                 warnings.warn("Explicit dt should comply with CFL.", UserWarning)
             dt = args.dt
 
         print("dt_final      :", dt)
 
-        if args.case == "Rlx":
+        if args.mode == "rlx":
             # run a relaxation of randomly initialized state for 500 steps
             sequence_length = 5000
             args.t_end = dt * sequence_length
@@ -94,11 +94,11 @@ class SimulationSetup(ABC):
 
         # Equation of state
         if args.solver == "RIE":
-            eos = RIEMANNEoS(rho_ref, p_bg, args.Vmax)
+            eos = RIEMANNEoS(rho_ref, p_bg, args.u_ref)
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
 
-        # initialize box and regular grid positions of particles
+        # initialize box and positions of particles
         if args.dim == 2:
             box_size = self._box_size2D()
             r = self._init_pos2D(box_size, args.dx)
@@ -107,6 +107,7 @@ class SimulationSetup(ABC):
             box_size = self._box_size3D()
             r = self._init_pos3D(box_size, args.dx)
             tag = self._tag3D(r)
+        displacement_fn, shift_fn = space.periodic(side=box_size)
 
         num_particles = len(r)
         print("Total number of particles = ", num_particles)
@@ -115,9 +116,9 @@ class SimulationSetup(ABC):
         key, subkey = jax.random.split(key_prng)
         if args.r0_noise_factor != 0.0:
             noise_std = args.r0_noise_factor * args.dx
-            r = noise_masked(r, tag == Tag.FLUID, subkey, std=noise_std)
+            noise = get_noise_masked(r.shape, tag == Tag.FLUID, subkey, std=noise_std)
             # PBC: move all particles to the box limits after noise addition
-            r = r % jnp.array(box_size)
+            r = shift_fn(r, noise)
 
         # initialize the velocity given the coordinates r with the noise
         if args.dim == 2:
@@ -152,9 +153,21 @@ class SimulationSetup(ABC):
             "Cp": Cp,
         }
 
+        # overwrite the state dictionary with the provided one
+        if args.state0_path != "none":
+            _state = read_h5(args.state0_path)
+            for k in state:
+                if k not in _state:
+                    warnings.warn(f"Key {k} not found in state0 file.", UserWarning)
+                    continue
+                assert state[k].shape == _state[k].shape, ValueError(
+                    f"Shape mismatch for key {k} while loading initial state."
+                )
+                state[k] = _state[k]
+
+        # the following arguments are needed for dataset generation
         args.dt, args.sequence_length = dt, sequence_length
         args.num_particles_max = num_particles
-        # TODO: embed this in the code - for dataset generation
         args.periodic_boundary_conditions = [True, True, True]
         args.bounds = np.array([np.zeros_like(box_size), box_size]).T.tolist()
 
@@ -163,7 +176,17 @@ class SimulationSetup(ABC):
         g_ext_fn = self._external_acceleration_fn
         bc_fn = self._boundary_conditions_fn
 
-        return args, box_size, state, g_ext_fn, bc_fn, eos, key
+        return (
+            args,
+            box_size,
+            state,
+            g_ext_fn,
+            bc_fn,
+            eos,
+            key,
+            displacement_fn,
+            shift_fn,
+        )
 
     @abstractmethod
     def _box_size2D(self, args):
@@ -202,3 +225,82 @@ class SimulationSetup(ABC):
     @abstractmethod
     def _boundary_conditions_fn(self, state):
         pass
+
+    def _get_relaxed_r0(self, box_size, dx):
+        assert hasattr(self, "_load_only_fluid"), AttributeError
+
+        args = self.args
+        name = "_".join([args.case.lower(), str(args.dim), str(dx), str(args.seed)])
+        init_path = "data_relaxed/" + name + ".h5"
+
+        if not os.path.isfile(init_path):
+            message = (
+                f"python main.py --case={args.case} --mode=rlx --solver=SPH --tvf=1.0 "
+                f"--dim={str(args.dim)} --dx={str(dx)} --seed={str(args.seed)} "
+                f"--write-h5 --r0-noise-factor=0.25 --data-path=data_relaxed"
+            )
+            raise FileNotFoundError(f"First execute this: \n{message}")
+
+        state = read_h5(init_path)
+        if self._load_only_fluid:
+            return state["r"][state["tag"] == Tag.FLUID]
+        else:
+            return state["r"]
+
+    def _set_default_rlx(self):
+        """Set default values for relaxation case setup.
+
+        These would only change if the domain is not full.
+        """
+
+        self._box_size2D_rlx = self._box_size2D
+        self._box_size3D_rlx = self._box_size3D
+        self._init_pos2D_rlx = self._init_pos2D
+        self._init_pos3D_rlx = self._init_pos3D
+        self._tag2D_rlx = self._tag2D
+        self._tag3D_rlx = self._tag3D
+
+
+def set_relaxation(Case, args):
+    """Make a relaxation case from a SimulationSetup instance."""
+
+    class Rlx(Case):
+        """Relax particles in a box"""
+
+        def __init__(self, args):
+            super().__init__(args)
+
+            # custom variables related only to this Simulation
+            self.args.g_ext_magnitude = 0.0
+
+            # use the relaxation setup from the main case
+            self.args.is_bc_trick = self.args.is_bc_trick
+            self.args.p_bg_factor = self.args.p_bg_factor
+            self._init_pos2D = self._init_pos2D_rlx
+            self._init_pos3D = self._init_pos3D_rlx
+            self._box_size2D = self._box_size2D_rlx
+            self._box_size3D = self._box_size3D_rlx
+            self._tag2D = self._tag2D_rlx
+            self._tag3D = self._tag3D_rlx
+
+        def _init_velocity2D(self, r):
+            return jnp.zeros_like(r)
+
+        def _init_velocity3D(self, r):
+            return self._init_velocity2D(r)
+
+        def _external_acceleration_fn(self, r):
+            return jnp.zeros_like(r)
+
+        def _boundary_conditions_fn(self, state):
+            mask1 = jnp.isin(state["tag"], wall_tags)[:, None]
+
+            state["u"] = jnp.where(mask1, 0.0, state["u"])
+            state["v"] = jnp.where(mask1, 0.0, state["v"])
+
+            state["dudt"] = jnp.where(mask1, 0.0, state["dudt"])
+            state["dvdt"] = jnp.where(mask1, 0.0, state["dvdt"])
+
+            return state
+
+    return Rlx(args)

@@ -42,15 +42,15 @@ In the following, a quick setup guide for different cases is presented.
 ### Running an SPH Simulation
 - Standard SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
 - Transport velocity SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
 - Riemann SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --nxnynz=50_50_0 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
  ```
 -  Thermal diffusion
 ```bash
@@ -65,6 +65,9 @@ The presented inverse problem of finding the initial state of a 100-step-long SP
 
 ### Gradient Validation
 The presented validation of the gradients through the solver can be fully reproduced using the notebook [./experiments/grads.ipynb](./experiments/grads.ipynb)
+
+## Setting up a case
+To set up a case, just add it to the `cases/` directory. Every case should inherit from `SimulationSetup` in `jax_sph/case_setup.py` or from another case. Running a case in relaxation mode `--mode=rlx` overwrites the selected case, and passed CLI arguments overwrite any argument.
 
 ## Development and Contribution
 If you wish to contribute, please run

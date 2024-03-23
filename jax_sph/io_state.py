@@ -36,7 +36,7 @@ def io_setup(args):
     dir = args.data_path
     if not dir.endswith("/"):
         dir += "/"
-    if (args.write_h5 or args.write_vtk) and args.case != "Rlx":
+    if (args.write_h5 or args.write_vtk) and args.mode != "rlx":
         dir += str(dim) + "D_" + case + "_" + solver + "_" + str(args.seed)
         dir += "_" + time.strftime("%Y%m%d-%H%M%S")
 
@@ -62,17 +62,17 @@ def write_vtk(data_dict, path):
 
 def write_state(step, step_max, state, dir, args):
     write_normal = (
-        (args.case != "Rlx") and ((step % args.write_every) == 0) and (step >= 0)
+        (args.mode != "rlx") and ((step % args.write_every) == 0) and (step >= 0)
     )
-    write_relax = (args.case == "Rlx") and (step == (step_max - 1))
+    write_relax = (args.mode == "rlx") and (step == (step_max - 1))
 
     if write_normal or write_relax:
         digits = len(str(step_max))
         step_str = str(step).zfill(digits)
 
-        if args.case == "Rlx":
-            p = "pbc" if args.relax_pbc else ""
-            name = "_".join([args.nxnynz, str(args.dx), str(args.seed), p])
+        if args.mode == "rlx":
+            name = [args.case.lower(), str(args.dim), str(args.dx), str(args.seed)]
+            name = "_".join(name)
         else:
             name = "traj_" + step_str
 

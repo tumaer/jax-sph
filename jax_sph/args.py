@@ -14,8 +14,14 @@ class Args:
             "--case",
             type=str,
             default="TGV",
-            choices=["TGV", "RPF", "LDC", "PF", "CW", "DB", "Rlx", "UT", "HT"],
             help="Simulation setup",
+        )
+        self.parser.add_argument(
+            "--mode",
+            type=str,
+            default="sim",
+            choices=["sim", "rlx"],
+            help="run a simulation or relax an initial state",
         )
         self.parser.add_argument(
             "--solver",
@@ -56,12 +62,11 @@ class Args:
             default=0.05,
             help="Average distance between particles [0.001, 0.1]",
         )
-        self.parser.add_argument("--Nx", type=int, help="alternative to --dx")
         self.parser.add_argument(
             "--dt",
             type=float,
-            default=0.0,
-            help="If the user wants to specify if explicitly",
+            default=None,
+            help="If the user wants to specify the time step explicitly",
         )
         self.parser.add_argument(
             "--t-end",
@@ -76,6 +81,21 @@ class Args:
             help="Dynamic viscosity. Inversely proportional to Re",
         )
         self.parser.add_argument(
+            "--state0-path",
+            type=str,
+            default="none",
+            help="Initalize the state from a .h5 file. Overrides `--r0-type`."
+            "Can be useful to restart a simulation",
+        )
+        self.parser.add_argument(
+            "--r0-type",
+            type=str,
+            default="cartesian",
+            choices=["cartesian", "relaxed"],
+            help="Position initialization type. Cartesian can have `--r0-noise-factor`"
+            "Relaxed requires a relaxed state to be present in `data_relaxed`",
+        )
+        self.parser.add_argument(
             "--r0-noise-factor",
             type=float,
             default=0.0,
@@ -85,13 +105,19 @@ class Args:
             "--p-bg-factor",
             type=float,
             default=None,
-            help="Background pressure factor w.r.t. p_ref. For Rlx",
+            help="Background pressure factor w.r.t. p_ref.",
         )
         self.parser.add_argument(
             "--g-ext-magnitude",
             type=float,
             default=None,
             help="Magnitude of external force field",
+        )
+        self.parser.add_argument(
+            "--u_ref",
+            type=float,
+            default=None,
+            help="Estimatet max flow velocity to calculate artificial speed of sound",
         )
         self.parser.add_argument(
             "--artificial-alpha",
@@ -103,17 +129,6 @@ class Args:
             "--free-slip",
             action="store_true",
             help="Whether to turn on free-slip boundary condition",
-        )
-        self.parser.add_argument(
-            "--nxnynz",
-            type=str,
-            default="20_20_20",
-            help="Number of fluid points per dimension for Rlx!",
-        )
-        self.parser.add_argument(
-            "--relax-pbc",
-            action="store_true",
-            help="Relax particles in a PBC box oposed to wall box",
         )
         self.parser.add_argument(
             "--nl-backend",
@@ -151,12 +166,6 @@ class Args:
         )
         self.parser.add_argument(
             "--no-f64", action="store_true", help="Whether to use 64 bit precision"
-        )
-        self.parser.add_argument(
-            "--Vmax",
-            type=float,
-            default=1,
-            help="Estimatet max flow velocity to calculate artificial speed of sound",
         )
         self.parser.add_argument(
             "--eta-limiter",
