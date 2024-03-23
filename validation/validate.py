@@ -195,9 +195,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         axs1[1].plot(t, e_kin_theory, "k", label="Theory")
     elif dim == 3:
         Re = 1 / args.viscosity
-        ref = np.loadtxt(
-            f"./validation/ref/tgv3d_ref_{int(Re)}.txt", delimiter=","
-        )
+        ref = np.loadtxt(f"./validation/ref/tgv3d_ref_{int(Re)}.txt", delimiter=",")
         num_dots = 50
         every_n = max(len(ref) // num_dots, 1)
         axs1[0].scatter(

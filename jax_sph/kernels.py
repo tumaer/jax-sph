@@ -1,10 +1,29 @@
 """SPH interpolation kernels"""
 
+from abc import ABC, abstractmethod
+
 import jax.numpy as jnp
 from jax import grad
 
 
-class QuinticKernel:
+class BaseKernel(ABC):
+    """Base class for SPH interpolation kernels."""
+
+    def __init__(self, h):
+        self._one_over_h = 1.0 / h
+
+    @abstractmethod
+    def w(self, r):
+        """Evaluates the kernel at the radial distance r."""
+        pass
+
+    def grad_w(self, r):
+        """Evaluates the 1D kernel gradient at the radial distance r."""
+
+        return grad(self.w)(r)
+
+
+class QuinticKernel(BaseKernel):
     """The quintic kernel function of Morris."""
 
     def __init__(self, h, dim=3):
@@ -29,23 +48,8 @@ class QuinticKernel:
 
         return self._sigma * (q3**5 - 6.0 * q2**5 + 15.0 * q1**5)
 
-    def grad_w(self, r):
-        """Evaluates the 1D kernel gradient at the radial distance r."""
 
-        return grad(self.w)(r)
-    
-    def grad_w_analytical(self, r):
-        """Evaluates the 1D kernel gradient at the radial distance r analytically."""
-
-        q = r * self._one_over_h
-        q1 = jnp.maximum(0.0, 1.0 - q)
-        q2 = jnp.maximum(0.0, 2.0 - q)
-        q3 = jnp.maximum(0.0, 3.0 - q)
-
-        return self._sigma * (-5.0 * q3**4 + 6.0 * 5 * q2**4 - 15.0 * 5 * q1**4)
-
-
-class WendlandC2Kernel:
+class WendlandC2Kernel(BaseKernel):
     """The 5th-order C2 kernel function of Wendland."""
 
     def __init__(self, h, dim=3):
@@ -76,24 +80,3 @@ class WendlandC2Kernel:
             q2 = 2.0 * q + 1.0
 
             return self._sigma * (q1**4 * q2)
-
-    def grad_w(self, r):
-        """Evaluates the 1D kernel gradient at the radial distance r."""
-
-        return grad(self.w)(r)
-    
-    def grad_w_analytical(self, r):
-        """Evaluates the 1D kernel gradient at the radial distance r analytically."""
-
-        if self.dim == 1:
-            q = r * self._one_over_h
-            q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
-            q2 = -3.0 * q
-
-            return self._sigma * (q1**2 * q2)
-        else:
-            q = r * self._one_over_h
-            q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)
-            q2 = -5.0 * q
-
-            return self._sigma * (q1**3 * q2)
