@@ -755,7 +755,7 @@ def neighbor_list(
     mask_self: bool = True,
     custom_mask_function: Optional[MaskFn] = None,
     fractional_coordinates: bool = False,
-    format: NeighborListFormat = NeighborListFormat.Dense,
+    format: NeighborListFormat = NeighborListFormat.Sparse,
     num_particles_max: int = None,
     num_partitions: int = 1,
     pbc: jnp.ndarray = None,

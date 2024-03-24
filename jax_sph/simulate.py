@@ -24,7 +24,6 @@ def simulate(args):
         case = set_relaxation(Case, args)
     elif args.mode == "sim":
         case = Case(args)
-
     (
         args,
         box_size,
@@ -36,32 +35,10 @@ def simulate(args):
         displacement_fn,
         shift_fn,
     ) = case.initialize()
-
-    if args.kernel == "QSK":
-        r_cut = 3
-    elif args.kernel == "WC2K":
-        r_cut = 2.6
-
-    # Initialize a neighbors list for looping through the local neighborhood
-    # cell_size = r_cutoff + dr_threshold
-    # capacity_multiplier is used for preallocating the (2, NN) neighbors.idx
-    neighbor_fn = partition.neighbor_list(
-        displacement_fn,
-        box_size,
-        r_cutoff=r_cut * args.dx,
-        backend=args.nl_backend,
-        capacity_multiplier=1.25,
-        mask_self=False,
-        format=Sparse,
-        num_particles_max=state["r"].shape[0],
-        num_partitions=args.num_partitions,
-        pbc=np.array(args.periodic_boundary_conditions),
-    )
-    num_particles = (state["tag"] != Tag.PAD_VALUE).sum()
-    neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
+    pprint.pprint(vars(args))
 
     # Solver setup
-    model = WCSPH(
+    solver = WCSPH(
         displacement_fn,
         eos_fn,
         g_ext_fn,
@@ -79,9 +56,28 @@ def simulate(args):
         args.density_renormalize,
         args.heat_conduction,
     )
-    pprint.pprint(vars(args))
+    forward = solver.forward_wrapper()
+
+    # Initialize a neighbors list for looping through the local neighborhood
+    # cell_size = r_cutoff + dr_threshold
+    # capacity_multiplier is used for preallocating the (2, NN) neighbors.idx
+    neighbor_fn = partition.neighbor_list(
+        displacement_fn,
+        box_size,
+        r_cutoff=solver._kernel_fn.cutoff,
+        backend=args.nl_backend,
+        capacity_multiplier=1.25,
+        mask_self=False,
+        format=Sparse,
+        num_particles_max=state["r"].shape[0],
+        num_partitions=args.num_partitions,
+        pbc=np.array(args.periodic_boundary_conditions),
+    )
+    num_particles = (state["tag"] != Tag.PAD_VALUE).sum()
+    neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
+
     # Instantiate advance function for our use case
-    advance = si_euler(args.tvf, model, shift_fn, bc_fn)
+    advance = si_euler(args.tvf, forward, shift_fn, bc_fn)
 
     advance = advance if args.no_jit else jit(advance)
 
