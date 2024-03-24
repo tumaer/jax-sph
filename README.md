@@ -2,7 +2,7 @@
 
 ![HT_T.gif](https://s9.gifyu.com/images/SUwUD.gif)
 
-JAX-SPH [(Toshev et al., 2024)](https://openreview.net/forum?id=8X5PXVmsHW) is a modular JAX-based weakly compressible SPH framework, which implements the following SPH routines:
+JAX-SPH [(Toshev et al., 2024)](https://arxiv.org/abs/2403.04750) is a modular JAX-based weakly compressible SPH framework, which implements the following SPH routines:
 - Standard SPH [(Adami et al., 2012)](https://www.sciencedirect.com/science/article/pii/S002199911200229X)
 - Transport velocity SPH [(Adami et al., 2013)](https://www.sciencedirect.com/science/article/pii/S002199911300096X)
 - Riemann SPH [(Zhang et al., 2017)](https://www.sciencedirect.com/science/article/abs/pii/S0021999117300438)
@@ -102,11 +102,11 @@ booktitle  = {37th Conference on Neural Information Processing Systems (NeurIPS 
 
 ## Acknowledgements
 
-The initial idea for JAX-SPH is due to Fabian Fritz and Ludger Paehler, which has led to a first validated JAX implementation of the 3D Taylor-Green vortex simulated with the transport velocity SPH formulation. Since then, Artur Toshev has maintained the codebase and extended it in various ways. The people who have provided useful feedback include, but are not limited to: Stefan Adami, Xiangyu Hu, Fabian Fritz, Christopher Zöller, Fabien Thiery, Johannes Brandstetter, and Ludger Paehler. Special thanks to Nikolaus Adams, who has supervised the project from the beginning.
+The initial idea for JAX-SPH is due to Fabian Fritz and Ludger Paehler, which has led to the first validated JAX implementation of the 3D Taylor-Green vortex simulated with the transport velocity SPH formulation. Since then, Artur Toshev has maintained the codebase and extended it in various ways. The people who have provided useful feedback include, but are not limited to: Stefan Adami, Xiangyu Hu, Fabian Fritz, Christopher Zöller, Fabian Thiery, Johannes Brandstetter, and Ludger Paehler. Special thanks to Nikolaus Adams, who has supervised the project from the beginning.
 
 ### Contributors
 - [Artur Toshev](https://github.com/arturtoshev) - developed and maintains the codebase; selected the SPH algorithms and validated most of them; designed the simulation cases and ML experiments.
 - [Fabian Fritz](https://github.com/orgs/tumaer/people/fritzio) - provided the first validated transport velocity SPH implementation of the 3D Taylor-Green vortex in JAX.
 - [Jonas Erbesdobler](https://github.com/JonasErbesdobler) - implemented Riemann SPH; improved and added solver validation scripts; contributed to refactoring the codebase.
 - [Harish Ramachandran](https://github.com/harish6696) - implemented thermal diffusion and the inverse problem; helped in the initial phase of Solver-in-the-Loop.
-- [Gianluca Galletti](https://github.com/gerkone) - validated the gradients through the solver; implemented Solver-in-the-Loop, and tuned its parameters.
+- [Gianluca Galletti](https://github.com/gerkone) - validated the gradients through the solver; implemented and tuned Solver-in-the-Loop.
