@@ -1,7 +1,6 @@
--f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 h5py
-ipykernel
 jax-md==0.2.8
-jax[cuda12_pip]==0.4.23
+jax[cpu]==0.4.23
 pandas
 pyvista
+scipy==1.12.0
