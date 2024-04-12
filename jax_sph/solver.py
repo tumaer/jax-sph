@@ -428,245 +428,267 @@ def temperature_derivative_wrapper(kernel_fn):
     return temperature_derivative
 
 
-def WCSPH(
-    displacement_fn,
-    eos,
-    g_ext_fn,
-    dx,
-    dim,
-    dt,
-    c_ref,
-    eta_limiter=3,
-    solver="SPH",
-    kernel="QSK",
-    is_bc_trick=False,
-    is_rho_evol=False,
-    artificial_alpha=0.0,
-    is_free_slip=False,
-    is_rho_renorm=False,
-    is_heat_conduction=False,
-):
+class WCSPH:
     """Weakly compressible SPH solver with transport velocity formulation."""
 
-    _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
-    if kernel == "QSK":
-        _kernel_fn = QuinticKernel(h=dx, dim=dim)
-    elif kernel == "WC2K":
-        _kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
+    def __init__(
+        self,
+        displacement_fn,
+        eos,
+        g_ext_fn,
+        dx,
+        dim,
+        dt,
+        c_ref,
+        eta_limiter=3,
+        solver="SPH",
+        kernel="QSK",
+        is_bc_trick=False,
+        is_rho_evol=False,
+        artificial_alpha=0.0,
+        is_free_slip=False,
+        is_rho_renorm=False,
+        is_heat_conduction=False,
+    ):
+        self.displacement_fn = displacement_fn
+        self.solver = solver
+        self.g_ext_fn = g_ext_fn
+        self.is_bc_trick = is_bc_trick
+        self.is_rho_evol = is_rho_evol
+        self.is_rho_renorm = is_rho_renorm
+        self.dt = dt
+        self.eos = eos
+        self.artificial_alpha = artificial_alpha
+        self.is_heat_conduction = is_heat_conduction
 
-    _gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
-    _free_weight, _heat_bc = gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction)
-    _acceleration_tvf_fn = acceleration_tvf_fn_wrapper(_kernel_fn)
-    _acceleration_riemann_fn = acceleration_riemann_fn_wrapper(
-        _kernel_fn, eos, _beta_fn, eta_limiter
-    )
-    _acceleration_fn = acceleration_standard_fn_wrapper(_kernel_fn)
-    _artificial_viscosity_fn = artificial_viscosity_fn_wrapper(dx, artificial_alpha)
-    _wall_phi_vec = wall_phi_vec_wrapper(_kernel_fn)
-    _rho_evol_riemann_fn = rho_evol_riemann_fn_wrapper(_kernel_fn, eos, c_ref)
-    _temperature_derivative = temperature_derivative_wrapper(_kernel_fn)
+        _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
+        if kernel == "QSK":
+            self._kernel_fn = QuinticKernel(h=dx, dim=dim)
+        elif kernel == "WC2K":
+            self._kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
 
-    def forward(state, neighbors):
-        """Update step of SPH solver
-
-        Args:
-            state (dict): Flow fields and particle properties.
-            neighbors (_type_): Neighbors object.
-        """
-
-        r, tag, mass, eta = state["r"], state["tag"], state["mass"], state["eta"]
-        u, v, dudt, dvdt = state["u"], state["v"], state["dudt"], state["dvdt"]
-        rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
-        kappa, Cp = state["kappa"], state["Cp"]
-        temperature, dTdt = state["T"], state["dTdt"]
-        N = len(r)
-
-        # precompute displacements `dr` and distances `dist`
-        # the second vector is sorted
-        i_s, j_s = neighbors.idx
-        r_i_s, r_j_s = r[i_s], r[j_s]
-        dr_i_j = vmap(displacement_fn)(r_i_s, r_j_s)
-        dist = space.distance(dr_i_j)
-        w_dist = vmap(_kernel_fn.w)(dist)
-
-        e_s = dr_i_j / (dist[:, None] + EPS)
-        # currently only for density evolution and with artificial viscosity
-        grad_w_dist_norm = vmap(_kernel_fn.grad_w)(dist)
-        grad_w_dist = grad_w_dist_norm[:, None] * e_s
-
-        # external acceleration field
-        g_ext = g_ext_fn(r)  # e.g. np.array([[0, -1], [0, -1], ...])
-
-        # masks
-        wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
-        fluid_mask = jnp.where(tag == Tag.FLUID, 1.0, 0.0)
-
-        # calculate normal vector of wall boundaries
-        temp = vmap(_wall_phi_vec)(
-            rho[j_s], mass[j_s], dr_i_j, dist, wall_mask[j_s], wall_mask[i_s]
+        self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
+        self._free_weight, self._heat_bc = gwbc_fn_riemann_wrapper(
+            is_free_slip, is_heat_conduction
         )
-        phi = ops.segment_sum(temp, i_s, N)
-
-        # compute normal vector for boundary particles eq. (15), Zhang (2017)
-        n_w = (
-            phi
-            / (jnp.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None]
-            * wall_mask[:, None]
+        self._acceleration_tvf_fn = acceleration_tvf_fn_wrapper(self._kernel_fn)
+        self._acceleration_riemann_fn = acceleration_riemann_fn_wrapper(
+            self._kernel_fn, eos, _beta_fn, eta_limiter
         )
-        n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
+        self._acceleration_fn = acceleration_standard_fn_wrapper(self._kernel_fn)
+        self._artificial_viscosity_fn = artificial_viscosity_fn_wrapper(
+            dx, artificial_alpha
+        )
+        self._wall_phi_vec = wall_phi_vec_wrapper(self._kernel_fn)
+        self._rho_evol_riemann_fn = rho_evol_riemann_fn_wrapper(
+            self._kernel_fn, eos, c_ref
+        )
+        self._temperature_derivative = temperature_derivative_wrapper(self._kernel_fn)
 
-        ##### Density summation or evolution
+    def forward_wrapper(self):
+        def forward(state, neighbors):
+            """Update step of SPH solver
 
-        # update evolution
+            Args:
+                state (dict): Flow fields and particle properties.
+                neighbors (_type_): Neighbors object.
+            """
 
-        if is_rho_evol and (solver == "SPH"):
-            rho, drhodt = rho_evol_fn(rho, mass, u, grad_w_dist, i_s, j_s, dt, N)
+            r, tag, mass, eta = state["r"], state["tag"], state["mass"], state["eta"]
+            u, v, dudt, dvdt = state["u"], state["v"], state["dudt"], state["dvdt"]
+            rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
+            kappa, Cp = state["kappa"], state["Cp"]
+            temperature, dTdt = state["T"], state["dTdt"]
+            N = len(r)
 
-            if is_rho_renorm:
-                rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
-        elif is_rho_evol and (solver == "RIE"):
-            temp = vmap(_rho_evol_riemann_fn)(
-                e_s,
-                rho[i_s],
-                rho[j_s],
-                mass[j_s],
-                u[i_s],
-                u[j_s],
-                p[i_s],
-                p[j_s],
+            # precompute displacements `dr` and distances `dist`
+            # the second vector is sorted
+            i_s, j_s = neighbors.idx
+            r_i_s, r_j_s = r[i_s], r[j_s]
+            dr_i_j = vmap(self.displacement_fn)(r_i_s, r_j_s)
+            dist = space.distance(dr_i_j)
+            w_dist = vmap(self._kernel_fn.w)(dist)
+
+            e_s = dr_i_j / (dist[:, None] + EPS)
+            # currently only for density evolution and with artificial viscosity
+            grad_w_dist_norm = vmap(self._kernel_fn.grad_w)(dist)
+            grad_w_dist = grad_w_dist_norm[:, None] * e_s
+
+            # external acceleration field
+            g_ext = self.g_ext_fn(r)  # e.g. np.array([[0, -1], [0, -1], ...])
+
+            # masks
+            wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
+            fluid_mask = jnp.where(tag == Tag.FLUID, 1.0, 0.0)
+
+            # calculate normal vector of wall boundaries
+            temp = vmap(self._wall_phi_vec)(
+                rho[j_s], mass[j_s], dr_i_j, dist, wall_mask[j_s], wall_mask[i_s]
+            )
+            phi = ops.segment_sum(temp, i_s, N)
+
+            # compute normal vector for boundary particles eq. (15), Zhang (2017)
+            n_w = (
+                phi
+                / (jnp.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None]
+                * wall_mask[:, None]
+            )
+            n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
+
+            ##### Density summation or evolution
+
+            # update evolution
+
+            if self.is_rho_evol and (self.solver == "SPH"):
+                rho, drhodt = rho_evol_fn(
+                    rho, mass, u, grad_w_dist, i_s, j_s, self.dt, N
+                )
+
+                if self.is_rho_renorm:
+                    rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
+            elif self.is_rho_evol and (self.solver == "RIE"):
+                temp = vmap(self._rho_evol_riemann_fn)(
+                    e_s,
+                    rho[i_s],
+                    rho[j_s],
+                    mass[j_s],
+                    u[i_s],
+                    u[j_s],
+                    p[i_s],
+                    p[j_s],
+                    dr_i_j,
+                    dist,
+                    wall_mask[j_s],
+                    n_w[j_s],
+                    g_ext[i_s],
+                )
+                drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
+                rho = rho + self.dt * drhodt
+
+                if self.is_rho_renorm:
+                    rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
+            else:
+                rho = rho_summation_fn(mass, i_s, w_dist, N)
+
+            ##### Compute primitives
+
+            # pressure, and background pressure
+            p = vmap(self.eos.p_fn)(rho)
+            background_pressure_tvf = vmap(self.eos.p_fn)(jnp.zeros_like(p))
+
+            #####  Apply BC trick
+
+            if self.is_bc_trick and (self.solver == "SPH"):
+                p, rho, u, v, temperature = self._gwbc_fn(
+                    temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
+                )
+            elif self.is_bc_trick and (self.solver == "RIE"):
+                mask = self._free_weight(fluid_mask[i_s], tag[i_s])
+                temperature = self._heat_bc(
+                    fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N
+                )
+            elif (not self.is_bc_trick) and (self.solver == "RIE"):
+                mask = jnp.ones_like(tag[i_s])
+
+            ##### compute heat conduction
+
+            if self.is_heat_conduction:
+                # integrate the incomming temperature derivative
+                temperature += self.dt * dTdt
+
+                # compute temperature derivative for next step
+                out = vmap(self._temperature_derivative)(
+                    e_s,
+                    dr_i_j,
+                    dist,
+                    rho[i_s],
+                    rho[j_s],
+                    mass[j_s],
+                    kappa[i_s],
+                    kappa[j_s],
+                    Cp[i_s],
+                    temperature[i_s],
+                    temperature[j_s],
+                )
+                dTdt = ops.segment_sum(out, i_s, N)
+
+            ##### Compute RHS
+
+            if self.solver == "SPH":
+                out = vmap(self._acceleration_fn)(
+                    dr_i_j,
+                    dist,
+                    rho[i_s],
+                    rho[j_s],
+                    u[i_s],
+                    u[j_s],
+                    v[i_s],
+                    v[j_s],
+                    mass[i_s],
+                    mass[j_s],
+                    eta[i_s],
+                    eta[j_s],
+                    p[i_s],
+                    p[j_s],
+                )
+            elif self.solver == "RIE":
+                out = vmap(self._acceleration_riemann_fn)(
+                    e_s,
+                    dr_i_j,
+                    dist,
+                    rho[i_s],
+                    rho[j_s],
+                    mass[j_s],
+                    mass[i_s],
+                    u[i_s],
+                    u[j_s],
+                    p[i_s],
+                    p[j_s],
+                    eta[i_s],
+                    eta[j_s],
+                    wall_mask[j_s],
+                    mask,
+                    n_w[j_s],
+                    g_ext[i_s],
+                )
+            dudt = ops.segment_sum(out, i_s, N)
+
+            out_tv = vmap(self._acceleration_tvf_fn)(
                 dr_i_j,
                 dist,
-                wall_mask[j_s],
-                n_w[j_s],
-                g_ext[i_s],
-            )
-            drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
-            rho = rho + dt * drhodt
-
-            if is_rho_renorm:
-                rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
-        else:
-            rho = rho_summation_fn(mass, i_s, w_dist, N)
-
-        ##### Compute primitives
-
-        # pressure, and background pressure
-        p = vmap(eos.p_fn)(rho)
-        background_pressure_tvf = vmap(eos.p_fn)(jnp.zeros_like(p))
-
-        #####  Apply BC trick
-
-        if is_bc_trick and (solver == "SPH"):
-            p, rho, u, v, temperature = _gwbc_fn(
-                temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
-            )
-        elif is_bc_trick and (solver == "RIE"):
-            mask = _free_weight(fluid_mask[i_s], tag[i_s])
-            temperature = _heat_bc(
-                fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N
-            )
-        elif (not is_bc_trick) and (solver == "RIE"):
-            mask = jnp.ones_like(tag[i_s])
-
-        ##### compute heat conduction
-
-        if is_heat_conduction:
-            # integrate the incomming temperature derivative
-            temperature += dt * dTdt
-
-            # compute temperature derivative for next step
-            out = vmap(_temperature_derivative)(
-                e_s,
-                dr_i_j,
-                dist,
                 rho[i_s],
                 rho[j_s],
-                mass[j_s],
-                kappa[i_s],
-                kappa[j_s],
-                Cp[i_s],
-                temperature[i_s],
-                temperature[j_s],
-            )
-            dTdt = ops.segment_sum(out, i_s, N)
-
-        ##### Compute RHS
-
-        if solver == "SPH":
-            out = vmap(_acceleration_fn)(
-                dr_i_j,
-                dist,
-                rho[i_s],
-                rho[j_s],
-                u[i_s],
-                u[j_s],
-                v[i_s],
-                v[j_s],
                 mass[i_s],
                 mass[j_s],
-                eta[i_s],
-                eta[j_s],
-                p[i_s],
-                p[j_s],
+                background_pressure_tvf[i_s],
             )
-        elif solver == "RIE":
-            out = vmap(_acceleration_riemann_fn)(
-                e_s,
-                dr_i_j,
-                dist,
-                rho[i_s],
-                rho[j_s],
-                mass[j_s],
-                mass[i_s],
-                u[i_s],
-                u[j_s],
-                p[i_s],
-                p[j_s],
-                eta[i_s],
-                eta[j_s],
-                wall_mask[j_s],
-                mask,
-                n_w[j_s],
-                g_ext[i_s],
-            )
-        dudt = ops.segment_sum(out, i_s, N)
+            dvdt = ops.segment_sum(out_tv, i_s, N)
 
-        out_tv = vmap(_acceleration_tvf_fn)(
-            dr_i_j,
-            dist,
-            rho[i_s],
-            rho[j_s],
-            mass[i_s],
-            mass[j_s],
-            background_pressure_tvf[i_s],
-        )
-        dvdt = ops.segment_sum(out_tv, i_s, N)
+            ##### Additional things
 
-        ##### Additional things
+            if self.artificial_alpha != 0.0:
+                dudt += self._artificial_viscosity_fn(
+                    rho, mass, u, tag, i_s, j_s, dr_i_j, dist, grad_w_dist, N
+                )
 
-        if artificial_alpha != 0.0:
-            dudt += _artificial_viscosity_fn(
-                rho, mass, u, tag, i_s, j_s, dr_i_j, dist, grad_w_dist, N
-            )
+            state = {
+                "r": r,
+                "tag": tag,
+                "u": u,
+                "v": v,
+                "drhodt": drhodt,
+                "dudt": dudt + g_ext,
+                "dvdt": dvdt,
+                "rho": rho,
+                "p": p,
+                "mass": mass,
+                "eta": eta,
+                "dTdt": dTdt,
+                "T": temperature,
+                "kappa": kappa,
+                "Cp": Cp,
+            }
 
-        state = {
-            "r": r,
-            "tag": tag,
-            "u": u,
-            "v": v,
-            "drhodt": drhodt,
-            "dudt": dudt + g_ext,
-            "dvdt": dvdt,
-            "rho": rho,
-            "p": p,
-            "mass": mass,
-            "eta": eta,
-            "dTdt": dTdt,
-            "T": temperature,
-            "kappa": kappa,
-            "Cp": Cp,
-        }
+            return state
 
-        return state
-
-    return forward
+        return forward
