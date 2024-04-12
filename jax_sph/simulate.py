@@ -17,6 +17,8 @@ from jax_sph.utils import Tag, get_ekin, get_val_max
 
 
 def simulate(args):
+    """Core simulation loop."""
+
     # Case setup
     Case = select_case(args.case)
     # if in relaxation mode, wrap the case with the relaxation case

@@ -1,0 +1,12 @@
+coverage:
+  range: 50..70  # red color under 50%, yellow at 50%..70%, green over 70%
+  precision: 1
+  status:
+    project:
+      default:
+        target: 60%  # coverage success only above X%
+        threshold: 5%  # allow the coverage to drop by X% and being a success
+    patch:
+      default:
+        target: 50%
+        threshold: 5%

@@ -26,12 +26,19 @@ ruff = ">=0.1.8"
 ott-jax = ">=0.4.2"
 ipykernel = ">=6.25.1"
 
+[tool.poetry.group.docs.dependencies]
+sphinx = "7.2.6"
+sphinx-exec-code = "0.12"
+sphinx-rtd-theme = "1.3.0"
+toml = "^0.10.2"
+
 [tool.ruff]
 ignore = ["F821", "E402"]
 exclude = [
     ".git",
     ".venv*",
     "venv*",
+    "docs/_build",
     "dist"
 ]
 show-fixes = true
@@ -43,6 +50,14 @@ select = [
     "F", # Pyflakes
     "SIM", # flake8-simplify
     "I", # isort
+]
+
+[tool.pytest.ini_options] # TODO:jax_sph or jax-sph
+testpaths = "tests/"
+addopts = "--cov=jax-sph --cov-fail-under=50"
+filterwarnings = [
+    # ignore all deprecation warnings except from jax-sph
+    "ignore::DeprecationWarning:^(?!.*jax_sph).*"
 ]
 
 [build-system]
