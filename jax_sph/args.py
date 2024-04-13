@@ -1,9 +1,11 @@
-"""Parsing input arguments"""
+"""Parsing input arguments."""
 
 import argparse
 
 
 class Args:
+    """Parsing input arguments."""
+
     def __init__(self) -> None:
         self.parser = argparse.ArgumentParser()
         self.add_args()

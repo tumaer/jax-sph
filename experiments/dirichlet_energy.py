@@ -13,7 +13,7 @@ from jax_md.partition import Sparse
 
 from jax_sph import partition
 from jax_sph.io_state import read_args, read_h5
-from jax_sph.kernels import QuinticKernel, WendlandC2Kernel
+from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 from jax_sph.utils import Tag, pos_init_cartesian_2d
 
 EPS = jnp.finfo(float).eps

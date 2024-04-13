@@ -1,4 +1,4 @@
-"""Core simulation loop"""
+"""Core simulation loop."""
 
 import pprint
 import time
@@ -17,7 +17,13 @@ from jax_sph.utils import Tag, get_ekin, get_val_max
 
 
 def simulate(args):
-    """Core simulation loop."""
+    """Core simulation loop.
+
+    This function is the main entry point for the simulation and does the following:
+
+    1. Initialize the 1) case, 2) solver, 3) neighbor list, 4) integrator.
+    2. Run the simulation loop and optionally write states.
+    """
 
     # Case setup
     Case = select_case(args.case)

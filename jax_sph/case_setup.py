@@ -1,4 +1,4 @@
-"""Simulation setup"""
+"""Simulation setup."""
 
 import os
 import warnings
@@ -30,7 +30,30 @@ class SimulationSetup(ABC):
         self.args = args
 
     def initialize(self):
-        """Initialize and return everything needed for the numerical setup"""
+        """Initialize and return everything needed for the numerical setup.
+
+        This function sets up all physical and numerical quantities including:
+
+            - reference values and case specific parameters
+            - integration time step
+            - relaxation or simulation mode
+            - equation of state
+            - boundary conditions
+            - state dictionary
+            - function including external force and boundary conditions
+
+        Returns: A tuple containing the following elements:
+
+           - args (Namespace): configuration arguments
+           - box_size (ndarray): size of the simulation box starting at 0.0
+           - state (dict): dictionary containing all field values
+           - g_ext_fn (Callable): external force function
+           - bc_fn (Callable): boundary conditions function (e.g. velocity at walls)
+           - eos (Callable): equation of state function
+           - key (PRNGKey): random key for sampling
+           - displacement_fn (Callable): displacement function for edge features
+           - shift_fn (Callable): shift function for position updates
+        """
 
         # check whether these variables were defined in the child class
         assert hasattr(self.args, "g_ext_magnitude"), AttributeError
@@ -262,7 +285,17 @@ class SimulationSetup(ABC):
 
 
 def set_relaxation(Case, args):
-    """Make a relaxation case from a SimulationSetup instance."""
+    """Make a relaxation case from a SimulationSetup instance.
+
+    Create a child class of a particular SimulationSetup instance and overwrite:
+
+        - _init_pos{2|3}D
+        - _box_size{2|3}D
+        - _tag{2|3}D
+        - _init_velocity{2|3}D
+        - _external_acceleration_fn
+        - _boundary_conditions_fn
+    """
 
     class Rlx(Case):
         """Relax particles in a box"""

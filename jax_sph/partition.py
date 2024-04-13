@@ -1,4 +1,5 @@
-"""Neighbors search backends
+"""Neighbors search backends.
+
 Source:
 https://github.com/tumaer/lagrangebench/blob/main/lagrangebench/case_setup/partition.py
 """
@@ -764,6 +765,7 @@ def neighbor_list(
 
     Args:
         backend: The backend to use. One of "jaxmd_vmap", "jaxmd_scan", "matscipy".
+
             - "jaxmd_vmap": Default jax-md neighbor list. Uses vmap. Fast.
             - "jaxmd_scan": Modified jax-md neighbor list. Uses scan. Memory efficient.
             - "matscipy": Matscipy neighbor list. Runs on cpu, allows dynamic shapes.

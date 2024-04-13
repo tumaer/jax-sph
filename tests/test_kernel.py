@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from jax import vmap
 
-from jax_sph.kernels import QuinticKernel, WendlandC2Kernel
+from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 
 
 @pytest.mark.parametrize(
