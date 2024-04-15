@@ -1,11 +1,14 @@
 [tool.poetry]
 name = "jax-sph"
-version = "0.0.1"
+version = "0.0.0a"
 description = "JAX-SPH: Smoothed Particle Hydrodynamics in JAX"
 authors = ["Artur Toshev <artur.toshev@tum.de>",]
 maintainers = ["Artur Toshev <artur.toshev@tum.de>",]
 license = "MIT"
 readme = "README.md"
+homepage = "https://jax-sph.readthedocs.io/"
+documentation = "https://jax-sph.readthedocs.io/"
+repository = "https://github.com/tumaer/jax-sph"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<=3.11"
@@ -52,9 +55,9 @@ select = [
     "I", # isort
 ]
 
-[tool.pytest.ini_options] # TODO:jax_sph or jax-sph
+[tool.pytest.ini_options]
 testpaths = "tests/"
-addopts = "--cov=jax-sph --cov-fail-under=50"
+addopts = "--cov=jax_sph --cov-fail-under=50"
 filterwarnings = [
     # ignore all deprecation warnings except from jax-sph
     "ignore::DeprecationWarning:^(?!.*jax_sph).*"
