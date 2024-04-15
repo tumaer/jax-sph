@@ -5,14 +5,22 @@ venv*/
 *data*/
 validation/figs
 
+# build files
 __pycache__/
 *.egg-info
+*.pyc
+dist/
+.coverage
 
 *.out
 *.DS_Store
 
+# LagrangeBench related
 datasets/
 ckp/
 wandb/
 rollout/
 rollouts/
+
+# Sphinx documentation
+docs/_build/

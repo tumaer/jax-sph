@@ -1,0 +1,12 @@
+coverage:  # TODO: increase required values once proper tests are implemented
+  range: 2..3  # red color under 50%, yellow at 50%..70%, green over 70%
+  precision: 1
+  status:
+    project:
+      default:
+        target: 2%  # coverage success only above X%. Later to be changed to e.g. 60%
+        threshold: 5%  # allow the coverage to drop by X% and being a success
+    patch:
+      default:
+        target: 5%  # later to be changed to e.g. 50%
+        threshold: 5%

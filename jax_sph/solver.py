@@ -1,10 +1,13 @@
-"""Transport velocity SPH implementation"""
+"""Weakly compressible SPH solver."""
+
+from typing import Callable, Union
 
 import jax.numpy as jnp
 from jax import ops, vmap
 from jax_md import space
 
-from jax_sph.kernels import QuinticKernel, WendlandC2Kernel
+from jax_sph.eos import RIEMANNEoS, TaitEoS
+from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 from jax_sph.utils import Tag, wall_tags
 
 EPS = jnp.finfo(float).eps
@@ -20,6 +23,8 @@ def rho_evol_fn(rho, mass, u, grad_w_dist, i_s, j_s, dt, N, **kwargs):
 
 
 def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
+    """Density evolution according to Zhang et al. 2017."""
+
     def rho_evol_riemann_fn(
         e_s,
         rho_i,
@@ -36,8 +41,6 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
         g_ext_i,
         **kwargs,
     ):
-        """Density evolution according to Zhang et al. 2017."""
-
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij = e_s
 
@@ -88,6 +91,8 @@ def rho_summation_fn(mass, i_s, w_dist, N):
 
 
 def wall_phi_vec_wrapper(kernel_fn):
+    """Compute the wall phi vector according to Zhang et al. 2017."""
+
     def wall_phi_vec(rho_j, m_j, dr_ij, dist, tag_j, tag_i):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij_w = dr_ij / (dist + EPS)
@@ -104,6 +109,8 @@ def wall_phi_vec_wrapper(kernel_fn):
 
 
 def acceleration_tvf_fn_wrapper(kernel_fn):
+    """Transport velocity formulation acceleration according to Adami et al. 2013."""
+
     def acceleration_tvf_fn(r_ij, d_ij, rho_i, rho_j, m_i, m_j, p_bg_i):
         # compute the common prefactor `_c`
         _weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
@@ -124,6 +131,8 @@ def tvf_stress_fn(rho: float, u, v):
 
 
 def acceleration_standard_fn_wrapper(kernel_fn):
+    """Standard SPH acceleration according to Adami et al. 2012."""
+
     def acceleration_standard_fn(
         r_ij,
         d_ij,
@@ -160,6 +169,8 @@ def acceleration_standard_fn_wrapper(kernel_fn):
 
 
 def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
+    """Riemann solver acceleration according to Zhang et al. 2017."""
+
     def acceleration_fn_riemann(
         e_s,
         r_ij,
@@ -235,6 +246,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
 
 
 def artificial_viscosity_fn_wrapper(dx, artificial_alpha, u_ref=1.0):
+    """Artificial viscosity according to Adami et al. 2012."""
     h_ab = dx
     # if only artificial viscosity is used, then the following applies
     # nu = alpha * h * c_ab / 2 / (dim+2)
@@ -261,24 +273,25 @@ def artificial_viscosity_fn_wrapper(dx, artificial_alpha, u_ref=1.0):
 
 
 def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
+    """Enforce wall boundary conditions by treating boundary particles in a special way.
+
+    If solid walls -> apply BC tricks
+
+    Update dummy particles before acceleration computation (if appl.).
+
+    Steps for boundary particles:
+
+    - sum pressure over fluid with sheparding
+    - inverse EoS for density
+    - sum velocity over fluid with sheparding and * (-1)
+    - if free-slip: project velocity onto normal vector
+    - subtract that from 2 * u_wall - keeps lid intact
+
+    Based on: "A generalized wall boundary condition for smoothed
+    particle hydrodynamics", Adami, Hu, Adams, 2012
+    """
+
     def gwbc_fn(temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N):
-        """Enforce wall BC by treating boundary particles in special way
-
-        If solid walls -> apply BC tricks
-
-        Update dummy particles before acceleration computation (if appl.).
-
-        Steps for boundary particles:
-        - sum pressure over fluid with sheparding
-        - inverse EoS for density
-        - sum velocity over fluid with sheparding and * (-1)
-        - if free-slip: project velocity onto normal vector
-        - subtract that from 2 * u_wall - keeps lid intact
-
-        Based on: "A generalized wall boundary condition for smoothed
-        particle hydrodynamics", Adami, Hu, Adams, 2012
-        """
-
         mask_bc = jnp.isin(tag, wall_tags)
 
         def no_slip_bc_fn(x):
@@ -362,6 +375,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
 
 
 def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
+    """Riemann solver boundary condition for wall particles."""
     if is_free_slip:
 
         def free_weight(fluid_mask_i, tag_i):
@@ -392,7 +406,7 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
 
 
 def limiter_fn_wrapper(eta_limiter, c_ref):
-    """if != -1, introduce dissipation limiter eq. (11), Zhang (2017)"""
+    """if eta_limiter != -1, introduce dissipation limiter eq. (11), Zhang (2017)."""
 
     if eta_limiter == -1:
 
@@ -409,6 +423,8 @@ def limiter_fn_wrapper(eta_limiter, c_ref):
 
 
 def temperature_derivative_wrapper(kernel_fn):
+    """Temperature derivative according to Cleary 1998."""
+
     def temperature_derivative(
         e_s, r_ij, d_ij, rho_i, rho_j, m_j, kappa_i, kappa_j, Cp_i, T_i, T_j
     ):
@@ -433,22 +449,22 @@ class WCSPH:
 
     def __init__(
         self,
-        displacement_fn,
-        eos,
-        g_ext_fn,
-        dx,
-        dim,
-        dt,
-        c_ref,
-        eta_limiter=3,
-        solver="SPH",
-        kernel="QSK",
-        is_bc_trick=False,
-        is_rho_evol=False,
-        artificial_alpha=0.0,
-        is_free_slip=False,
-        is_rho_renorm=False,
-        is_heat_conduction=False,
+        displacement_fn: Callable,
+        eos: Union[TaitEoS, RIEMANNEoS],
+        g_ext_fn: Callable,
+        dx: float,
+        dim: int,
+        dt: float,
+        c_ref: float,
+        eta_limiter: float = 3,
+        solver: str = "SPH",
+        kernel: str = "QSK",
+        is_bc_trick: bool = False,
+        is_rho_evol: bool = False,
+        artificial_alpha: float = 0.0,
+        is_free_slip: bool = False,
+        is_rho_renorm: bool = False,
+        is_heat_conduction: bool = False,
     ):
         self.displacement_fn = displacement_fn
         self.solver = solver
@@ -486,8 +502,10 @@ class WCSPH:
         self._temperature_derivative = temperature_derivative_wrapper(self._kernel_fn)
 
     def forward_wrapper(self):
+        """Wrapper of update step of SPH."""
+
         def forward(state, neighbors):
-            """Update step of SPH solver
+            """Update step of SPH solver.
 
             Args:
                 state (dict): Flow fields and particle properties.

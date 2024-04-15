@@ -19,7 +19,7 @@ from lagrangebench.evaluate import averaged_metrics
 
 from jax_sph import partition
 from jax_sph.eos import TaitEoS
-from jax_sph.kernels import QuinticKernel
+from jax_sph.kernel import QuinticKernel
 from jax_sph.solver import WCSPH
 from jax_sph.utils import Tag
 

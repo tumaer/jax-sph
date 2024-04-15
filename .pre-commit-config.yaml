@@ -4,7 +4,7 @@ exclude: |
   (?x)^(
       venv*/|
       data*/|
-      .vscode/.*|
+      docs/|
   )$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

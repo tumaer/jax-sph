@@ -1,4 +1,4 @@
-"""SPH interpolation kernels"""
+"""SPH interpolation kernels."""
 
 from abc import ABC, abstractmethod
 
@@ -9,7 +9,7 @@ from jax import grad
 class BaseKernel(ABC):
     """Base class for SPH interpolation kernels."""
 
-    def __init__(self, h):
+    def __init__(self, h: float):
         self._one_over_h = 1.0 / h
 
     @abstractmethod
@@ -39,8 +39,6 @@ class QuinticKernel(BaseKernel):
             self._sigma = 3.0 / 359.0 / jnp.pi * self._one_over_h**3
 
     def w(self, r):
-        """Evaluates the kernel at the radial distance r."""
-
         q = r * self._one_over_h
         q1 = jnp.maximum(0.0, 1.0 - q)
         q2 = jnp.maximum(0.0, 2.0 - q)
@@ -66,8 +64,6 @@ class WendlandC2Kernel(BaseKernel):
             self._sigma = 21.0 / 16.0 / jnp.pi * self._one_over_h**3
 
     def w(self, r):
-        """Evaluates the kernel at the radial distance r."""
-
         if self.dim == 1:
             q = r * self._one_over_h
             q1 = jnp.maximum(0.0, 1.0 - 0.5 * q)

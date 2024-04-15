@@ -1,13 +1,26 @@
-"""Integrator schemes"""
+"""Integrator schemes."""
 
+
+from typing import Callable, Dict
 
 from jax_sph.utils import Tag
 
 
-def si_euler(tvf, model, shift_fn, bc_fn):
-    """Semi-implicit Euler integrator including tvf"""
+def si_euler(tvf: float, model: Callable, shift_fn: Callable, bc_fn: Callable):
+    """Semi-implicit Euler integrator including Transport Velocity.
 
-    def advance(dt, state, neighbors):
+    The integrator advances the state of the system following the steps:
+
+        1. Update u and v with dudt and dvdt
+        2. Update position r with velocity v
+        3. Update neighbor list
+        4. Compute accelerations - SPH model call
+        5. Impose boundary conditions as defined by the case.
+    """
+
+    def advance(dt: float, state: Dict, neighbors):
+        """Call to integrator."""
+
         # 1. Twice 1/2dt integration of u and v
         state["u"] += 1.0 * dt * state["dudt"]
         state["v"] = state["u"] + tvf * 0.5 * dt * state["dvdt"]
@@ -15,7 +28,7 @@ def si_euler(tvf, model, shift_fn, bc_fn):
         # 2. Integrate position with velocity v
         state["r"] = shift_fn(state["r"], 1.0 * dt * state["v"])
 
-        # 3. Update neighbors list
+        # 3. Update neighbor list
 
         # The displacment and shift function from JAX MD are used for computing the
         # relative particle distance and moving particles across the priodic domain

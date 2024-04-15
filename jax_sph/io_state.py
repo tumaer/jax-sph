@@ -1,9 +1,10 @@
-"""Input-output utilities"""
+"""Input-output utilities."""
 
 import json
 import os
 import time
 from argparse import Namespace
+from typing import Dict
 
 import h5py
 import jax.numpy as jnp
@@ -12,26 +13,28 @@ import numpy as np
 import pyvista
 
 
-def write_args(args, file_path):
-    """Write argparse arguments to a .txt file using json and dicts
+def write_args(args: Namespace, file_path: str):
+    """Write argparse arguments to a .txt file using json.
 
     Args:
-        args (Namespace): full set of input arguments incl. defaults
-        file_path (str): e.g. "./data/3D_TGV_.../args.txt"
+        args: full set of input arguments incl. defaults
+        file_path: e.g. "./data/3D_TGV_<...>/args.txt"
     """
 
     with open(file_path, "w") as f:
         json.dump(vars(args), f)
 
 
-def read_args(file_path):
+def read_args(file_path: str):
+    """Read argparse arguments from a .txt file using json."""
     with open(file_path, "r") as f:
         args_dict = json.load(f)
     args = Namespace(**(args_dict))
     return args
 
 
-def io_setup(args):
+def io_setup(args: Namespace):
+    """Setup the output directory and write the arguments to a .txt file."""
     case, solver, dim = args.case, args.solver, args.dim
     dir = args.data_path
     if not dir.endswith("/"):
@@ -46,21 +49,22 @@ def io_setup(args):
     return dir
 
 
-def write_h5(data_dict, path):
-    """Write a dict of numpy or jax arrays to a .h5 file"""
+def write_h5(data_dict: Dict, path: str):
+    """Write a dict of numpy or jax arrays to a .h5 file."""
     hf = h5py.File(path, "w")
     for k, v in data_dict.items():
         hf.create_dataset(k, data=np.array(v))
     hf.close()
 
 
-def write_vtk(data_dict, path):
-    """Store a .vtk file for ParaView"""
+def write_vtk(data_dict: Dict, path: str):
+    """Store a .vtk file for ParaView."""
     data_pv = dict2pyvista(data_dict)
     data_pv.save(path)
 
 
-def write_state(step, step_max, state, dir, args):
+def write_state(step: int, step_max: int, state: Dict, dir: str, args: Namespace):
+    """Write state to .h5 or .vtk file while simulation is running."""
     write_normal = (
         (args.mode != "rlx") and ((step % args.write_every) == 0) and (step >= 0)
     )
@@ -84,7 +88,8 @@ def write_state(step, step_max, state, dir, args):
             write_vtk(state, path)
 
 
-def read_h5(file_name, array_type="jax"):
+def read_h5(file_name: str, array_type: str = "jax"):
+    """Read an .h5 file and return a dict of numpy or jax arrays."""
     hf = h5py.File(file_name, "r")
 
     data_dict = {}
@@ -101,12 +106,12 @@ def read_h5(file_name, array_type="jax"):
     return data_dict
 
 
-def write_vtks_from_h5s(dir_path, keep_h5=True):
-    """Transform a set of .h5 files to .vtk files
+def write_vtks_from_h5s(dir_path: str, keep_h5: bool = True):
+    """Transform a set of .h5 files to .vtk files.
 
     Args:
-        path (str): path to directory with .h5 files
-        keep_h5 (bool, optional): Whether to keep or delete h5 files.
+        path: path to directory with .h5 files
+        keep_h5: Whether to keep or delete the original .h5 files.
     """
 
     files = os.listdir(dir_path)
@@ -169,4 +174,5 @@ def _plot(r, x, ttl, vmin=None, vmax=None):
 
 
 if __name__ == "__main__":
-    write_vtks_from_h5s("./3D_TGV_SPH_17_20221224-084051", False)
+    # write_vtks_from_h5s("./3D_TGV_SPH_17_20221224-084051", False)
+    pass

@@ -1,8 +1,25 @@
-"""Equation of state"""
+"""Equation of state."""
 
 
-class TaitEoS:
-    """Equation of state
+from abc import ABC, abstractmethod
+
+
+class BaseEoS(ABC):
+    """Base class for SPH equation of state."""
+
+    @abstractmethod
+    def p_fn(self, rho: float):
+        """Compute pressure from density."""
+        pass
+
+    @abstractmethod
+    def rho_fn(self, p: float):
+        """Compute density from pressure."""
+        pass
+
+
+class TaitEoS(BaseEoS):
+    """Tait equation of state.
 
     From: "A generalized wall boundary condition for smoothed particle
     hydrodynamics", Adami et al 2012
@@ -22,8 +39,8 @@ class TaitEoS:
         return self.rho_ref * (p_temp / self.p_ref) ** (1 / self.gamma)
 
 
-class RIEMANNEoS:
-    """Equation of state
+class RIEMANNEoS(BaseEoS):
+    """Riemann SPH equation of state.
 
     From: "A weakly compressible SPH method based on a
     low-dissipation Riemann solver", Zhang, Hu, Adams, 2017

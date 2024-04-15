@@ -1,15 +1,17 @@
-"""General jax-sph utils"""
+"""General jax-sph utils."""
 
 import enum
+from typing import Dict
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import ops, vmap
 from jax_md import partition, space
+from numpy import array
 
 from jax_sph.io_state import read_h5
-from jax_sph.kernels import QuinticKernel
+from jax_sph.kernel import QuinticKernel
 
 EPS = jnp.finfo(float).eps
 
@@ -27,22 +29,33 @@ class Tag(enum.IntEnum):
 wall_tags = jnp.array([tag.value for tag in Tag if "WALL" in tag.name])
 
 
-def pos_init_cartesian_2d(box_size, dx):
+def pos_init_cartesian_2d(box_size: array, dx: float):
+    """Create a grid of particles in 2D.
+
+    Particles are at the center of the corresponding Cartesian grid cells.
+    Example: if box_size=np.array([1, 1]) and dx=0.1, then the first particle will be at
+    position [0.05, 0.05].
+    """
     n = np.array((box_size / dx).round(), dtype=int)
     grid = np.meshgrid(range(n[0]), range(n[1]), indexing="xy")
     r = (jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx
     return r
 
 
-def pos_init_cartesian_3d(box_size, dx):
+def pos_init_cartesian_3d(box_size: array, dx: float):
+    """Create a grid of particles in 3D."""
     n = np.array((box_size / dx).round(), dtype=int)
     grid = np.meshgrid(range(n[0]), range(n[1]), range(n[2]), indexing="xy")
     r = (jnp.vstack(list(map(jnp.ravel, grid))).T + 0.5) * dx
     return r
 
 
-def pos_box_2d(L, H, dx, num_wall_layers=3):
-    """Create an empty box of particles in 2D"""
+def pos_box_2d(L: float, H: float, dx: float, num_wall_layers: int = 3):
+    """Create an empty box of particles in 2D.
+
+    The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx).
+    The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
+    """
     dx3 = num_wall_layers * dx
     # horizontal and vertical blocks
     vertical = pos_init_cartesian_2d(np.array([dx3, H + 2 * dx3]), dx)
@@ -58,21 +71,26 @@ def pos_box_2d(L, H, dx, num_wall_layers=3):
     return res
 
 
-def get_noise_masked(shape, mask, key, std):
+def get_noise_masked(shape: tuple, mask: array, key: jax.random.PRNGKey, std: float):
+    """Generate Gaussian noise with `std` where `mask` is True."""
     noise = std * jax.random.normal(key, shape)
     masked_noise = jnp.where(mask[:, None], noise, 0.0)
     return masked_noise
 
 
-def get_ekin(state, dx):
+def get_ekin(state: Dict, dx: float):
+    """Compute the kinetic energy of the fluid from `state["v"]`."""
     v = state["v"]
     v_water = jnp.where(state["tag"][:, None] == Tag.FLUID, v, 0.0)
     ekin = jnp.square(v_water).sum().item()
     return 0.5 * ekin * dx ** v.shape[1]
 
 
-def get_val_max(state, var="u"):
-    "Extract the largest velocity magnitude, needed for TGV"
+def get_val_max(state: Dict, var: str = "u"):
+    """Extract the largest magnitude of `state["var"]`.
+
+    For vectorial quantities, the magnitude is the Euclidean norm.
+    """
     if jnp.size(state[var].shape) > 1:
         max = jnp.sqrt(jnp.square(state[var]).sum(axis=1)).max()
     else:
@@ -80,14 +98,16 @@ def get_val_max(state, var="u"):
     return max
 
 
-def sph_interpolator(args, src_path, prop_type="vector"):
-    """Interpolate SPH data to a regular grid / line.
+def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
+    """Interpolate properties from a `state` to arbitrary coordinates, e.g. a line.
 
     Args:
-        args (_type_): Simulation arguments.
-        src_path (str): used only for instantiating the neighbors object
-        prop (str, optional): Which velocity to use. Defaults to 'u'.
-        dim_ind (int, optional): Which component of velocity. Defaults to 0.
+        args: Simulation arguments.
+        src_path: used only for instantiating the neighbors object.
+        prop_type: Whether the target will be of vectorial or scalar type.
+
+    Returns:
+        Callable: Interpolation function.
     """
     state = read_h5(src_path)
     N = len(state["r"])
@@ -140,7 +160,15 @@ def sph_interpolator(args, src_path, prop_type="vector"):
             state["r"],
         )
 
-    def interp_vel(src_path, r_target, prop="u", dim_ind=0):
+    def interp_vel(src_path: str, r_target: array, prop: str = "u", dim_ind: int = 0):
+        """Interpolator for vectorial quantities.
+
+        Args:
+            src_path: Path to the source state.
+            r_target: Target positions.
+            prop: Which quantity to use. Defaults to 'u'.
+            dim_ind: Which component of velocity. Defaults to 0.
+        """
         #### SPH interpolate from "set_src" onto "set_dst"
         state = read_h5(src_path)
         # compute kernel avarages at y_axis positions in the center, x=0.2
@@ -172,7 +200,14 @@ def sph_interpolator(args, src_path, prop_type="vector"):
 
         return u_val
 
-    def interp_scalar(src_path, r_target, prop="p"):
+    def interp_scalar(src_path: str, r_target: array, prop: str = "p"):
+        """Interpolator for scalar quantities.
+
+        Args:
+            src_path: Path to the source state.
+            r_target: Target positions.
+            prop: Which quantity to use. Defaults to 'u'.
+        """
         #### SPH interpolate from "set_src" onto "set_dst"
         state = read_h5(src_path)
         # compute kernel avarages at y_axis positions in the center, x=0.2
