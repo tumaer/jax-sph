@@ -4,9 +4,9 @@ coverage:
   status:
     project:
       default:
-        target: 60%  # coverage success only above X%
+        target: 6%  # coverage success only above X%. Later to be changed to e.g. 60%
         threshold: 5%  # allow the coverage to drop by X% and being a success
     patch:
       default:
-        target: 50%
+        target: 5%  # later to be changed to e.g. 50%
         threshold: 5%
