@@ -1,4 +1,4 @@
-coverage:
+coverage:  # TODO: increase required values once proper tests are implemented
   range: 2..3  # red color under 50%, yellow at 50%..70%, green over 70%
   precision: 1
   status:
