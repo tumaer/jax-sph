@@ -1,0 +1,21 @@
+extends: JAX_SPH_DEFAULTS
+
+seed: 123
+
+case:
+  source: "pf.py"
+  dim: 2
+  dx: 0.0166666
+  viscosity: 100.0
+  u_ref: 1.25
+  g_ext_magnitude: 1000.0
+
+solver:
+  dt: 0.0000005
+  t_end: 0.01
+  is_bc_trick: True
+
+io:
+  write_type: ["h5"]
+  write_every: 200
+  data_path: "data/debug"

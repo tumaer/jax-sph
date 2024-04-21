@@ -1,0 +1,21 @@
+extends: JAX_SPH_DEFAULTS
+
+case:
+  source: "ldc.py"
+  dim: 2
+  dx: 0.02
+  special:
+    u_x_lid: 1.0
+
+solver:
+  dt: 0.0004
+  t_end: 5.0
+  is_bc_trick: True
+
+eos:
+  p_bg_factor: 0.01
+
+io:
+  write_type: ["h5"]
+  write_every: 100
+  data_path: "data/debug"

@@ -3,6 +3,7 @@
 
 import jax.numpy as jnp
 import numpy as np
+from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
 from jax_sph.utils import Tag
@@ -11,20 +12,14 @@ from jax_sph.utils import Tag
 class TGV(SimulationSetup):
     """Taylor-Green Vortex"""
 
-    def __init__(self, args):
-        super().__init__(args)
-
-        self.args.g_ext_magnitude = 0.0
-        self.args.is_bc_trick = False
-        if self.args.p_bg_factor is None:
-            # p_bg introduces oscillations at low speed
-            self.args.p_bg_factor = 0.0
+    def __init__(self, cfg: DictConfig):
+        super().__init__(cfg)
 
         # relaxation configurations
-        if self.args.mode == "rlx":
+        if self.case.mode == "rlx":
             self._set_default_rlx()
 
-        if args.r0_type == "relaxed":
+        if self.case.r0_type == "relaxed":
             self._load_only_fluid = False
             self._init_pos2D = self._get_relaxed_r0
             self._init_pos3D = self._get_relaxed_r0

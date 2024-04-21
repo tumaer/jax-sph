@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# # # ####### 2D Dam break
-python main.py --case=DB --solver=RIE --dim=2 --dx=0.02 --t-end=7.5 --dt=0.0002 --viscosity=0.0 --free-slip --write-every=50 --write-h5 --seed=123 --data-path=data_valid/db2d_Riemann --density-evolution --eta-limiter=3 --u_ref=2
+####### 2D Dam break
+python main.py config=cases/db.yaml case.u_ref=2 case.viscosity=0.0 solver.name=RIE solver.t_end=7.5 solver.dt=0.0002 solver.free_slip=True solver.eta_limiter=3 io.write_every=50 io.data_path=data_valid/db2d_Riemann/
 
 # Run validation script
-python validation/validate.py --case=2D_DB --src_dir="data_valid/db2d_Riemann"
-
+python validation/validate.py --case=2D_DB --src_dir=data_valid/db2d_Riemann/

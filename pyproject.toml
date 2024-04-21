@@ -18,6 +18,7 @@ pyvista = ">=0.42.2" # for visualization
 jax = "0.4.23"
 jaxlib = "0.4.23"
 jax-md = "0.2.8"
+omegaconf = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = ">=3.3.1"

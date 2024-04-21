@@ -76,7 +76,7 @@ axs[1].set_ylabel("h(x = 0) / H")
 axs[1].set_title("Time evolution of the height")
 
 now = datetime.datetime.now()
-# plt.savefig(f'dambreak_data{now:%Y-%m-%d %H:%M:%S}.png')
+# plt.savefig(f"dambreak_data{now:%Y-%m-%d %H:%M:%S}.png")
 plt.close()
 
 pressure_profile = pd.read_csv("sph_data/Buchner_pressureProfile.csv")

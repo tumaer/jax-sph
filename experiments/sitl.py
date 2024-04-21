@@ -281,7 +281,7 @@ def train_or_infer(args: argparse.Namespace):
 
     features, _ = data_train[0]
 
-    pbc = jnp.array(metadata["periodic_boundary_conditions"])
+    pbc = jnp.array(metadata["pbc"])
 
     if pbc.any():
         displacement_fn, shift_fn = space.periodic(side=jnp.array(box))

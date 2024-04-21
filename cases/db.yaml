@@ -1,0 +1,28 @@
+extends: JAX_SPH_DEFAULTS
+
+case:
+  source: "db.py"
+  dim: 2
+  dx: 0.02
+  g_ext_magnitude: 1.0
+  u_ref: 1.4142135623730951
+  viscosity: 0.00005
+  special:
+    L_wall: 5.366
+    H_wall: 2.0
+    L: 2.0  # water column length
+    H: 1.0  # water column height
+    W: 0.2  # width in 3D case
+    box_offset: 0.1 # trick to reduce computation using PBC in z-direction
+
+solver:
+  is_bc_trick: True
+  density_evolution: True
+  artificial_alpha: 0.1
+  t_end: 12.0
+  dt: 0.0003
+
+io:
+  write_type: ["h5"]
+  write_every: 100
+  data_path: "data/debug"

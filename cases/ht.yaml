@@ -1,0 +1,27 @@
+extends: JAX_SPH_DEFAULTS
+
+case:
+  source: "ht.py"
+  dim: 2
+  dx: 0.02
+  r0_noise_factor: 0.05
+  g_ext_magnitude: 2.3
+  kappa_ref: 7.313  # value at 50°C
+  Cp_ref: 305.27  # value at 50°C     
+  special:
+    hot_wall_temperature: 1.23  # nondimensionalized corresponding to 100
+    hot_wall_half_width: 0.25
+
+
+solver:
+  t_end: 1.5
+  heat_conduction: True
+  is_bc_trick: True
+
+eos:
+  p_bg_factor: 0.05
+
+io:
+  write_type: ["h5"]
+  write_every: 100
+  data_path: "data/debug"

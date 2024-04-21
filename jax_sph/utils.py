@@ -9,6 +9,7 @@ import numpy as np
 from jax import ops, vmap
 from jax_md import partition, space
 from numpy import array
+from omegaconf import DictConfig
 
 from jax_sph.io_state import read_h5
 from jax_sph.kernel import QuinticKernel
@@ -98,11 +99,11 @@ def get_val_max(state: Dict, var: str = "u"):
     return max
 
 
-def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
+def sph_interpolator(cfg: DictConfig, src_path: str, prop_type: str = "vector"):
     """Interpolate properties from a `state` to arbitrary coordinates, e.g. a line.
 
     Args:
-        args: Simulation arguments.
+        cfg: Simulation arguments.
         src_path: used only for instantiating the neighbors object.
         prop_type: Whether the target will be of vectorial or scalar type.
 
@@ -111,7 +112,7 @@ def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
     """
     state = read_h5(src_path)
     N = len(state["r"])
-    dim = args.dim
+    dim = cfg.case.dim
 
     mask_bc = jnp.isin(state["tag"], wall_tags)
 
@@ -138,11 +139,11 @@ def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
         x = jnp.where(mask_bc, x_wall, x)
         return x
 
-    kernel_fn = QuinticKernel(h=args.dx, dim=args.dim)
+    kernel_fn = QuinticKernel(h=cfg.case.dx, dim=cfg.case.dim)
 
     if prop_type == "vector" or prop_type == "scalar":
-        box_size = np.array(args.bounds)[:, 1]
-        if np.array(args.periodic_boundary_conditions).sum() > 0:
+        box_size = np.array(cfg.case.bounds)[:, 1]
+        if np.array(cfg.case.pbc).sum() > 0:
             displacement_fn, shift_fn = space.periodic(side=box_size)
         else:
             displacement_fn, shift_fn = space.free()
@@ -150,8 +151,8 @@ def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
         neighbor_fn = partition.neighbor_list(
             displacement_fn,
             box_size,
-            r_cutoff=3 * args.dx,
-            dr_threshold=3 * args.dx * 0.25,
+            r_cutoff=3 * cfg.case.dx,
+            dr_threshold=3 * cfg.case.dx * 0.25,
             capacity_multiplier=1.25,
             mask_self=False,
             format=partition.Sparse,
@@ -192,10 +193,10 @@ def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
         dist = (((r_target[:, None] - state["r"][None, :]) ** 2).sum(axis=-1)) ** 0.5
         w_dist = kernel_fn.w(dist)
         # weight normalization for non-full support
-        w_norm = w_dist.sum(axis=-1) * args.dx**dim
+        w_norm = w_dist.sum(axis=-1) * cfg.case.dx**dim
 
         u_val = (w_dist * vel[:, dim_ind][None, :]).sum(axis=1)
-        u_val *= args.dx**dim
+        u_val *= cfg.case.dx**dim
         u_val /= w_norm
 
         return u_val
@@ -231,10 +232,10 @@ def sph_interpolator(args, src_path: str, prop_type: str = "vector"):
         dist = (((r_target[:, None] - state["r"][None, :]) ** 2).sum(axis=-1)) ** 0.5
         w_dist = kernel_fn.w(dist)
         # weight normalization for non-full support
-        w_norm = w_dist.sum(axis=-1) * args.dx**dim
+        w_norm = w_dist.sum(axis=-1) * cfg.case.dx**dim
 
         p_val = (w_dist * p).sum(axis=1)
-        p_val *= args.dx**dim
+        p_val *= cfg.case.dx**dim
         p_val /= w_norm
 
         return p_val

@@ -26,8 +26,14 @@ EPS = jnp.finfo(float).eps
 class SimulationSetup(ABC):
     """Parent class for all simulation setups."""
 
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, cfg):
+        # If a value is changed in one of these, it also changes in the others
+        self.cfg = cfg
+        self.case = cfg.case
+        self.special = cfg.case.special
+
+        if cfg.case.r0_type == "relaxed":
+            assert (cfg.case.state0_path is not None) and ("r" in cfg.case.state0_keys)
 
     def initialize(self):
         """Initialize and return everything needed for the numerical setup.
@@ -44,7 +50,7 @@ class SimulationSetup(ABC):
 
         Returns: A tuple containing the following elements:
 
-           - args (Namespace): configuration arguments
+           - cfg (DictConfig): configuration arguments
            - box_size (ndarray): size of the simulation box starting at 0.0
            - state (dict): dictionary containing all field values
            - g_ext_fn (Callable): external force function
@@ -55,80 +61,69 @@ class SimulationSetup(ABC):
            - shift_fn (Callable): shift function for position updates
         """
 
-        # check whether these variables were defined in the child class
-        assert hasattr(self.args, "g_ext_magnitude"), AttributeError
-        assert hasattr(self.args, "is_bc_trick"), AttributeError
-        assert hasattr(self.args, "p_bg_factor"), AttributeError
+        cfg = self.cfg
+        dx = cfg.case.dx
+        dim = cfg.case.dim
+        rho_ref = cfg.case.rho_ref
+        viscosity = cfg.case.viscosity
+        u_ref = cfg.case.u_ref
+        cfl = cfg.solver.cfl
 
-        args = self.args
-
-        key_prng = jax.random.PRNGKey(args.seed)
-
-        # reference temperature, kappa, cp
-        T_ref = 1.0
-        kappa_ref = 0.0 if not hasattr(args, "kappa") else args.kappa
-        Cp_ref = 0.0 if not hasattr(args, "Cp") else args.Cp
+        key_prng = jax.random.PRNGKey(cfg.seed)
 
         # Primal: reference density, dynamic viscosity, and velocity
-        rho_ref = 1.00
-        eta_ref = args.viscosity
-        args.u_ref = 1.0 if args.u_ref is None else args.u_ref
-        gamma_eos = 1.0
-        print(f"Using gamma_EoS={gamma_eos}.")
         # Derived: reference speed of sound, pressure
-        args.c_ref = 10.0 * args.u_ref
-        p_ref = rho_ref * args.c_ref**2 / gamma_eos
-        # for free surface simulation p_background has to be 0
-        p_bg = args.p_bg_factor * p_ref
+        c_ref = cfg.case.c_ref_factor * u_ref
+        p_ref = rho_ref * c_ref**2 / cfg.eos.gamma
+        # for free surface simulation p_background in the EoS has to be 0.0
+        p_bg = cfg.eos.p_bg_factor * p_ref
 
         # calculate volume and mass
-        h = args.dx
-        volume_ref = h**args.dim
+        h = dx
+        volume_ref = h**dim
         mass_ref = volume_ref * rho_ref
 
         # time integration step dt
-        CFL = 0.25
-        dt_convective = CFL * h / (args.c_ref + args.u_ref)
-        dt_viscous = CFL * h**2 * rho_ref / eta_ref if eta_ref != 0.0 else 999
-        dt_body_force = CFL * (h / (self.args.g_ext_magnitude + EPS)) ** 0.5
-        dt = np.amin([dt_convective, dt_viscous, dt_body_force])
+        dt_convective = cfl * h / (c_ref + u_ref)
+        dt_viscous = cfl * h**2 * rho_ref / (viscosity + EPS)
+        dt_body_force = cfl * (h / (cfg.case.g_ext_magnitude + EPS)) ** 0.5
+        dt = np.amin([dt_convective, dt_viscous, dt_body_force]).item()
         # TODO: consider adaptive time step sizes
 
         print("dt_convective :", dt_convective)
         print("dt_viscous    :", dt_viscous)
         print("dt_body_force :", dt_body_force)
-        print("dt_max        :", dt)
+        print("dt_max_allowed:", dt)
 
-        # assert dt > args.dt, ValueError("Explicit dt has to comply with CFL.")
-        if args.dt is not None:
-            if args.dt > dt:
+        if cfg.solver.dt is not None:
+            if cfg.solver.dt > dt:
                 warnings.warn("Explicit dt should comply with CFL.", UserWarning)
-            dt = args.dt
+            dt = cfg.solver.dt
 
         print("dt_final      :", dt)
 
-        if args.mode == "rlx":
+        if cfg.case.mode == "rlx":
             # run a relaxation of randomly initialized state for 500 steps
             sequence_length = 5000
-            args.t_end = dt * sequence_length
+            cfg.solver.t_end = dt * sequence_length
             # turn background pressure on for homogeneous particle distribution
         else:
-            sequence_length = int(args.t_end / dt)
+            sequence_length = int(cfg.solver.t_end / dt)
 
         # Equation of state
-        if args.solver == "RIE":
-            eos = RIEMANNEoS(rho_ref, p_bg, args.u_ref)
+        if cfg.solver.name == "RIE":
+            eos = RIEMANNEoS(rho_ref, p_bg, u_ref)
         else:
-            eos = TaitEoS(p_ref, rho_ref, p_bg, gamma_eos)
+            eos = TaitEoS(p_ref, rho_ref, p_bg, cfg.eos.gamma)
 
         # initialize box and positions of particles
-        if args.dim == 2:
+        if dim == 2:
             box_size = self._box_size2D()
-            r = self._init_pos2D(box_size, args.dx)
+            r = self._init_pos2D(box_size, dx)
             tag = self._tag2D(r)
-        elif args.dim == 3:
+        elif dim == 3:
             box_size = self._box_size3D()
-            r = self._init_pos3D(box_size, args.dx)
+            r = self._init_pos3D(box_size, dx)
             tag = self._tag3D(r)
         displacement_fn, shift_fn = space.periodic(side=box_size)
 
@@ -137,25 +132,22 @@ class SimulationSetup(ABC):
 
         # add noise to the fluid particles to break symmetry
         key, subkey = jax.random.split(key_prng)
-        if args.r0_noise_factor != 0.0:
-            noise_std = args.r0_noise_factor * args.dx
+        if cfg.case.r0_noise_factor != 0.0:
+            noise_std = cfg.case.r0_noise_factor * dx
             noise = get_noise_masked(r.shape, tag == Tag.FLUID, subkey, std=noise_std)
             # PBC: move all particles to the box limits after noise addition
             r = shift_fn(r, noise)
 
         # initialize the velocity given the coordinates r with the noise
-        if args.dim == 2:
+        if dim == 2:
             v = vmap(self._init_velocity2D)(r)
-        elif args.dim == 3:
+        elif dim == 3:
             v = vmap(self._init_velocity3D)(r)
 
         # initialize all other field values
-        rho = jnp.ones(num_particles) * rho_ref
-        mass = jnp.ones(num_particles) * mass_ref
-        eta = jnp.ones(num_particles) * eta_ref
-        temp = jnp.ones(num_particles) * T_ref
-        kappa = jnp.ones(num_particles) * kappa_ref
-        Cp = jnp.ones(num_particles) * Cp_ref
+        rho, mass, eta, temperature, kappa, Cp = self._set_field_properties(
+            num_particles, mass_ref, cfg.case
+        )
 
         # initialize the state dictionary
         state = {
@@ -171,28 +163,29 @@ class SimulationSetup(ABC):
             "mass": mass,
             "eta": eta,
             "dTdt": jnp.zeros_like(rho),
-            "T": temp,
+            "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
         }
 
         # overwrite the state dictionary with the provided one
-        if args.state0_path != "none":
-            _state = read_h5(args.state0_path)
+        if cfg.case.state0_path is not None:
+            _state = read_h5(cfg.case.state0_path)
             for k in state:
-                if k not in _state:
-                    warnings.warn(f"Key {k} not found in state0 file.", UserWarning)
+                if k not in cfg.case.state0_keys:
                     continue
+                assert k in _state, ValueError(f"Key {k} not found in state0 file.")
                 assert state[k].shape == _state[k].shape, ValueError(
-                    f"Shape mismatch for key {k} while loading initial state."
+                    f"Shape mismatch for key {k} in state0 file."
                 )
                 state[k] = _state[k]
 
         # the following arguments are needed for dataset generation
-        args.dt, args.sequence_length = dt, sequence_length
-        args.num_particles_max = num_particles
-        args.periodic_boundary_conditions = [True, True, True]
-        args.bounds = np.array([np.zeros_like(box_size), box_size]).T.tolist()
+        cfg.case.c_ref, cfg.case.p_ref, cfg.case.p_bg = c_ref, p_ref, p_bg
+        cfg.solver.dt, cfg.solver.sequence_length = dt, sequence_length
+        cfg.case.num_particles_max = num_particles
+        cfg.case.pbc = [True, True, True]  # TODO: matscipy needs 3D
+        cfg.case.bounds = np.array([np.zeros_like(box_size), box_size]).T.tolist()
 
         state = self._boundary_conditions_fn(state)
 
@@ -200,7 +193,7 @@ class SimulationSetup(ABC):
         bc_fn = self._boundary_conditions_fn
 
         return (
-            args,
+            cfg,
             box_size,
             state,
             g_ext_fn,
@@ -212,11 +205,11 @@ class SimulationSetup(ABC):
         )
 
     @abstractmethod
-    def _box_size2D(self, args):
+    def _box_size2D(self, cfg):
         pass
 
     @abstractmethod
-    def _box_size3D(self, args):
+    def _box_size3D(self, cfg):
         pass
 
     def _init_pos2D(self, box_size, dx):
@@ -252,15 +245,16 @@ class SimulationSetup(ABC):
     def _get_relaxed_r0(self, box_size, dx):
         assert hasattr(self, "_load_only_fluid"), AttributeError
 
-        args = self.args
-        name = "_".join([args.case.lower(), str(args.dim), str(dx), str(args.seed)])
-        init_path = "data_relaxed/" + name + ".h5"
+        cfg = self.cfg
+        name = "_".join([cfg.case.name, str(cfg.case.dim), str(dx), str(cfg.seed)])
+        init_path = os.path.join("data_relaxed", name + ".h5")
 
         if not os.path.isfile(init_path):
             message = (
-                f"python main.py --case={args.case} --mode=rlx --solver=SPH --tvf=1.0 "
-                f"--dim={str(args.dim)} --dx={str(dx)} --seed={str(args.seed)} "
-                f"--write-h5 --r0-noise-factor=0.25 --data-path=data_relaxed"
+                f"python main.py config={cfg.config} mode=rlx seed={str(cfg.seed)} "
+                f"case.dim={str(cfg.case.dim)} case.dx={str(cfg.case.dx)} "
+                f"solver.name=SPH solver.tvf=1 solver.r0_noise_factor=0.25 "
+                f"io.write_type=['h5'] io.data_path=data_relaxed/"
             )
             raise FileNotFoundError(f"First execute this: \n{message}")
 
@@ -269,6 +263,15 @@ class SimulationSetup(ABC):
             return state["r"][state["tag"] == Tag.FLUID]
         else:
             return state["r"]
+
+    def _set_field_properties(self, num_particles, mass_ref, case):
+        rho = jnp.ones(num_particles) * case.rho_ref
+        mass = jnp.ones(num_particles) * mass_ref
+        eta = jnp.ones(num_particles) * case.viscosity
+        temperature = jnp.ones(num_particles) * case.T_ref
+        kappa = jnp.ones(num_particles) * case.kappa_ref
+        Cp = jnp.ones(num_particles) * case.Cp_ref
+        return rho, mass, eta, temperature, kappa, Cp
 
     def _set_default_rlx(self):
         """Set default values for relaxation case setup.
@@ -284,7 +287,7 @@ class SimulationSetup(ABC):
         self._tag3D_rlx = self._tag3D
 
 
-def set_relaxation(Case, args):
+def set_relaxation(Case, cfg):
     """Make a relaxation case from a SimulationSetup instance.
 
     Create a child class of a particular SimulationSetup instance and overwrite:
@@ -300,15 +303,13 @@ def set_relaxation(Case, args):
     class Rlx(Case):
         """Relax particles in a box"""
 
-        def __init__(self, args):
-            super().__init__(args)
+        def __init__(self, cfg):
+            super().__init__(cfg)
 
             # custom variables related only to this Simulation
-            self.args.g_ext_magnitude = 0.0
+            self.case.g_ext_magnitude = 0.0
 
             # use the relaxation setup from the main case
-            self.args.is_bc_trick = self.args.is_bc_trick
-            self.args.p_bg_factor = self.args.p_bg_factor
             self._init_pos2D = self._init_pos2D_rlx
             self._init_pos3D = self._init_pos3D_rlx
             self._box_size2D = self._box_size2D_rlx
@@ -336,4 +337,4 @@ def set_relaxation(Case, args):
 
             return state
 
-    return Rlx(args)
+    return Rlx(cfg)

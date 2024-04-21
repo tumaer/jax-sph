@@ -8,9 +8,22 @@ JAX-SPH [(Toshev et al., 2024)](https://arxiv.org/abs/2403.04750) is a modular J
 - Riemann SPH [(Zhang et al., 2017)](https://www.sciencedirect.com/science/article/abs/pii/S0021999117300438)
 
 ## Installation
-Currently, the code can only be installed by cloning this repository. We recommend using a Poetry or `python3-venv` environment.
 
-### Using Poetry (recommended)
+### Standalone library
+Install the `jax-sph` library from PyPI as
+
+```bash
+python3.10 -m venv venv
+source venv/bin/activate
+pip install jax-sph
+```
+
+By default `jax-sph` is installed without GPU support. If you have a CUDA-capable GPU, follow the instructions in the [GPU support](#gpu-support) section.
+
+### Clone
+We recommend using a `poetry` or `python3-venv` environment.
+
+**Using Poetry**
 ```bash
 poetry config virtualenvs.in-project true
 poetry install
@@ -18,14 +31,13 @@ source .venv/bin/activate
 ```
 Later, you just need to `source .venv/bin/activate` to activate the environment.
 
-### Using `python3-venv`
+**Using `python3-venv`**
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install -e . # to install jax_sph in interactive mode
 ```
-
 Later, you just need to `source venv/bin/activate` to activate the environment.
 
 ### GPU Support
@@ -42,19 +54,19 @@ In the following, a quick setup guide for different cases is presented.
 ### Running an SPH Simulation
 - Standard SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --solver=SPH --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py config=cases/tgv.yaml solver.name=SPH solver.tvf=0.0
  ```
 - Transport velocity SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --tvf=1.0 --solver=SPH --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py config=cases/tgv.yaml solver.name=SPH solver.tvf=1.0
  ```
 - Riemann SPH 2D Taylor Green vortex
 ```bash
-python main.py --case=TGV --tvf=1.0 --solver=RIE --dim=2 --dx=0.02 --t-end=5 --seed=123 --write-h5 --write-every=25 --data-path="data/tgv2d_notvf/"
+python main.py config=cases/tgv.yaml solver.name=RIE solver.tvf=0.0
  ```
 -  Thermal diffusion
 ```bash
-python main.py --case=HT --solver=SPH --density-evolution --heat-conduction --dim=2 --dx=0.02 --t-end=1.5 --write-h5 --write-vtk --r0-noise-factor=0.05 --outlet-temperature-derivative --data-path="data/therm_diff/"
+python main.py config=ht.yaml
 ```
 
 ### Solver-in-the-Loop
@@ -67,7 +79,7 @@ The presented inverse problem of finding the initial state of a 100-step-long SP
 The presented validation of the gradients through the solver can be fully reproduced using the notebook [./experiments/grads.ipynb](./experiments/grads.ipynb)
 
 ## Setting up a case
-To set up a case, just add it to the `cases/` directory. Every case should inherit from `SimulationSetup` in `jax_sph/case_setup.py` or from another case. Running a case in relaxation mode `--mode=rlx` overwrites the selected case, and passed CLI arguments overwrite any argument.
+To set up a case, just add a `my_case.py` and a `my_case.yaml` file to the `cases/` directory. Every *.py case should inherit from `SimulationSetup` in `jax_sph/case_setup.py` or another case, and every *.yaml config file should either contain a complete set of parameters (see `jax_sph/defaults.py`) or extend `JAX_SPH_DEFAULTS`. Running a case in relaxation mode `case.mode=rlx` overwrites certain parts of the selected case. Passed CLI arguments overwrite any argument.
 
 ## Development and Contribution
 If you wish to contribute, please run
