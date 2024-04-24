@@ -101,3 +101,6 @@ class HT(SimulationSetup):
         state["dTdt"] = jnp.where(mask_outflow, 0.0, state["dTdt"])
 
         return state
+
+    def _init_density(self, r):
+        return jnp.ones(jnp.shape(r)[0:1]) * self.case.rho_ref

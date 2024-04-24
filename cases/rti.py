@@ -1,45 +1,44 @@
-"""Cube of water falling under gravity case setup"""
+"""Rayleigh-Taylor Instability case setup"""
+
 
 import jax.numpy as jnp
 import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
+from jax_sph.utils import Tag
 
 
-class CW(SimulationSetup):
-    """Cube of Water Experiment"""
+class RTI(SimulationSetup):
+    """Rayleigh-Taylor Instability"""
 
     def __init__(self, cfg: DictConfig):
         super().__init__(cfg)
 
         # relaxation configurations
-        if cfg.case.mode == "rlx" or cfg.case.r0_type == "relaxed":
-            raise NotImplementedError("Relaxation not implemented for CW.")
+        if self.case.mode == "rlx":
+            self._set_default_rlx()
+
+        if self.case.r0_type == "relaxed":
+            self._load_only_fluid = False
+            self._init_pos2D = self._get_relaxed_r0
+            self._init_pos3D = self._get_relaxed_r0
 
     def _box_size2D(self):
-        return np.array([self.special.L_wall, self.special.H_wall]) + 6 * self.case.dx
+        return np.array([1.0, 2.0])
 
     def _box_size3D(self):
-        dx6 = 6 * self.case.dx
-        return np.array([self.special.L_wall + dx6, self.special.H_wall + dx6, 0.5])
-
-    def _init_pos2D(self, box_size, dx):
-        dx3 = 3 * self.case.dx
-        walls = pos_box_2d(self.special.L_wall, self.special.H_wall, dx)
-
-        r_fluid = pos_init_cartesian_2d(np.array([self.special.L, self.special.H]), dx)
-        r_fluid += dx3 + np.array(self.special.cube_offset)
-        res = np.concatenate([walls, r_fluid])
-        return res
+        return np.array([1.0, 2.0, 1,0])
 
     def _tag2D(self, r):
+        box_size = self._box_size2D() if self.case.dim == 2 else self._box_size3D()
+
         dx3 = 3 * self.case.dx
         mask_left = jnp.where(r[:, 0] < dx3, True, False)
         mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
-        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dx3, True, False)
-        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dx3, True, False)
+        mask_right = jnp.where(r[:, 0] > box_size[0] - dx3, True, False)
+        mask_top = jnp.where(r[:, 1] >  box_size[1] - dx3, True, False)
+
         mask_wall = mask_left + mask_bottom + mask_right + mask_top
 
         tag = jnp.full(len(r), Tag.FLUID, dtype=int)
@@ -50,8 +49,7 @@ class CW(SimulationSetup):
         return self._tag2D(r)
 
     def _init_velocity2D(self, r):
-        res = jnp.array(self.special.u_init)
-        return res
+        return jnp.zeros_like(r)
 
     def _init_velocity3D(self, r):
         return jnp.zeros_like(r)
@@ -70,6 +68,12 @@ class CW(SimulationSetup):
         state["dvdt"] = jnp.where(mask_wall[:, None], 0.0, state["dvdt"])
         state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state
-
+    
     def _init_density(self, r):
-        return jnp.ones(jnp.shape(r)[0:1]) * self.case.rho_ref
+        rho_ref = self.case.rho_ref
+        rho = jnp.where(
+            r[:,1] > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:,0]),
+            rho_ref[0],
+            rho_ref[1]
+            )
+        return rho

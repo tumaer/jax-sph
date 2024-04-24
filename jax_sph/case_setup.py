@@ -81,8 +81,8 @@ class SimulationSetup(ABC):
         # calculate volume and mass
         h = dx
         volume_ref = h**dim
-        mass_ref = volume_ref * rho_ref
 
+        # TODO: fix for multiphase
         # time integration step dt
         dt_convective = cfl * h / (c_ref + u_ref)
         dt_viscous = cfl * h**2 * rho_ref / (viscosity + EPS)
@@ -110,6 +110,7 @@ class SimulationSetup(ABC):
         else:
             sequence_length = int(cfg.solver.t_end / dt)
 
+        # TODO: fix for multiphase
         # Equation of state
         if cfg.solver.name == "RIE":
             eos = RIEMANNEoS(rho_ref, p_bg, u_ref)
@@ -146,7 +147,7 @@ class SimulationSetup(ABC):
 
         # initialize all other field values
         rho, mass, eta, temperature, kappa, Cp = self._set_field_properties(
-            num_particles, mass_ref, cfg.case
+            num_particles, volume_ref, r, cfg.case
         )
 
         # initialize the state dictionary
@@ -242,6 +243,10 @@ class SimulationSetup(ABC):
     def _boundary_conditions_fn(self, state):
         pass
 
+    @abstractmethod
+    def _init_density(self, r):
+        pass
+
     def _get_relaxed_r0(self, box_size, dx):
         assert hasattr(self, "_load_only_fluid"), AttributeError
 
@@ -264,10 +269,10 @@ class SimulationSetup(ABC):
         else:
             return state["r"]
 
-    def _set_field_properties(self, num_particles, mass_ref, case):
-        rho = jnp.ones(num_particles) * case.rho_ref
-        mass = jnp.ones(num_particles) * mass_ref
-        eta = jnp.ones(num_particles) * case.viscosity
+    def _set_field_properties(self, num_particles, volume_ref, r, case):
+        rho = self._init_density(r)
+        mass = rho * volume_ref
+        eta = rho * case.viscosity
         temperature = jnp.ones(num_particles) * case.T_ref
         kappa = jnp.ones(num_particles) * case.kappa_ref
         Cp = jnp.ones(num_particles) * case.Cp_ref

@@ -103,3 +103,6 @@ class DB(SimulationSetup):
         state["dvdt"] = jnp.where(mask_wall[:, None], 0.0, state["dvdt"])
         state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state
+
+    def _init_density(self, r):
+        return jnp.ones(jnp.shape(r)[0:1]) * self.case.rho_ref

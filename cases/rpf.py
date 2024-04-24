@@ -52,3 +52,6 @@ class RPF(SimulationSetup):
 
     def _boundary_conditions_fn(self, state):
         return state
+
+    def _init_density(self, r):
+        return jnp.ones(jnp.shape(r)[0:1]) * self.case.rho_ref

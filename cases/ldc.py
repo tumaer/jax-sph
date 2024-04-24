@@ -85,3 +85,6 @@ class LDC(SimulationSetup):
         state["dvdt"] = jnp.where(mask2, 0.0, state["dvdt"])
 
         return state
+
+    def _init_density(self, r):
+        return jnp.ones(jnp.shape(r)[0:1]) * self.case.rho_ref

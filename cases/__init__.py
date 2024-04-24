@@ -6,6 +6,7 @@ from cases.ht import HT
 from cases.ldc import LDC
 from cases.pf import PF
 from cases.rpf import RPF
+from cases.rti import RTI
 from cases.tgv import TGV
 from cases.ut import UTSetup
 
@@ -19,6 +20,7 @@ def select_case(case_name):
         "pf": PF,
         "cw": CW,
         "db": DB,
+        "rt": RTI,
         "ut": UTSetup,
         "ht": HT,
     }
