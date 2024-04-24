@@ -28,7 +28,7 @@ class RTI(SimulationSetup):
         return np.array([1.0, 2.0])
 
     def _box_size3D(self):
-        return np.array([1.0, 2.0, 1,0])
+        return np.array([1.0, 2.0, 1, 0])
 
     def _tag2D(self, r):
         box_size = self._box_size2D() if self.case.dim == 2 else self._box_size3D()
@@ -37,7 +37,7 @@ class RTI(SimulationSetup):
         mask_left = jnp.where(r[:, 0] < dx3, True, False)
         mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
         mask_right = jnp.where(r[:, 0] > box_size[0] - dx3, True, False)
-        mask_top = jnp.where(r[:, 1] >  box_size[1] - dx3, True, False)
+        mask_top = jnp.where(r[:, 1] > box_size[1] - dx3, True, False)
 
         mask_wall = mask_left + mask_bottom + mask_right + mask_top
 
@@ -68,12 +68,10 @@ class RTI(SimulationSetup):
         state["dvdt"] = jnp.where(mask_wall[:, None], 0.0, state["dvdt"])
         state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state
-    
+
     def _init_density(self, r):
         rho_ref = self.case.rho_ref
         rho = jnp.where(
-            r[:,1] > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:,0]),
-            rho_ref[0],
-            rho_ref[1]
-            )
+            r[:, 1] > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:, 0]), rho_ref[1], rho_ref[0]
+        )
         return rho

@@ -3,8 +3,10 @@ extends: JAX_SPH_DEFAULTS
 case:
   source: "rti.py"
   dim: 2
-  dx: 0.01667
-  rho_ref: [1.8, 1.0]
+  dx: 0.0166666667
+  rho_ref: [1.0, 1.8]
+  g_ext_magnitude: 0.1
+  viscosity: 0.00238095
 
 solver:
   dt: 0.0004
@@ -12,9 +14,9 @@ solver:
   is_bc_trick: True
 
 eos:
-  p_bg_factor: 0.01
+  p_bg_factor: 0.1
 
 io:
-  write_type: ["h5"]
+  write_type: ["h5", "vtk"]
   write_every: 100
   data_path: "data/debug"

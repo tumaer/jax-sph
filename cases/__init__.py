@@ -20,7 +20,7 @@ def select_case(case_name):
         "pf": PF,
         "cw": CW,
         "db": DB,
-        "rt": RTI,
+        "rti": RTI,
         "ut": UTSetup,
         "ht": HT,
     }

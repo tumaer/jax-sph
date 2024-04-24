@@ -74,7 +74,7 @@ class SimulationSetup(ABC):
         # Primal: reference density, dynamic viscosity, and velocity
         # Derived: reference speed of sound, pressure
         c_ref = cfg.case.c_ref_factor * u_ref
-        p_ref = rho_ref * c_ref**2 / cfg.eos.gamma
+        p_ref = rho_ref[0] * c_ref**2 / cfg.eos.gamma
         # for free surface simulation p_background in the EoS has to be 0.0
         p_bg = cfg.eos.p_bg_factor * p_ref
 
@@ -85,7 +85,7 @@ class SimulationSetup(ABC):
         # TODO: fix for multiphase
         # time integration step dt
         dt_convective = cfl * h / (c_ref + u_ref)
-        dt_viscous = cfl * h**2 * rho_ref / (viscosity + EPS)
+        dt_viscous = cfl * h**2 * rho_ref[0] / (viscosity + EPS)
         dt_body_force = cfl * (h / (cfg.case.g_ext_magnitude + EPS)) ** 0.5
         dt = np.amin([dt_convective, dt_viscous, dt_body_force]).item()
         # TODO: consider adaptive time step sizes
@@ -113,9 +113,9 @@ class SimulationSetup(ABC):
         # TODO: fix for multiphase
         # Equation of state
         if cfg.solver.name == "RIE":
-            eos = RIEMANNEoS(rho_ref, p_bg, u_ref)
+            eos = RIEMANNEoS(rho_ref[0], p_bg, u_ref)
         else:
-            eos = TaitEoS(p_ref, rho_ref, p_bg, cfg.eos.gamma)
+            eos = TaitEoS(p_ref, rho_ref[0], p_bg, cfg.eos.gamma)
 
         # initialize box and positions of particles
         if dim == 2:
