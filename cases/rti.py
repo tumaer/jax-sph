@@ -34,12 +34,10 @@ class RTI(SimulationSetup):
         box_size = self._box_size2D() if self.case.dim == 2 else self._box_size3D()
 
         dx3 = 3 * self.case.dx
-        mask_left = jnp.where(r[:, 0] < dx3, True, False)
         mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
-        mask_right = jnp.where(r[:, 0] > box_size[0] - dx3, True, False)
         mask_top = jnp.where(r[:, 1] > box_size[1] - dx3, True, False)
 
-        mask_wall = mask_left + mask_bottom + mask_right + mask_top
+        mask_wall = mask_bottom + mask_top
 
         tag = jnp.full(len(r), Tag.FLUID, dtype=int)
         tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
