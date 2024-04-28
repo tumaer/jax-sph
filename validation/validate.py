@@ -542,7 +542,7 @@ def val_2D_RTI(val_root, dim=2, save_fig=False):
 
     if save_fig:
         os.makedirs(val_root, exist_ok=True)
-        plt.savefig(f"{val_root}/2D_LCD.pdf", dpi=300)
+        plt.savefig(f"{val_root}/2D_RTI.pdf", dpi=300)
 
     plt.show()
 
