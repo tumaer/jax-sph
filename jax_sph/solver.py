@@ -39,6 +39,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
         wall_mask_j,
         n_w_j,
         g_ext_i,
+        phase_R,
         **kwargs,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
@@ -59,7 +60,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
             jnp.dot(u_j, -e_ij),
         )
         p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
-        rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
+        rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R, phase_R), rho_j)
 
         U_avg = (u_L + u_R) / 2
         v_avg = (u_i + u_j) / 2
@@ -189,6 +190,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         mask,
         n_w_j,
         g_ext_i,
+        phase_R,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij = e_s
@@ -209,7 +211,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
             jnp.dot(u_j, -e_ij),
         )
         p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
-        rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
+        rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R, phase_R), rho_j)
 
         P_avg = (p_L + p_R) / 2
         rho_avg = (rho_L + rho_R) / 2
@@ -291,7 +293,9 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
     particle hydrodynamics", Adami, Hu, Adams, 2012
     """
 
-    def gwbc_fn(temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N):
+    def gwbc_fn(
+        temperature, rho, tag, phase, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
+    ):
         mask_bc = jnp.isin(tag, wall_tags)
 
         def no_slip_bc_fn(x):
@@ -357,7 +361,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
         p_wall = (p_wall_unnorm + p_wall_ext) / (w_i_sum_wf + EPS)
         p = jnp.where(mask_bc, p_wall, p)
 
-        rho = vmap(eos.rho_fn)(p)
+        rho = vmap(eos.rho_fn)(p, phase)
 
         if is_heat_conduction:
             # wall particles without temperature boundary condition obtain the adjacent
@@ -515,7 +519,7 @@ class WCSPH:
             r, tag, mass, eta = state["r"], state["tag"], state["mass"], state["eta"]
             u, v, dudt, dvdt = state["u"], state["v"], state["dudt"], state["dvdt"]
             rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
-            kappa, Cp = state["kappa"], state["Cp"]
+            phase, kappa, Cp = state["phase"], state["kappa"], state["Cp"]
             temperature, dTdt = state["T"], state["dTdt"]
             N = len(r)
 
@@ -579,6 +583,7 @@ class WCSPH:
                     wall_mask[j_s],
                     n_w[j_s],
                     g_ext[i_s],
+                    phase[j_s],
                 )
                 drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
                 rho = rho + self.dt * drhodt
@@ -591,14 +596,26 @@ class WCSPH:
             ##### Compute primitives
 
             # pressure, and background pressure
-            p = vmap(self.eos.p_fn)(rho)
-            background_pressure_tvf = vmap(self.eos.p_fn)(jnp.zeros_like(p))
+            p = vmap(self.eos.p_fn)(rho, phase)
+            background_pressure_tvf = vmap(self.eos.p_fn)(jnp.zeros_like(p), phase)
 
             #####  Apply BC trick
 
             if self.is_bc_trick and (self.solver == "SPH"):
                 p, rho, u, v, temperature = self._gwbc_fn(
-                    temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
+                    temperature,
+                    rho,
+                    tag,
+                    phase,
+                    u,
+                    v,
+                    p,
+                    g_ext,
+                    i_s,
+                    j_s,
+                    w_dist,
+                    dr_i_j,
+                    N,
                 )
             elif self.is_bc_trick and (self.solver == "RIE"):
                 mask = self._free_weight(fluid_mask[i_s], tag[i_s])
@@ -668,6 +685,7 @@ class WCSPH:
                     mask,
                     n_w[j_s],
                     g_ext[i_s],
+                    phase[j_s],
                 )
             dudt = ops.segment_sum(out, i_s, N)
 
@@ -692,6 +710,7 @@ class WCSPH:
             state = {
                 "r": r,
                 "tag": tag,
+                "phase": phase,
                 "u": u,
                 "v": v,
                 "drhodt": drhodt,

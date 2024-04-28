@@ -6,7 +6,7 @@ import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag
+from jax_sph.utils import Phase, Tag
 
 
 class RTI(SimulationSetup):
@@ -25,32 +25,48 @@ class RTI(SimulationSetup):
             self._init_pos3D = self._get_relaxed_r0
 
     def _box_size2D(self):
-        return np.array([1.0, 2.0])
+        return np.array([1.0, 2.0]) + 6 * self.case.dx
 
     def _box_size3D(self):
-        return np.array([1.0, 2.0, 1, 0])
-
-    def _tag2D(self, r):
-        box_size = self._box_size2D() if self.case.dim == 2 else self._box_size3D()
-
-        dx3 = 3 * self.case.dx
-        mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
-        mask_top = jnp.where(r[:, 1] > box_size[1] - dx3, True, False)
-
-        mask_wall = mask_bottom + mask_top
-
-        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
-        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
-        return tag
-
-    def _tag3D(self, r):
-        return self._tag2D(r)
+        return np.array([1.0, 2.0 + 6 * self.case.dx, 1.0])
 
     def _init_velocity2D(self, r):
         return jnp.zeros_like(r)
 
     def _init_velocity3D(self, r):
         return jnp.zeros_like(r)
+
+    def _tag2D(self, r):
+        r_centered_abs = jnp.abs(r - r.mean(axis=0)) / np.array([1.0, 2.0])
+        mask_water = jnp.where(r_centered_abs.max(axis=1) < 0.5, True, False)
+        tag = jnp.full(len(r), Tag.SOLID_WALL, dtype=int)
+        tag = jnp.where(mask_water, Tag.FLUID, tag)
+        return tag
+
+    def _tag3D(self, r):
+        box_size = self._box_size3D()
+
+        dx3 = 3 * self.case.dx
+        mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
+        mask_top = jnp.where(r[:, 1] > box_size[1] - dx3, True, False)
+        mask_wall = mask_bottom + mask_top
+
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
+        return tag
+
+    def _phase2D(self, r):
+        mask_fluid1 = jnp.where(
+            r[:, 1] + 3 * self.case.dx > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:, 0]),
+            True,
+            False,
+        )
+        phase = jnp.full(len(r), Phase.FLUID_PHASE0, dtype=int)
+        phase = jnp.where(mask_fluid1, Phase.FLUID_PHASE1, phase)
+        return phase
+
+    def _phase3D(self, r):
+        return self._phase2D(r)
 
     def _external_acceleration_fn(self, r):
         res = jnp.zeros_like(r)
@@ -70,6 +86,8 @@ class RTI(SimulationSetup):
     def _init_density(self, r):
         rho_ref = self.case.rho_ref
         rho = jnp.where(
-            r[:, 1] > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:, 0]), rho_ref[1], rho_ref[0]
+            r[:, 1] + 3 * self.case.dx > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:, 0]),
+            rho_ref[1],
+            rho_ref[0],
         )
         return rho

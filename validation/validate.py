@@ -459,6 +459,94 @@ def val_2D_LDC(
     plt.show()
 
 
+def val_2D_RTI(val_root, dim=2, save_fig=False):
+    # get directories with relevant statistics
+    dirs = os.listdir(val_root)
+    if dim == 2:
+        dirs = [d for d in dirs if ("2D_RTI_SPH" in d)]
+    elif dim == 3:
+        raise NotImplementedError
+
+    if len(dirs) > 1:
+        raise ValueError(f"More than one directory found in {val_root}")
+
+    val_dir_path = os.path.join(val_root, dirs[0])
+    files = os.listdir(val_dir_path)
+    files = [f for f in files if (".h5" in f)]
+    files = sorted(files, key=lambda x: int(x.split("_")[1][:-3]))
+
+    state = {}
+    for i in range(0, 3):
+        src_path = files[50 + i * 100]
+        src_path_temp = os.path.join(val_dir_path, src_path)
+        state[str(i)] = read_h5(src_path_temp)
+
+    cfg = OmegaConf.load(os.path.join(val_dir_path, "config.yaml"))
+    dx = np.round(cfg.case.dx, 4)
+    Re = np.round(cfg.case.u_ref / cfg.case.viscosity)  # Reynolds number
+
+    fig, (ax0, ax1, ax2) = plt.subplots(1, 3, figsize=(18, 12))
+    fig.suptitle(f"Re = {int(Re)}, dx = {dx}", fontsize=22)
+    ax0.grid()
+    ax0.scatter(
+        state["0"]["r"][:, 0],
+        state["0"]["r"][:, 1],
+        c=state["0"]["phase"],
+        cmap="Greys",
+        s=12,
+        vmin=-0.3,
+        vmax=1.2,
+    )
+    ax0.set_xlim([3 * dx, 1.0 + 3 * dx])
+    ax0.set_ylim([3 * dx, 2.0 + 3 * dx])
+    ax0.tick_params(
+        left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+    )
+    ax0.set_title("t = 1s", fontsize=16)
+
+    ax1.grid()
+    ax1.scatter(
+        state["1"]["r"][:, 0],
+        state["1"]["r"][:, 1],
+        c=state["1"]["phase"],
+        cmap="Greys",
+        s=12,
+        vmin=-0.3,
+        vmax=1.2,
+    )
+    ax1.set_xlim([3 * dx, 1.0 + 3 * dx])
+    ax1.set_ylim([3 * dx, 2.0 + 3 * dx])
+    ax1.tick_params(
+        left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+    )
+    ax1.set_title("t = 3s", fontsize=16)
+
+    ax2.grid()
+    ax2.scatter(
+        state["2"]["r"][:, 0],
+        state["2"]["r"][:, 1],
+        c=state["1"]["phase"],
+        cmap="Greys",
+        s=12,
+        vmin=-0.3,
+        vmax=1.2,
+    )
+    ax2.set_xlim([3 * dx, 1.0 + 3 * dx])
+    ax2.set_ylim([3 * dx, 2.0 + 3 * dx])
+    ax2.tick_params(
+        left=False, right=False, labelleft=False, labelbottom=False, bottom=False
+    )
+    ax2.set_title("t = 5s", fontsize=16)
+
+    fig.tight_layout()
+
+    if save_fig:
+        os.makedirs(val_root, exist_ok=True)
+        plt.savefig(f"{val_root}/2D_LCD.pdf", dpi=300)
+
+    plt.show()
+
+
 def val_DB(val_root, save_fig=False):
     dirs = os.listdir(val_root)
     dirs = [d for d in dirs if os.path.isdir(os.path.join(val_root, d))]
@@ -654,3 +742,6 @@ if __name__ == "__main__":
 
     elif args.case == "2D_DB":
         val_DB(args.src_dir, save_fig=True)
+
+    elif args.case == "2D_RTI":
+        val_2D_RTI(args.src_dir, save_fig=True)

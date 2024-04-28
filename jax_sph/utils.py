@@ -30,6 +30,15 @@ class Tag(enum.IntEnum):
 wall_tags = jnp.array([tag.value for tag in Tag if "WALL" in tag.name])
 
 
+class Phase(enum.IntEnum):
+    """Differentiate between fluid phases."""
+
+    FLUID_PHASE0 = 0
+    FLUID_PHASE1 = 1
+    FLUID_PHASE2 = 2
+    FLUID_PHASE3 = 3
+
+
 def pos_init_cartesian_2d(box_size: array, dx: float):
     """Create a grid of particles in 2D.
 

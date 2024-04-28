@@ -5,18 +5,18 @@ case:
   dim: 2
   dx: 0.0166666667
   rho_ref: [1.0, 1.8]
-  g_ext_magnitude: 0.1
+  g_ext_magnitude: 1.0
   viscosity: 0.00238095
 
 solver:
-  dt: 0.0004
+  dt: 0.0002
   t_end: 5.0
   is_bc_trick: True
 
 eos:
-  p_bg_factor: 0.1
+  p_bg_factor: 0.02
 
 io:
-  write_type: ["h5", "vtk"]
+  write_type: ["h5"]
   write_every: 100
   data_path: "data/debug"

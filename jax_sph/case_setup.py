@@ -64,7 +64,7 @@ class SimulationSetup(ABC):
         cfg = self.cfg
         dx = cfg.case.dx
         dim = cfg.case.dim
-        rho_ref = cfg.case.rho_ref
+        rho_ref = jnp.asarray(cfg.case.rho_ref)
         viscosity = cfg.case.viscosity
         u_ref = cfg.case.u_ref
         cfl = cfg.solver.cfl
@@ -74,7 +74,7 @@ class SimulationSetup(ABC):
         # Primal: reference density, dynamic viscosity, and velocity
         # Derived: reference speed of sound, pressure
         c_ref = cfg.case.c_ref_factor * u_ref
-        p_ref = rho_ref[0] * c_ref**2 / cfg.eos.gamma
+        p_ref = rho_ref * c_ref**2 / cfg.eos.gamma
         # for free surface simulation p_background in the EoS has to be 0.0
         p_bg = cfg.eos.p_bg_factor * p_ref
 
@@ -82,10 +82,9 @@ class SimulationSetup(ABC):
         h = dx
         volume_ref = h**dim
 
-        # TODO: fix for multiphase
         # time integration step dt
         dt_convective = cfl * h / (c_ref + u_ref)
-        dt_viscous = cfl * h**2 * rho_ref[0] / (viscosity + EPS)
+        dt_viscous = cfl * h**2 * jnp.min(rho_ref) / (viscosity + EPS)
         dt_body_force = cfl * (h / (cfg.case.g_ext_magnitude + EPS)) ** 0.5
         dt = np.amin([dt_convective, dt_viscous, dt_body_force]).item()
         # TODO: consider adaptive time step sizes
@@ -110,23 +109,25 @@ class SimulationSetup(ABC):
         else:
             sequence_length = int(cfg.solver.t_end / dt)
 
-        # TODO: fix for multiphase
-        # Equation of state
-        if cfg.solver.name == "RIE":
-            eos = RIEMANNEoS(rho_ref[0], p_bg, u_ref)
-        else:
-            eos = TaitEoS(p_ref, rho_ref[0], p_bg, cfg.eos.gamma)
-
         # initialize box and positions of particles
         if dim == 2:
             box_size = self._box_size2D()
             r = self._init_pos2D(box_size, dx)
             tag = self._tag2D(r)
+            phase = self._phase2D(r)
         elif dim == 3:
             box_size = self._box_size3D()
             r = self._init_pos3D(box_size, dx)
             tag = self._tag3D(r)
+            phase = self._phase3D(r)
         displacement_fn, shift_fn = space.periodic(side=box_size)
+
+        # TODO: fix for multiphase
+        # Equation of state
+        if cfg.solver.name == "RIE":
+            eos = RIEMANNEoS(rho_ref, p_bg, u_ref)
+        else:
+            eos = TaitEoS(p_ref, rho_ref, p_bg, cfg.eos.gamma)
 
         num_particles = len(r)
         print("Total number of particles = ", num_particles)
@@ -154,13 +155,14 @@ class SimulationSetup(ABC):
         state = {
             "r": r,
             "tag": tag,
+            "phase": phase,
             "u": v,
             "v": v,
             "dudt": jnp.zeros_like(v),
             "dvdt": jnp.zeros_like(v),
             "drhodt": jnp.zeros_like(rho),
             "rho": rho,
-            "p": eos.p_fn(rho),
+            "p": eos.p_fn(rho, phase),
             "mass": mass,
             "eta": eta,
             "dTdt": jnp.zeros_like(rho),
@@ -182,7 +184,9 @@ class SimulationSetup(ABC):
                 state[k] = _state[k]
 
         # the following arguments are needed for dataset generation
-        cfg.case.c_ref, cfg.case.p_ref, cfg.case.p_bg = c_ref, p_ref, p_bg
+        cfg.case.c_ref = c_ref
+        cfg.case.p_ref = np.ndarray.tolist(np.asarray(p_ref))
+        cfg.case.p_bg = np.ndarray.tolist(np.asarray(p_bg))
         cfg.solver.dt, cfg.solver.sequence_length = dt, sequence_length
         cfg.case.num_particles_max = num_particles
         cfg.case.pbc = [True, True, True]  # TODO: matscipy needs 3D
@@ -228,6 +232,14 @@ class SimulationSetup(ABC):
         pass
 
     @abstractmethod
+    def _phase2D(self, r):
+        pass
+
+    @abstractmethod
+    def _phase3D(self, r):
+        pass
+
+    @abstractmethod
     def _init_velocity2D(self, r):
         pass
 
@@ -241,10 +253,6 @@ class SimulationSetup(ABC):
 
     @abstractmethod
     def _boundary_conditions_fn(self, state):
-        pass
-
-    @abstractmethod
-    def _init_density(self, r):
         pass
 
     def _get_relaxed_r0(self, box_size, dx):

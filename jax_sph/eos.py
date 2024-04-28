@@ -31,12 +31,15 @@ class TaitEoS(BaseEoS):
         self.p_bg = p_background
         self.gamma = gamma
 
-    def p_fn(self, rho):
-        return self.p_ref * ((rho / self.rho_ref) ** self.gamma - 1) + self.p_bg
+    def p_fn(self, rho, phase):
+        return (
+            self.p_ref[phase] * ((rho / self.rho_ref[phase]) ** self.gamma - 1)
+            + self.p_bg[phase]
+        )
 
-    def rho_fn(self, p):
-        p_temp = p + self.p_ref - self.p_bg
-        return self.rho_ref * (p_temp / self.p_ref) ** (1 / self.gamma)
+    def rho_fn(self, p, phase):
+        p_temp = p + self.p_ref[phase] - self.p_bg[phase]
+        return self.rho_ref[phase] * (p_temp / self.p_ref[phase]) ** (1 / self.gamma)
 
 
 class RIEMANNEoS(BaseEoS):
@@ -51,8 +54,8 @@ class RIEMANNEoS(BaseEoS):
         self.u_ref = u_ref
         self.p_bg = p_background
 
-    def p_fn(self, rho):
-        return 100 * self.u_ref**2 * (rho - self.rho_ref) + self.p_bg
+    def p_fn(self, rho, phase):
+        return 100 * self.u_ref**2 * (rho - self.rho_ref[phase]) + self.p_bg[phase]
 
-    def rho_fn(self, p):
-        return (p - self.p_bg) / (100 * self.u_ref**2) + self.rho_ref
+    def rho_fn(self, p, phase):
+        return (p - self.p_bg[phase]) / (100 * self.u_ref**2) + self.rho_ref[phase]
