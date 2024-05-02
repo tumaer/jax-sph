@@ -88,6 +88,8 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver.kappa = 0  # previously: kappa
     # Whether to apply the heat conduction term
     cfg.solver.heat_conduction = False  # previously: heat-conduction
+    # Specify whether it is a multiphase simulation
+    cfg.solver.multiphase = False
     # Whether to apply boundaty conditions
     cfg.solver.is_bc_trick = False  # new
 

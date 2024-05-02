@@ -502,7 +502,7 @@ def val_2D_RTI(val_root, dim=2, save_fig=False):
     ax0.tick_params(
         left=False, right=False, labelleft=False, labelbottom=False, bottom=False
     )
-    ax0.set_title("t = 1s", fontsize=16)
+    ax0.set_title("t = 1s", fontsize=22)
 
     ax1.grid()
     ax1.scatter(
@@ -519,7 +519,7 @@ def val_2D_RTI(val_root, dim=2, save_fig=False):
     ax1.tick_params(
         left=False, right=False, labelleft=False, labelbottom=False, bottom=False
     )
-    ax1.set_title("t = 3s", fontsize=16)
+    ax1.set_title("t = 3s", fontsize=22)
 
     ax2.grid()
     ax2.scatter(
@@ -536,7 +536,7 @@ def val_2D_RTI(val_root, dim=2, save_fig=False):
     ax2.tick_params(
         left=False, right=False, labelleft=False, labelbottom=False, bottom=False
     )
-    ax2.set_title("t = 5s", fontsize=16)
+    ax2.set_title("t = 5s", fontsize=22)
 
     fig.tight_layout()
 

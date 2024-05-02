@@ -10,9 +10,10 @@ import numpy as np
 from jax import vmap
 from jax_md import space
 
-from jax_sph.eos import RIEMANNEoS, TaitEoS
+from jax_sph.eos import MultiphaseTaitEoS, RIEMANNEoS, TaitEoS
 from jax_sph.io_state import read_h5
 from jax_sph.utils import (
+    Phase,
     Tag,
     get_noise_masked,
     pos_init_cartesian_2d,
@@ -64,7 +65,7 @@ class SimulationSetup(ABC):
         cfg = self.cfg
         dx = cfg.case.dx
         dim = cfg.case.dim
-        rho_ref = jnp.asarray(cfg.case.rho_ref)
+        rho_ref = cfg.case.rho_ref
         viscosity = cfg.case.viscosity
         u_ref = cfg.case.u_ref
         cfl = cfg.solver.cfl
@@ -84,7 +85,7 @@ class SimulationSetup(ABC):
 
         # time integration step dt
         dt_convective = cfl * h / (c_ref + u_ref)
-        dt_viscous = cfl * h**2 * jnp.min(rho_ref) / (viscosity + EPS)
+        dt_viscous = cfl * h**2 * rho_ref / (viscosity + EPS)
         dt_body_force = cfl * (h / (cfg.case.g_ext_magnitude + EPS)) ** 0.5
         dt = np.amin([dt_convective, dt_viscous, dt_body_force]).item()
         # TODO: consider adaptive time step sizes
@@ -126,6 +127,10 @@ class SimulationSetup(ABC):
         # Equation of state
         if cfg.solver.name == "RIE":
             eos = RIEMANNEoS(rho_ref, p_bg, u_ref)
+        elif cfg.solver.multiphase:
+            eos = MultiphaseTaitEoS(
+                p_ref, rho_ref, self.special.rho_ref_factor, p_bg, cfg.eos.gamma
+            )
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, cfg.eos.gamma)
 
@@ -155,21 +160,25 @@ class SimulationSetup(ABC):
         state = {
             "r": r,
             "tag": tag,
-            "phase": phase,
             "u": v,
             "v": v,
             "dudt": jnp.zeros_like(v),
             "dvdt": jnp.zeros_like(v),
             "drhodt": jnp.zeros_like(rho),
             "rho": rho,
-            "p": eos.p_fn(rho, phase),
             "mass": mass,
             "eta": eta,
-            "dTdt": jnp.zeros_like(rho),
-            "T": temperature,
-            "kappa": kappa,
-            "Cp": Cp,
         }
+        if cfg.solver.heat_conduction:
+            state["dTdt"] = jnp.zeros_like(rho)
+            state["T"] = temperature
+            state["kappa"] = kappa
+            state["Cp"] = Cp
+        if cfg.solver.multiphase:
+            state["phase"] = phase
+            state["p"] = eos.p_fn(rho, phase)
+        else:
+            state["p"] = eos.p_fn(rho)
 
         # overwrite the state dictionary with the provided one
         if cfg.case.state0_path is not None:
@@ -184,9 +193,7 @@ class SimulationSetup(ABC):
                 state[k] = _state[k]
 
         # the following arguments are needed for dataset generation
-        cfg.case.c_ref = c_ref
-        cfg.case.p_ref = np.ndarray.tolist(np.asarray(p_ref))
-        cfg.case.p_bg = np.ndarray.tolist(np.asarray(p_bg))
+        cfg.case.c_ref, cfg.case.p_ref, cfg.case.p_bg = c_ref, p_ref, p_bg
         cfg.solver.dt, cfg.solver.sequence_length = dt, sequence_length
         cfg.case.num_particles_max = num_particles
         cfg.case.pbc = [True, True, True]  # TODO: matscipy needs 3D
@@ -223,20 +230,19 @@ class SimulationSetup(ABC):
     def _init_pos3D(self, box_size, dx):
         return pos_init_cartesian_3d(box_size, dx)
 
+    def _phase2D(self, r):
+        phase = jnp.full(len(r), Phase.FLUID_PHASE0, dtype=int)
+        return phase
+
+    def _phase3D(self, r):
+        return self._tag2D(r)
+
     @abstractmethod
     def _tag2D(self, r):
         pass
 
     @abstractmethod
     def _tag3D(self, r):
-        pass
-
-    @abstractmethod
-    def _phase2D(self, r):
-        pass
-
-    @abstractmethod
-    def _phase3D(self, r):
         pass
 
     @abstractmethod
@@ -278,7 +284,7 @@ class SimulationSetup(ABC):
             return state["r"]
 
     def _set_field_properties(self, num_particles, volume_ref, r, case):
-        rho = self._init_density(r)
+        rho = jnp.ones(num_particles) * case.rho_ref
         mass = rho * volume_ref
         eta = rho * case.viscosity
         temperature = jnp.ones(num_particles) * case.T_ref

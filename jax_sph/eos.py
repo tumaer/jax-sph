@@ -1,7 +1,8 @@
 """Equation of state."""
 
-
 from abc import ABC, abstractmethod
+
+import jax.numpy as jnp
 
 
 class BaseEoS(ABC):
@@ -31,14 +32,37 @@ class TaitEoS(BaseEoS):
         self.p_bg = p_background
         self.gamma = gamma
 
+    def p_fn(self, rho, *phase):
+        return self.p_ref * ((rho / self.rho_ref) ** self.gamma - 1) + self.p_bg
+
+    def rho_fn(self, p, *phase):
+        p_temp = p + self.p_ref - self.p_bg
+        return self.rho_ref * (p_temp / self.p_ref) ** (1 / self.gamma)
+
+
+class MultiphaseTaitEoS(BaseEoS):
+    """Tait equation of state for multiphase simulations.
+
+    From: "A generalized wall boundary condition for smoothed particle
+    hydrodynamics", Adami et al 2012
+    """
+
+    def __init__(self, p_ref, rho_ref, rho_ref_factor, p_background, gamma):
+        const = jnp.ones(1)
+        fac = jnp.array(rho_ref_factor).ravel()
+        self.p_ref = p_ref * jnp.concatenate((const, fac))
+        self.rho_ref = rho_ref * jnp.concatenate((const, fac))
+        self.p_bg = p_background  # TODO: unified pb correct?
+        self.gamma = gamma
+
     def p_fn(self, rho, phase):
         return (
             self.p_ref[phase] * ((rho / self.rho_ref[phase]) ** self.gamma - 1)
-            + self.p_bg[phase]
+            + self.p_bg
         )
 
     def rho_fn(self, p, phase):
-        p_temp = p + self.p_ref[phase] - self.p_bg[phase]
+        p_temp = p + self.p_ref[phase] - self.p_bg
         return self.rho_ref[phase] * (p_temp / self.p_ref[phase]) ** (1 / self.gamma)
 
 
@@ -54,8 +78,8 @@ class RIEMANNEoS(BaseEoS):
         self.u_ref = u_ref
         self.p_bg = p_background
 
-    def p_fn(self, rho, phase):
-        return 100 * self.u_ref**2 * (rho - self.rho_ref[phase]) + self.p_bg[phase]
+    def p_fn(self, rho, *phase):
+        return 100 * self.u_ref**2 * (rho - self.rho_ref) + self.p_bg
 
-    def rho_fn(self, p, phase):
-        return (p - self.p_bg[phase]) / (100 * self.u_ref**2) + self.rho_ref[phase]
+    def rho_fn(self, p, *phase):
+        return (p - self.p_bg) / (100 * self.u_ref**2) + self.rho_ref

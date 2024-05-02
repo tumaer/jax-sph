@@ -65,6 +65,7 @@ def simulate(cfg: DictConfig):
         cfg.solver.free_slip,
         cfg.solver.density_renormalize,
         cfg.solver.heat_conduction,
+        cfg.solver.multiphase,
     )
     forward = solver.forward_wrapper()
 
@@ -127,7 +128,8 @@ def simulate(cfg: DictConfig):
             t_ = (step + 1) * cfg.solver.dt
             ekin_ = get_ekin(state, cfg.case.dx)
             u_max_ = get_val_max(state, "u")
-            T_max_ = get_val_max(state, "T")
+            if cfg.solver.heat_conduction:
+                T_max_ = get_val_max(state, "T")
 
             msg = f"{str(step).zfill(digits)}/{cfg.solver.sequence_length}"
             msg += f", t={t_:.4f}, Ekin={ekin_:.7f}, u_max={u_max_:.4f}"

@@ -30,6 +30,7 @@ class Tag(enum.IntEnum):
 wall_tags = jnp.array([tag.value for tag in Tag if "WALL" in tag.name])
 
 
+# TODO: Better to have two vectors? e.g. does one want Fluid as seperate Tag?
 class Phase(enum.IntEnum):
     """Differentiate between fluid phases."""
 

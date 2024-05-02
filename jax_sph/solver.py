@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jax import ops, vmap
 from jax_md import space
 
-from jax_sph.eos import RIEMANNEoS, TaitEoS
+from jax_sph.eos import MultiphaseTaitEoS, RIEMANNEoS, TaitEoS
 from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 from jax_sph.utils import Tag, wall_tags
 
@@ -39,7 +39,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
         wall_mask_j,
         n_w_j,
         g_ext_i,
-        phase_R,
+        *phase_R,
         **kwargs,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
@@ -190,7 +190,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         mask,
         n_w_j,
         g_ext_i,
-        phase_R,
+        *phase_R,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij = e_s
@@ -274,7 +274,7 @@ def artificial_viscosity_fn_wrapper(dx, artificial_alpha, u_ref=1.0):
     return artificial_viscosity_fn
 
 
-def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
+def gwbc_fn_wrapper(is_free_slip, eos):
     """Enforce wall boundary conditions by treating boundary particles in a special way.
 
     If solid walls -> apply BC tricks
@@ -293,9 +293,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
     particle hydrodynamics", Adami, Hu, Adams, 2012
     """
 
-    def gwbc_fn(
-        temperature, rho, tag, phase, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
-    ):
+    def gwbc_fn(rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N, *phase):
         mask_bc = jnp.isin(tag, wall_tags)
 
         def no_slip_bc_fn(x):
@@ -363,22 +361,12 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
 
         rho = vmap(eos.rho_fn)(p, phase)
 
-        if is_heat_conduction:
-            # wall particles without temperature boundary condition obtain the adjacent
-            # fluid temperature
-            t_wall_unnorm = ops.segment_sum(w_j_s_fluid * temperature[j_s], i_s, N)
-            t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-            mask = jnp.isin(tag, jnp.array([Tag.SOLID_WALL, Tag.MOVING_WALL]))
-            t_wall = jnp.where(mask, t_wall, temperature)
-
-            temperature = t_wall
-
-        return p, rho, u, v, temperature
+        return p, rho, u, v
 
     return gwbc_fn
 
 
-def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
+def gwbc_fn_riemann_wrapper(is_free_slip):
     """Riemann solver boundary condition for wall particles."""
     if is_free_slip:
 
@@ -389,24 +377,19 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
         def free_weight(fluid_mask_i, tag_i):
             return jnp.ones_like(tag_i)
 
-    if is_heat_conduction:
+    return free_weight
 
-        def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
-            w_j_s_fluid = w_dist * mask_j_s_fluid
-            # sheparding denominator
-            w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, N)
-            t_wall_unnorm = ops.segment_sum(w_j_s_fluid * temperature[j_s], i_s, N)
-            t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
-            mask = jnp.isin(tag, jnp.array([Tag.SOLID_WALL, Tag.MOVING_WALL]))
-            t_wall = jnp.where(mask, t_wall, temperature)
-            temperature = t_wall
-            return temperature
-    else:
 
-        def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
-            return temperature
-
-    return free_weight, heat_bc
+def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
+    w_j_s_fluid = w_dist * mask_j_s_fluid
+    # sheparding denominator
+    w_i_sum_wf = ops.segment_sum(w_j_s_fluid, i_s, N)
+    t_wall_unnorm = ops.segment_sum(w_j_s_fluid * temperature[j_s], i_s, N)
+    t_wall = t_wall_unnorm / (w_i_sum_wf + EPS)
+    mask = jnp.isin(tag, jnp.array([Tag.SOLID_WALL, Tag.MOVING_WALL]))
+    t_wall = jnp.where(mask, t_wall, temperature)
+    temperature = t_wall
+    return temperature
 
 
 def limiter_fn_wrapper(eta_limiter, c_ref):
@@ -454,7 +437,7 @@ class WCSPH:
     def __init__(
         self,
         displacement_fn: Callable,
-        eos: Union[TaitEoS, RIEMANNEoS],
+        eos: Union[TaitEoS, RIEMANNEoS, MultiphaseTaitEoS],
         g_ext_fn: Callable,
         dx: float,
         dim: int,
@@ -469,6 +452,7 @@ class WCSPH:
         is_free_slip: bool = False,
         is_rho_renorm: bool = False,
         is_heat_conduction: bool = False,
+        is_multiphase: bool = False,
     ):
         self.displacement_fn = displacement_fn
         self.solver = solver
@@ -480,6 +464,7 @@ class WCSPH:
         self.eos = eos
         self.artificial_alpha = artificial_alpha
         self.is_heat_conduction = is_heat_conduction
+        self.is_multiphase = is_multiphase
 
         _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
         if kernel == "QSK":
@@ -487,10 +472,8 @@ class WCSPH:
         elif kernel == "WC2K":
             self._kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
 
-        self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
-        self._free_weight, self._heat_bc = gwbc_fn_riemann_wrapper(
-            is_free_slip, is_heat_conduction
-        )
+        self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, eos)
+        self._free_weight = gwbc_fn_riemann_wrapper(is_free_slip)
         self._acceleration_tvf_fn = acceleration_tvf_fn_wrapper(self._kernel_fn)
         self._acceleration_riemann_fn = acceleration_riemann_fn_wrapper(
             self._kernel_fn, eos, _beta_fn, eta_limiter
@@ -519,8 +502,11 @@ class WCSPH:
             r, tag, mass, eta = state["r"], state["tag"], state["mass"], state["eta"]
             u, v, dudt, dvdt = state["u"], state["v"], state["dudt"], state["dvdt"]
             rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
-            phase, kappa, Cp = state["phase"], state["kappa"], state["Cp"]
-            temperature, dTdt = state["T"], state["dTdt"]
+            if self.is_multiphase:
+                phase = state["phase"]
+            if self.is_heat_conduction:
+                kappa, Cp = state["kappa"], state["Cp"]
+                temperature, dTdt = state["T"], state["dTdt"]
             N = len(r)
 
             # precompute displacements `dr` and distances `dist`
@@ -569,22 +555,39 @@ class WCSPH:
                 if self.is_rho_renorm:
                     rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
             elif self.is_rho_evol and (self.solver == "RIE"):
-                temp = vmap(self._rho_evol_riemann_fn)(
-                    e_s,
-                    rho[i_s],
-                    rho[j_s],
-                    mass[j_s],
-                    u[i_s],
-                    u[j_s],
-                    p[i_s],
-                    p[j_s],
-                    dr_i_j,
-                    dist,
-                    wall_mask[j_s],
-                    n_w[j_s],
-                    g_ext[i_s],
-                    phase[j_s],
-                )
+                if self.is_multiphase:
+                    temp = vmap(self._rho_evol_riemann_fn)(
+                        e_s,
+                        rho[i_s],
+                        rho[j_s],
+                        mass[j_s],
+                        u[i_s],
+                        u[j_s],
+                        p[i_s],
+                        p[j_s],
+                        dr_i_j,
+                        dist,
+                        wall_mask[j_s],
+                        n_w[j_s],
+                        g_ext[i_s],
+                        phase[j_s],
+                    )
+                else:
+                    temp = vmap(self._rho_evol_riemann_fn)(
+                        e_s,
+                        rho[i_s],
+                        rho[j_s],
+                        mass[j_s],
+                        u[i_s],
+                        u[j_s],
+                        p[i_s],
+                        p[j_s],
+                        dr_i_j,
+                        dist,
+                        wall_mask[j_s],
+                        n_w[j_s],
+                        g_ext[i_s],
+                    )
                 drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
                 rho = rho + self.dt * drhodt
 
@@ -596,34 +599,53 @@ class WCSPH:
             ##### Compute primitives
 
             # pressure, and background pressure
-            p = vmap(self.eos.p_fn)(rho, phase)
-            background_pressure_tvf = vmap(self.eos.p_fn)(jnp.zeros_like(p), phase)
+            if self.is_multiphase:
+                p = vmap(self.eos.p_fn)(rho, phase)
+                background_pressure_tvf = vmap(self.eos.p_fn)(jnp.zeros_like(p), phase)
+            else:
+                p = vmap(self.eos.p_fn)(rho)
+                background_pressure_tvf = vmap(self.eos.p_fn)(jnp.zeros_like(p))
 
             #####  Apply BC trick
 
             if self.is_bc_trick and (self.solver == "SPH"):
-                p, rho, u, v, temperature = self._gwbc_fn(
-                    temperature,
-                    rho,
-                    tag,
-                    phase,
-                    u,
-                    v,
-                    p,
-                    g_ext,
-                    i_s,
-                    j_s,
-                    w_dist,
-                    dr_i_j,
-                    N,
-                )
+                if self.is_multiphase:
+                    p, rho, u, v = self._gwbc_fn(
+                        rho,
+                        tag,
+                        u,
+                        v,
+                        p,
+                        g_ext,
+                        i_s,
+                        j_s,
+                        w_dist,
+                        dr_i_j,
+                        N,
+                        phase,
+                    )
+                else:
+                    p, rho, u, v = self._gwbc_fn(
+                        rho,
+                        tag,
+                        u,
+                        v,
+                        p,
+                        g_ext,
+                        i_s,
+                        j_s,
+                        w_dist,
+                        dr_i_j,
+                        N,
+                    )
             elif self.is_bc_trick and (self.solver == "RIE"):
                 mask = self._free_weight(fluid_mask[i_s], tag[i_s])
-                temperature = self._heat_bc(
-                    fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N
-                )
             elif (not self.is_bc_trick) and (self.solver == "RIE"):
                 mask = jnp.ones_like(tag[i_s])
+            if self.is_heat_conduction and self.is_bc_trick:
+                temperature = heat_bc(
+                    fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N
+                )
 
             ##### compute heat conduction
 
@@ -667,26 +689,47 @@ class WCSPH:
                     p[j_s],
                 )
             elif self.solver == "RIE":
-                out = vmap(self._acceleration_riemann_fn)(
-                    e_s,
-                    dr_i_j,
-                    dist,
-                    rho[i_s],
-                    rho[j_s],
-                    mass[j_s],
-                    mass[i_s],
-                    u[i_s],
-                    u[j_s],
-                    p[i_s],
-                    p[j_s],
-                    eta[i_s],
-                    eta[j_s],
-                    wall_mask[j_s],
-                    mask,
-                    n_w[j_s],
-                    g_ext[i_s],
-                    phase[j_s],
-                )
+                if self.is_multiphase:
+                    out = vmap(self._acceleration_riemann_fn)(
+                        e_s,
+                        dr_i_j,
+                        dist,
+                        rho[i_s],
+                        rho[j_s],
+                        mass[j_s],
+                        mass[i_s],
+                        u[i_s],
+                        u[j_s],
+                        p[i_s],
+                        p[j_s],
+                        eta[i_s],
+                        eta[j_s],
+                        wall_mask[j_s],
+                        mask,
+                        n_w[j_s],
+                        g_ext[i_s],
+                        phase[j_s],
+                    )
+                else:
+                    out = vmap(self._acceleration_riemann_fn)(
+                        e_s,
+                        dr_i_j,
+                        dist,
+                        rho[i_s],
+                        rho[j_s],
+                        mass[j_s],
+                        mass[i_s],
+                        u[i_s],
+                        u[j_s],
+                        p[i_s],
+                        p[j_s],
+                        eta[i_s],
+                        eta[j_s],
+                        wall_mask[j_s],
+                        mask,
+                        n_w[j_s],
+                        g_ext[i_s],
+                    )
             dudt = ops.segment_sum(out, i_s, N)
 
             out_tv = vmap(self._acceleration_tvf_fn)(
@@ -710,7 +753,6 @@ class WCSPH:
             state = {
                 "r": r,
                 "tag": tag,
-                "phase": phase,
                 "u": u,
                 "v": v,
                 "drhodt": drhodt,
@@ -720,11 +762,14 @@ class WCSPH:
                 "p": p,
                 "mass": mass,
                 "eta": eta,
-                "dTdt": dTdt,
-                "T": temperature,
-                "kappa": kappa,
-                "Cp": Cp,
             }
+            if self.is_heat_conduction:
+                state["dTdt"] = dTdt
+                state["T"] = temperature
+                state["kappa"] = kappa
+                state["Cp"] = Cp
+            if self.is_multiphase:
+                state["phase"] = phase
 
             return state
 

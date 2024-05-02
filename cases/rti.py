@@ -83,11 +83,15 @@ class RTI(SimulationSetup):
         state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state
 
-    def _init_density(self, r):
-        rho_ref = self.case.rho_ref
+    def _set_field_properties(self, num_particles, volume_ref, r, case):
         rho = jnp.where(
             r[:, 1] + 3 * self.case.dx > 1 - 0.15 * jnp.sin(2 * jnp.pi * r[:, 0]),
-            rho_ref[1],
-            rho_ref[0],
+            self.case.rho_ref * self.case.special.rho_ref_factor,
+            self.case.rho_ref,
         )
-        return rho
+        mass = rho * volume_ref
+        eta = rho * case.viscosity
+        temperature = jnp.ones(num_particles) * case.T_ref
+        kappa = jnp.ones(num_particles) * case.kappa_ref
+        Cp = jnp.ones(num_particles) * case.Cp_ref
+        return rho, mass, eta, temperature, kappa, Cp
