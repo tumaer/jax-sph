@@ -79,24 +79,24 @@ upon installation to automate the code linting and formatting checks.
 
 ## Citation
 
-The main reference for this code is `toshev2024jaxsph`. If you refer to the code used for dataset generation in LagrangeBench, please cite `toshev2023lagrangebench` directly.
+The main reference for this code is the ICLR'24 workshop paper `toshev2024jaxsph`. If you refer to the code used for dataset generation in LagrangeBench, please cite `toshev2024lagrangebench` directly.
 
 ```bibtex
-@inproceedings{toshev2024jaxsph,
-title      = {JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework},
-author     = {Artur Toshev and Harish Ramachandran and Jonas A. Erbesdobler and Gianluca Galletti and Johannes Brandstetter and Nikolaus A. Adams},
-booktitle  = {ICLR 2024 Workshop on AI4DifferentialEquations In Science},
-year       = {2024},
-url        = {https://openreview.net/forum?id=8X5PXVmsHW}
+@article{toshev2024jax,
+  title={JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework},
+  author={Toshev, Artur P and Ramachandran, Harish and Erbesdobler, Jonas A and Galletti, Gianluca and Brandstetter, Johannes and Adams, Nikolaus A},
+  journal={arXiv preprint arXiv:2403.04750},
+  year={2024}
 }
 ```
+
 ```bibtex
-@inproceedings{toshev2023lagrangebench,
-title      = {LagrangeBench: A Lagrangian Fluid Mechanics Benchmarking Suite},
-author     = {Artur P. Toshev and Gianluca Galletti and Fabian Fritz and Stefan Adami and Nikolaus A. Adams},
-year       = {2023},
-url        = {https://arxiv.org/abs/2309.16342},
-booktitle  = {37th Conference on Neural Information Processing Systems (NeurIPS 2023) Track on Datasets and Benchmarks},
+@article{toshev2024lagrangebench,
+  title={Lagrangebench: A lagrangian fluid mechanics benchmarking suite},
+  author={Toshev, Artur and Galletti, Gianluca and Fritz, Fabian and Adami, Stefan and Adams, Nikolaus},
+  journal={Advances in Neural Information Processing Systems},
+  volume={36},
+  year={2024}
 }
 ```
 
