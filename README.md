@@ -79,7 +79,7 @@ upon installation to automate the code linting and formatting checks.
 
 ## Citation
 
-The main reference for this code is the ICLR'24 workshop paper `toshev2024jaxsph`. If you refer to the code used for dataset generation in LagrangeBench, please cite `toshev2024lagrangebench` directly.
+The main reference for this code is the ICLR'24 workshop paper `toshev2024jax`. If you refer to the code used for dataset generation in LagrangeBench, please cite `toshev2024lagrangebench` directly.
 
 ```bibtex
 @article{toshev2024jax,
