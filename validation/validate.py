@@ -599,7 +599,7 @@ def val_DB(val_root, save_fig=False):
         if save_fig:
             os.makedirs(val_root, exist_ok=True)
             plt.savefig(
-                f"{val_root}/{str(dim)}D_DAM_{str(time_stamps[i])}.pdf",
+                f"{val_root}/{str(dim)}D_DAM_{str(time_stamps[i])}_{str(cfg.solver.name)}.pdf",
                 dpi=300,
             )
 

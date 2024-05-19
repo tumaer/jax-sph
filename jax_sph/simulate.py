@@ -57,6 +57,8 @@ def simulate(cfg: DictConfig):
         cfg.solver.dt,
         cfg.case.c_ref,
         cfg.solver.eta_limiter,
+        cfg.solver.diff_delta,
+        cfg.solver.diff_alpha,
         cfg.solver.name,
         cfg.kernel.name,
         cfg.solver.is_bc_trick,

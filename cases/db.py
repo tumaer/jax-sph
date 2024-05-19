@@ -1,7 +1,6 @@
 """Dam break case setup"""
 
 import jax.numpy as jnp
-import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
@@ -35,36 +34,36 @@ class DB(SimulationSetup):
 
     def _box_size2D(self):
         dx, bo = self.case.dx, self.special.box_offset
-        return np.array(
+        return jnp.array(
             [self.special.L_wall + 6 * dx + bo, self.special.H_wall + 6 * dx + bo]
         )
 
     def _box_size3D(self):
         dx, bo = self.case.dx, self.box_offset
         sp = self.special
-        return np.array([sp.L_wall + 6 * dx + bo, sp.H_wall + 6 * dx + bo, sp.W])
+        return jnp.array([sp.L_wall + 6 * dx + bo, sp.H_wall + 6 * dx + bo, sp.W])
 
     def _init_pos2D(self, box_size, dx):
         sp = self.special
         if self.case.r0_type == "cartesian":
-            r_fluid = 3 * dx + pos_init_cartesian_2d(np.array([sp.L, sp.H]), dx)
+            r_fluid = 3 * dx + pos_init_cartesian_2d(jnp.array([sp.L, sp.H]), dx)
         else:
             r_fluid = self._get_relaxed_r0(None, dx)
 
         walls = pos_box_2d(sp.L_wall, sp.H_wall, dx)
-        res = np.concatenate([walls, r_fluid])
+        res = jnp.concatenate([walls, r_fluid])
         return res
 
     def _init_pos3D(self, box_size, dx):
         # cartesian coordinates in z
         Lz = box_size[2]
-        zs = np.arange(0, Lz, dx) + 0.5 * dx
+        zs = jnp.arange(0, Lz, dx) + 0.5 * dx
 
         # extend 2D points to 3D
         xy = self._init_pos2D(box_size, dx)
-        xy_ext = np.hstack([xy, np.ones((len(xy), 1))])
+        xy_ext = jnp.hstack([xy, jnp.ones((len(xy), 1))])
 
-        r_xyz = np.vstack([xy_ext * [1, 1, z] for z in zs])
+        r_xyz = jnp.vstack([xy_ext * [1, 1, z] for z in zs])
         return r_xyz
 
     def _tag2D(self, r):

@@ -64,7 +64,8 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     ### solver
     cfg.solver = OmegaConf.create({})
 
-    # Solver name. One of "SPH" (standard SPH) or "RIE" (Riemann SPH)
+    # Solver name. One of "SPH" (standard SPH) or "RIE" (Riemann SPH) or
+    # "DELTA" (Delta SPH)
     cfg.solver.name = "SPH"  # previously: solver
     # Transport velocity inclusion factor [0,...,1]
     cfg.solver.tvf = 0.0  # previously: tvf
@@ -92,6 +93,10 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver.multiphase = False
     # Whether to apply boundaty conditions
     cfg.solver.is_bc_trick = False  # new
+    # Delta SPH density diffusion weighting factor
+    cfg.solver.diff_delta = 0.1
+    # Delta SPH acceleratin diffusion weighting factor
+    cfg.solver.diff_alpha = 0.01
 
     ### kernel
     cfg.kernel = OmegaConf.create({})

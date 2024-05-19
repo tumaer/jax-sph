@@ -10,6 +10,7 @@ class BaseKernel(ABC):
     """Base class for SPH interpolation kernels."""
 
     def __init__(self, h: float):
+        self._h = h
         self._one_over_h = 1.0 / h
 
     @abstractmethod
@@ -27,6 +28,7 @@ class QuinticKernel(BaseKernel):
     """The quintic kernel function of Morris."""
 
     def __init__(self, h, dim=3):
+        self._h = h
         self._one_over_h = 1.0 / h
 
         self._normalized_cutoff = 3.0
@@ -51,6 +53,7 @@ class WendlandC2Kernel(BaseKernel):
     """The 5th-order C2 kernel function of Wendland."""
 
     def __init__(self, h, dim=3):
+        self._h = h
         self._one_over_h = 1.0 / h
         self.dim = dim
 
