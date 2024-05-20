@@ -27,67 +27,69 @@ def rho_evol_fn_delta_wrapper(delta, support, c_ref, kernel_fn):
     """Density evolution according to Marrone et al. 2011."""
 
     def rho_evol_fn_delta(
-        rho, mass, r_ij, d_ij, u, grad_w_dist, i_s, j_s, dt, N, fluidmask_j, **kwargs
+        rho, mass, r_ij, d_ij, u, i_s, j_s, dt, N, fluidmask_j, **kwargs
     ):
-        # Density diffusion term
-        # TODO: rewrite function to pre-compute kernelgrad and volumes
-        def L_fn(r_ab, d_ab, m_b, rho_b):
-            # TODO: check sign for kernel gradient
+        # compute common quantities
+        def quantities_fn(r_ab, d_ab, m_a, m_b, rho_a, rho_b):
             e_ab = r_ab / (d_ab + EPS)
             kernel_grad = kernel_fn.grad_w(d_ab) * (e_ab)
+            V_a = m_a / rho_a
             V_b = m_b / rho_b
+            return kernel_grad, V_a, V_b
+
+        kernel_grad, V_i, V_j = vmap(quantities_fn)(
+            r_ij, d_ij, mass[i_s], mass[j_s], rho[i_s], rho[j_s]
+        )
+
+        def L_fn(r_ab, kernel_grad, V_b):
             return jnp.tensordot(-r_ab, kernel_grad * V_b, axes=0)
 
-        temp = vmap(L_fn)(r_ij, d_ij, mass[j_s], rho[j_s])
+        temp = vmap(L_fn)(r_ij, kernel_grad, V_j)
         L_mat = jnp.linalg.inv(ops.segment_sum(temp, i_s, N))
+        # TODO: check whether this is really the same
         # temp = vmap(L_fn)(-r_ij, d_ij, mass[i_s], rho[i_s])
         # L_j = jnp.linalg.inv(ops.segment_sum(temp, j_s, N))
 
-        def rho_grad_fn(r_ab, d_ab, rho_a, rho_b, L_a, m_b):
-            # TODO: check sign for kernel gradient
-            e_ab = r_ab / (d_ab + EPS)
-            kernel_grad = kernel_fn.grad_w(d_ab) * (e_ab)
-            V_b = m_b / rho_b
+        def rho_grad_fn(rho_a, rho_b, L_a, kernel_grad, V_b):
             return (rho_b - rho_a) * jnp.dot(L_a, kernel_grad * V_b)
 
-        temp = vmap(rho_grad_fn)(r_ij, d_ij, rho[i_s], rho[j_s], L_mat[i_s], mass[j_s])
+        temp = vmap(rho_grad_fn)(rho[i_s], rho[j_s], L_mat[i_s], kernel_grad, V_j)
         rho_grad_term_i = ops.segment_sum(temp, i_s, N)
-        temp = vmap(rho_grad_fn)(-r_ij, d_ij, rho[j_s], rho[i_s], L_mat[j_s], mass[i_s])
+        temp = vmap(rho_grad_fn)(rho[j_s], rho[i_s], L_mat[j_s], -kernel_grad, V_i)
         rho_grad_term_j = ops.segment_sum(temp, i_s, N)
 
         def rho_diff_fn(
             rho_i,
             rho_j,
-            m_j,
             r_ij,
             d_ij,
             rho_grad_term_i,
             rho_grad_term_j,
             fluidmask_j,
+            kernel_grad,
+            V_j,
         ):
             rho_term = 2 * (rho_j - rho_i) * (-r_ij) / (d_ij + EPS) ** 2
-
-            # TODO: check sign for kernel gradient
             psi_ij = rho_term - rho_grad_term_i - rho_grad_term_j
-            e_ij = r_ij / (d_ij + EPS)
-            kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij)
-
-            return jnp.dot(psi_ij, kernel_grad) * m_j / rho_j * fluidmask_j
+            return jnp.dot(psi_ij, kernel_grad) * V_j * fluidmask_j
 
         temp = vmap(rho_diff_fn)(
             rho[i_s],
             rho[j_s],
-            mass[j_s],
             r_ij,
             d_ij,
             rho_grad_term_i[i_s],
             rho_grad_term_j[j_s],
             fluidmask_j,
+            kernel_grad,
+            V_j,
         )
         diff_term = ops.segment_sum(temp, i_s, N)
 
-        v_j_s = (mass / rho)[j_s]
-        temp = v_j_s * ((u[i_s] - u[j_s]) * grad_w_dist).sum(axis=1)
+        def cont_eq(u_i, u_j, kernel_grad, V_j):
+            return jnp.dot(u_i - u_j, kernel_grad) * V_j
+
+        temp = vmap(cont_eq)(u[i_s], u[j_s], kernel_grad, V_j)
         drhodt = (
             rho * ops.segment_sum(temp, i_s, N) + c_ref * delta * support * diff_term
         )
@@ -270,7 +272,7 @@ def acceleration_delta_fn_wrapper(kernel_fn, alpha, support, c_ref, rho_ref):
         # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
         p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
 
-        # compute the common prefactor `_c`
+        # compute the common prefactor `c`
         weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
         kernel_grad = kernel_fn.grad_w(d_ij)
         c = weighted_volume * kernel_grad / (d_ij + EPS)
@@ -709,7 +711,6 @@ class WCSPH:
                     dr_i_j,
                     dist,
                     u,
-                    grad_w_dist,
                     i_s,
                     j_s,
                     self.dt,
