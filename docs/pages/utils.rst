@@ -15,6 +15,6 @@ Input/Output
 
 Defaults
 --------
-.. automodule:: jax_sph.args
+.. automodule:: jax_sph.defaults
     :members:
     :exclude-members: __init__, __delattr__, __setattr__, __hash__, __eq__, __repr__, __weakref__

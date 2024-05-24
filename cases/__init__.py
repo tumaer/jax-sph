@@ -13,13 +13,13 @@ from cases.ut import UTSetup
 def select_case(case_name):
     """Select a simulation case to run"""
     cases = {
-        "TGV": TGV,
-        "RPF": RPF,
-        "LDC": LDC,
-        "PF": PF,
-        "CW": CW,
-        "DB": DB,
-        "UT": UTSetup,
-        "HT": HT,
+        "tgv": TGV,
+        "rpf": RPF,
+        "ldc": LDC,
+        "pf": PF,
+        "cw": CW,
+        "db": DB,
+        "ut": UTSetup,
+        "ht": HT,
     }
     return cases[case_name]

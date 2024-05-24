@@ -1,0 +1,22 @@
+extends: JAX_SPH_DEFAULTS
+
+seed: 123 
+
+case:
+  source: "rpf.py"
+  dim: 2
+  dx: 0.025
+  viscosity: 0.1
+  g_ext_magnitude: 1.0
+
+solver:
+  dt: 0.0005
+  t_end: 100.0
+
+eos:
+  p_bg_factor: 0.05
+
+io:
+  write_type: ["h5"]
+  write_every: 10
+  data_path: "data/debug"

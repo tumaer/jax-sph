@@ -5,15 +5,16 @@ import os
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
+from omegaconf import OmegaConf
 
-from jax_sph.io_state import read_args, read_h5
+from jax_sph.io_state import read_h5
 from jax_sph.utils import Tag
 
 
 def paper_plots(data_dir, plt_dir, steps):
     """Create the three plots from the paper appendix."""
 
-    metadata = vars(read_args(f"{data_dir}/args.txt"))
+    metadata = OmegaConf.load(os.path.join(data_dir, "config.yaml"))
 
     for idx in steps:
         filename = f"{data_dir}/traj_{idx:04d}.h5"
@@ -33,8 +34,8 @@ def paper_plots(data_dir, plt_dir, steps):
             s=20,
         )
         ax.scatter(r[wall_mask][:, 0], r[wall_mask][:, 1], c="black", s=20)
-        ax.set_xlim(metadata["bounds"][0])
-        ax.set_ylim(metadata["bounds"][1])
+        ax.set_xlim(metadata.case.bounds[0])
+        ax.set_ylim(metadata.case.bounds[1])
         ax.set_aspect("equal")
         ax.set_xticks([])
         ax.set_yticks([])
@@ -69,8 +70,8 @@ def paper_plots(data_dir, plt_dir, steps):
 def docs_gif(data_dir, plt_dir):
     """Create a gif over all 3000 steps of the simulation."""
 
-    metadata = vars(read_args(f"{data_dir}/args.txt"))
-    bounds = metadata["bounds"]
+    metadata = OmegaConf.load(os.path.join(data_dir, "config.yaml"))
+    bounds = metadata.case.bounds
 
     files = os.listdir(data_dir)
     files = [f for f in files if f.endswith(".h5")]
@@ -103,8 +104,8 @@ def docs_gif(data_dir, plt_dir):
             s=20,
         )
         ax.scatter(r[wall_mask][:, 0], r[wall_mask][:, 1], c="black", s=20)
-        ax.set_xlim(metadata["bounds"][0])
-        ax.set_ylim(metadata["bounds"][1])
+        ax.set_xlim(metadata.case.bounds[0])
+        ax.set_ylim(metadata.case.bounds[1])
         ax.set_aspect("equal")
         ax.set_xticks([])
         ax.set_yticks([])

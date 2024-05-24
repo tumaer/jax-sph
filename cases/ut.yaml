@@ -1,0 +1,23 @@
+extends: JAX_SPH_DEFAULTS
+
+case:
+  source: "ut.py"
+  dim: 2
+  dx: 0.02
+  g_ext_magnitude: 1.0
+  u_ref: 1.0
+  special:
+    L_wall: 1.0
+    H_wall: 1.0
+    L: 0.5
+    H: 0.5
+    cube_offset: [0.25, 0.25]
+
+solver:
+  density_evolution: True
+  t_end: 1.0
+
+io:
+  write_type: ["h5"]
+  write_every: 10
+  data_path: "data/debug"

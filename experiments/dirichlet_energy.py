@@ -10,9 +10,10 @@ import numpy as np
 from jax import ops, vmap
 from jax_md import space
 from jax_md.partition import Sparse
+from omegaconf import OmegaConf
 
 from jax_sph import partition
-from jax_sph.io_state import read_args, read_h5
+from jax_sph.io_state import read_h5
 from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 from jax_sph.utils import Tag, pos_init_cartesian_2d
 
@@ -61,7 +62,7 @@ def get_dirichlet_energy_data(path, file_name):
     dirs = os.listdir(path)
     dirs = [d for d in dirs if (file_name in d)]
     dirs = sorted(dirs)[0]
-    args = read_args(os.path.join(path, dirs, "args.txt"))
+    cfg = OmegaConf.load(os.path.join(path, dirs, "config.yaml"))
 
     files = os.listdir(os.path.join(path, dirs))
     files = [f for f in files if (".h5" in f)]
@@ -76,9 +77,9 @@ def get_dirichlet_energy_data(path, file_name):
             "rho": state["rho"],
         }
 
-    dx = args.dx
-    dim = args.dim
-    box_size = jnp.array(args.bounds, float)[:, 1]
+    dx = cfg.case.dx
+    dim = cfg.case.dim
+    box_size = jnp.array(cfg.case.bounds, float)[:, 1]
 
     return quant, dim, dx, box_size
 

@@ -8,8 +8,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from omegaconf import OmegaConf
 
-from jax_sph.io_state import read_args, read_h5
+from jax_sph.io_state import read_h5
 from jax_sph.utils import get_ekin, get_val_max, sph_interpolator, wall_tags
 
 EPS = jnp.finfo(float).eps
@@ -54,17 +55,17 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     nx_found_tvf = {}
     nx_found_Rie = {}
     for dir in dirs_notvf:
-        args = read_args(os.path.join(val_root, notvf, dir, "args.txt"))
-        side_length = args.bounds[0][1] - args.bounds[0][0]
-        nx_found_notvf[round(side_length / args.dx)] = [dir, args]
+        cfg = OmegaConf.load(os.path.join(val_root, notvf, dir, "config.yaml"))
+        side_length = cfg.case.bounds[0][1] - cfg.case.bounds[0][0]
+        nx_found_notvf[round(side_length / cfg.case.dx)] = [dir, cfg]
     for dir in dirs_tvf:
-        args = read_args(os.path.join(val_root, tvf, dir, "args.txt"))
-        side_length = args.bounds[0][1] - args.bounds[0][0]
-        nx_found_tvf[round(side_length / args.dx)] = [dir, args]
+        cfg = OmegaConf.load(os.path.join(val_root, tvf, dir, "config.yaml"))
+        side_length = cfg.case.bounds[0][1] - cfg.case.bounds[0][0]
+        nx_found_tvf[round(side_length / cfg.case.dx)] = [dir, cfg]
     for dir in dirs_Rie:
-        args = read_args(os.path.join(val_root, Rie, dir, "args.txt"))
-        side_length = args.bounds[0][1] - args.bounds[0][0]
-        nx_found_Rie[round(side_length / args.dx)] = [dir, args]
+        cfg = OmegaConf.load(os.path.join(val_root, Rie, dir, "config.yaml"))
+        side_length = cfg.case.bounds[0][1] - cfg.case.bounds[0][0]
+        nx_found_Rie[round(side_length / cfg.case.dx)] = [dir, cfg]
 
     # verify that all requested nx values are available
     for nx in nxs:
@@ -79,10 +80,9 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     for nx in nxs:
         temp = temp + 1
 
-        args_tvf = nx_found_tvf[nx][1]
-        args_notvf = nx_found_tvf[nx][1]
-        args_Rie = nx_found_Rie[nx][1]
-        # dx = args.dx
+        cfg_tvf = nx_found_tvf[nx][1]
+        cfg_notvf = nx_found_tvf[nx][1]
+        cfg_Rie = nx_found_Rie[nx][1]
 
         dir_path_tvf = nx_found_tvf[nx][0]
         dir_path_notvf = nx_found_notvf[nx][0]
@@ -113,28 +113,28 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
                 rend = state["r"]
                 uend = state["u"]
             u_max_vec_tvf[i] = get_val_max(state, "v")
-            e_kin_vec_tvf[i] = get_ekin(state, args_tvf.dx)
+            e_kin_vec_tvf[i] = get_ekin(state, cfg_tvf.case.dx)
         e_kin_vec_tvf /= side_length**dim
         dEdt_tvf = -(e_kin_vec_tvf[1:] - e_kin_vec_tvf[:-1]) / (
-            args_tvf.dt * args_tvf.write_every
+            cfg_tvf.solver.dt * cfg_tvf.io.write_every
         )
 
         for i, filename in enumerate(files_h5_notvf):
             state = read_h5(os.path.join(val_root, notvf, dir_path_notvf, filename))
             u_max_vec_notvf[i] = get_val_max(state, "v")
-            e_kin_vec_notvf[i] = get_ekin(state, args_notvf.dx)
+            e_kin_vec_notvf[i] = get_ekin(state, cfg_notvf.case.dx)
         e_kin_vec_notvf /= side_length**dim
         dEdt_notvf = -(e_kin_vec_notvf[1:] - e_kin_vec_notvf[:-1]) / (
-            args_notvf.dt * args_notvf.write_every
+            cfg_notvf.solver.dt * cfg_notvf.io.write_every
         )
 
         for i, filename in enumerate(files_h5_Rie):
             state = read_h5(os.path.join(val_root, Rie, dir_path_Rie, filename))
             u_max_vec_Rie[i] = get_val_max(state, "v")
-            e_kin_vec_Rie[i] = get_ekin(state, args_Rie.dx)
+            e_kin_vec_Rie[i] = get_ekin(state, cfg_Rie.case.dx)
         e_kin_vec_Rie /= side_length**dim
         dEdt_Rie = -(e_kin_vec_Rie[1:] - e_kin_vec_Rie[:-1]) / (
-            args_Rie.dt * args_Rie.write_every
+            cfg_Rie.solver.dt * cfg_Rie.io.write_every
         )
 
         if dim == 2:
@@ -153,13 +153,13 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         cmap = matplotlib.colormaps["turbo"]
 
         # plot
-        t_tvf = np.linspace(0.0, args_tvf.t_end, len(u_max_vec_tvf))
-        t_notvf = np.linspace(0.0, args_notvf.t_end, len(u_max_vec_notvf))
-        t_Rie = np.linspace(0.0, args_Rie.t_end, len(u_max_vec_Rie))
+        t_tvf = np.linspace(0.0, cfg_tvf.solver.t_end, len(u_max_vec_tvf))
+        t_notvf = np.linspace(0.0, cfg_notvf.solver.t_end, len(u_max_vec_notvf))
+        t_Rie = np.linspace(0.0, cfg_Rie.solver.t_end, len(u_max_vec_Rie))
         if dim == 2:
-            lbl1 = f"SPH + tvf, dx={args_tvf.dx}"
-            lbl2 = f"SPH, dx={args_notvf.dx}"
-            lbl3 = f"Riemann, dx={args_Rie.dx}"
+            lbl1 = f"SPH + tvf, dx={cfg_tvf.case.dx}"
+            lbl2 = f"SPH, dx={cfg_notvf.case.dx}"
+            lbl3 = f"Riemann, dx={cfg_Rie.case.dx}"
             axs1[0].plot(t_tvf, u_max_vec_tvf, x, color=cmap(0.65), label=lbl1)
             axs1[0].plot(t_notvf, u_max_vec_notvf, x, color=cmap(0.1), label=lbl2)
             axs1[0].plot(t_Rie, u_max_vec_Rie, x, color=cmap(0.9), label=lbl3)
@@ -167,9 +167,9 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
             axs1[1].plot(t_notvf, e_kin_vec_notvf, x, color=cmap(0.1), label=lbl2)
             axs1[1].plot(t_Rie, e_kin_vec_Rie, x, color=cmap(0.9), label=lbl3)
         elif dim == 3:
-            lbl1 = f"SPH + tvf, dx={np.round(args_tvf.dx, decimals=3)}"
-            lbl2 = f"SPH, dx={np.round(args_notvf.dx, decimals=3)}"
-            lbl3 = f"Riemann, dx={np.round(args_Rie.dx, decimals=3)}"
+            lbl1 = f"SPH + tvf, dx={np.round(cfg_tvf.case.dx, decimals=3)}"
+            lbl2 = f"SPH, dx={np.round(cfg_notvf.case.dx, decimals=3)}"
+            lbl3 = f"Riemann, dx={np.round(cfg_Rie.case.dx, decimals=3)}"
             axs1[0].plot(t_tvf[:-1], dEdt_tvf, x, color=cmap(0.65), label=lbl1)
             axs1[0].plot(t_notvf[:-1], dEdt_notvf, x, color=cmap(0.1), label=lbl2)
             axs1[0].plot(t_Rie[:-1], dEdt_Rie, x, color=cmap(0.9), label=lbl3)
@@ -180,7 +180,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     # reference solutions in 2D and 3D
     if dim == 2:
         # x-axis
-        t = np.linspace(0.0, args_tvf.t_end, 100)
+        t = np.linspace(0.0, cfg_tvf.solver.t_end, 100)
 
         rho = 1.0
         u_ref = 1.0
@@ -194,7 +194,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
         axs1[0].plot(t, u_max_theory, "k", label="Theory")
         axs1[1].plot(t, e_kin_theory, "k", label="Theory")
     elif dim == 3:
-        Re = 1 / args.viscosity
+        Re = 1 / cfg.case.viscosity
         ref = np.loadtxt(f"./validation/ref/tgv3d_ref_{int(Re)}.txt", delimiter=",")
         num_dots = 50
         every_n = max(len(ref) // num_dots, 1)
@@ -222,14 +222,14 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
     axs1[0].set_yscale("log")
     axs1[0].set_xlabel(r"$t$ [-]")
     axs1[0].set_ylabel(r"$u_{max}$ [-]" if dim == 2 else r"$dE/dt$ [-]")
-    axs1[0].set_xlim([0, args_Rie.t_end])
+    axs1[0].set_xlim([0, cfg_Rie.solver.t_end])
     axs1[0].legend()
     axs1[0].grid()
 
     axs1[1].set_yscale("log")
     axs1[1].set_xlabel(r"$t$ [-]")
     axs1[1].set_ylabel(r"$E_{kin}$ [-]")
-    axs1[1].set_xlim([0, args_Rie.t_end])
+    axs1[1].set_xlim([0, cfg_Rie.solver.t_end])
     axs1[1].legend()
     axs1[1].grid()
 
@@ -313,23 +313,24 @@ def val_2D_LDC(
     files_notvf = [f for f in files_notvf if (".h5" in f)]
     files_notvf = sorted(files_notvf, key=lambda x: int(x.split("_")[1][:-3]))
 
-    args = read_args(os.path.join(val_dir_path_Rie, "args.txt"))
-    Re = 1 / args.viscosity  # Reynolds number
+    cfg = OmegaConf.load(os.path.join(val_dir_path_Rie, "config.yaml"))
+    dx = cfg.case.dx
+    Re = 1 / cfg.case.viscosity  # Reynolds number
 
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(12, 6))
 
-    N = round(1 / args.dx) + 1
+    N = round(1 / dx) + 1
     for i, src_path in enumerate(files_Rie[-1:]):
         # for i, src_path in enumerate(files[-1:]):
         src_path_Rie = os.path.join(val_dir_path_Rie, src_path)
         src_path_tvf = os.path.join(val_dir_path_tvf, src_path)
         src_path_notvf = os.path.join(val_dir_path_notvf, src_path)
         if i == 0:
-            interp_vel_fn = sph_interpolator(args, src_path_Rie)
+            interp_vel_fn = sph_interpolator(cfg, src_path_Rie)
 
         # velocity in Y
-        x_axis = jnp.array([args.dx * (3 + i) for i in range(N)])  # (101, )
-        rs = (0.5 + 3 * args.dx) * jnp.ones([x_axis.shape[0], 2])  # (101, 2)
+        x_axis = jnp.array([dx * (3 + i) for i in range(N)])  # (101, )
+        rs = (0.5 + 3 * dx) * jnp.ones([x_axis.shape[0], 2])  # (101, 2)
         rs = rs.at[:, 0].set(x_axis)
         v_val_Rie = interp_vel_fn(src_path_Rie, rs, "u", dim_ind=1)
         v_val_tvf = interp_vel_fn(src_path_tvf, rs, "u", dim_ind=1)
@@ -338,7 +339,7 @@ def val_2D_LDC(
         state = read_h5(src_path_Rie)
         rs = state["r"]
         mask = np.where(
-            (rs[:, 1] > 0.5 + args.dx * 2) * (rs[:, 1] < 0.5 + args.dx * 4), True, False
+            (rs[:, 1] > 0.5 + dx * 2) * (rs[:, 1] < 0.5 + dx * 4), True, False
         )
         x_axis_dots = rs[mask, 0]
         v_val_dots = state["v"][mask, 1]
@@ -347,8 +348,8 @@ def val_2D_LDC(
         v_val_dots = v_val_dots[sorted_indices]
 
         # velocity in x
-        y_axis = jnp.array([args.dx * (3 + i) for i in range(N)])  # (101,)
-        rs = (0.5 + 3 * args.dx) * jnp.ones([y_axis.shape[0], 2])  # (101, 2)
+        y_axis = jnp.array([dx * (3 + i) for i in range(N)])  # (101,)
+        rs = (0.5 + 3 * dx) * jnp.ones([y_axis.shape[0], 2])  # (101, 2)
         rs = rs.at[:, 1].set(y_axis)
         u_val_Rie = interp_vel_fn(src_path_Rie, rs, "u", dim_ind=0)
         u_val_tvf = interp_vel_fn(src_path_tvf, rs, "u", dim_ind=0)
@@ -357,22 +358,22 @@ def val_2D_LDC(
         cmap = matplotlib.colormaps["turbo"]
 
         ax2.plot(
-            np.asarray(x_axis - 3 * args.dx),
+            np.asarray(x_axis - 3 * dx),
             np.asarray(v_val_tvf),
             color=cmap(0.65),
-            label=f"SPH + tvf, dx={args.dx}",
+            label=f"SPH + tvf, dx={dx}",
         )
         ax2.plot(
-            np.asarray(x_axis - 3 * args.dx),
+            np.asarray(x_axis - 3 * dx),
             np.asarray(v_val_notvf),
             color=cmap(0.1),
-            label=f"SPH, dx={args.dx}",
+            label=f"SPH, dx={dx}",
         )
         ax2.plot(
-            np.asarray(x_axis - 3 * args.dx),
+            np.asarray(x_axis - 3 * dx),
             np.asarray(v_val_Rie),
             color=cmap(0.9),
-            label=f"Riemann, dx={args.dx}",
+            label=f"Riemann, dx={dx}",
         )
         ax2.set_xlim([0, 1])
         ax2.set_ylim([-0.6, 0.5])
@@ -387,15 +388,9 @@ def val_2D_LDC(
         ax3.set_xlabel("U(y)")
         ax4.set_ylabel("y")
 
-        ax3.plot(
-            np.asarray(u_val_Rie), np.asarray(y_axis - 3 * args.dx), color=cmap(0.9)
-        )
-        ax3.plot(
-            np.asarray(u_val_tvf), np.asarray(y_axis - 3 * args.dx), color=cmap(0.65)
-        )
-        ax3.plot(
-            np.asarray(u_val_notvf), np.asarray(y_axis - 3 * args.dx), color=cmap(0.1)
-        )
+        ax3.plot(np.asarray(u_val_Rie), np.asarray(y_axis - 3 * dx), color=cmap(0.9))
+        ax3.plot(np.asarray(u_val_tvf), np.asarray(y_axis - 3 * dx), color=cmap(0.65))
+        ax3.plot(np.asarray(u_val_notvf), np.asarray(y_axis - 3 * dx), color=cmap(0.1))
 
     # getting the reference data
     u_vel = pd.read_csv("validation/ref/ldc_data_u_vel.csv")
@@ -468,9 +463,10 @@ def val_DB(val_root, save_fig=False):
     dirs = os.listdir(val_root)
     dirs = [d for d in dirs if os.path.isdir(os.path.join(val_root, d))]
     assert len(dirs) == 1, f"Expected only one directory in {val_root}"
-    args = read_args(os.path.join(val_root, dirs[0], "args.txt"))
-    assert args.dt == 0.0002 or args.dt == 0.0001 or args.dt == 0.0003
-    assert args.dx == 0.02 or args.dx == 0.01
+    cfg = OmegaConf.load(os.path.join(val_root, dirs[0], "config.yaml"))
+    dx, dt, dim = cfg.case.dx, cfg.solver.dt, cfg.case.dim
+    assert dt in [0.0002, 0.0001, 0.0003]
+    assert dx == 0.02 or dx == 0.01
 
     files = os.listdir(os.path.join(val_root, dirs[0]))
     files_h5 = [f for f in files if (".h5" in f)]
@@ -482,7 +478,7 @@ def val_DB(val_root, save_fig=False):
 
     L_wall = 5.366
 
-    step_max = np.array(np.rint(args.t_end / args.dt), dtype=int)
+    step_max = np.array(np.rint(cfg.solver.t_end / dt), dtype=int)
     digits = len(str(step_max))
 
     time_stamps = [1.62, 2.38, 4.0, 5.21, 6.02, 7.23]
@@ -500,14 +496,14 @@ def val_DB(val_root, save_fig=False):
         mask_wall = jnp.isin(tag, wall_tags)
         p = np.where(mask_wall, 0.0, p)
 
-        mask_lower = r[:, 1] < 2.0 + 3 * args.dx
+        mask_lower = r[:, 1] < 2.0 + 3 * dx
         r = r[mask_lower]
         p = p[mask_lower]
 
         _ = plt.figure(figsize=(10, 4))
         plt.scatter(r[:, 0], r[:, 1], c=p, cmap="turbo", s=1, vmin=-0.0, vmax=1)
-        plt.xlim([0, L_wall + 6 * args.dx])
-        plt.ylim([0, 2 + 3 * args.dx])
+        plt.xlim([0, L_wall + 6 * dx])
+        plt.ylim([0, 2 + 3 * dx])
         plt.yticks([0, 0.5, 1, 1.5, 2], fontsize=20)
         plt.xticks([0, 1, 2, 3, 4, 5], fontsize=20)
         plt.tight_layout()
@@ -515,7 +511,8 @@ def val_DB(val_root, save_fig=False):
         if save_fig:
             os.makedirs(val_root, exist_ok=True)
             plt.savefig(
-                f"{val_root}/{str(args.dim)}D_DAM_{str(time_stamps[i])}.pdf", dpi=300
+                f"{val_root}/{str(dim)}D_DAM_{str(time_stamps[i])}.pdf",
+                dpi=300,
             )
 
     plt.show()
@@ -582,35 +579,34 @@ def val_2D_PF(
     dirs = os.listdir(val_dir_path)
     dirs = [d for d in dirs if os.path.isdir(os.path.join(val_dir_path, d))]
     assert len(dirs) == 1, f"Expected only one directory in {val_dir_path}"
-    args = read_args(os.path.join(val_dir_path, dirs[0], "args.txt"))
-    assert args.dt == 0.0000005
-    assert args.dx == 0.0166666
+    cfg = OmegaConf.load(os.path.join(val_dir_path, dirs[0], "config.yaml"))
+    dx, dt = cfg.case.dx, cfg.solver.dt
+    assert dt == 0.0000005
+    assert dx == 0.0166666
 
     num_points = 21
     dx_plot = 0.05
-    y_axis = jnp.array([dx_plot * i for i in range(num_points)]) + 3 * args.dx
+    y_axis = jnp.array([dx_plot * i for i in range(num_points)]) + 3 * dx
     rs = 0.2 * jnp.ones([y_axis.shape[0], 2])
     rs = rs.at[:, 1].set(y_axis)
 
-    step_max = np.array(np.rint(args.t_end / args.dt), dtype=int)
+    step_max = np.array(np.rint(cfg.solver.t_end / dt), dtype=int)
     digits = len(str(step_max))
 
     for i, t_val in enumerate(t_dimless):
-        step = np.array(np.rint(t_val / args.dt), dtype=int)
+        step = np.array(np.rint(t_val / dt), dtype=int)
         file_name = "traj_" + str(step).zfill(digits) + ".h5"
         src_path = os.path.join(val_dir_path, dirs[0], file_name)
 
         if i == 0:
-            interp_vel_fn = sph_interpolator(args, src_path)
+            interp_vel_fn = sph_interpolator(cfg, src_path)
 
         u_val = interp_vel_fn(src_path, rs, prop="u", dim_ind=0)
 
         if i == 0:
-            plt.plot(
-                y_axis - 3 * args.dx, u_val, "ko", mfc="none", label=r"SPH, $r_c$=0.05"
-            )
+            plt.plot(y_axis - 3 * dx, u_val, "ko", mfc="none", label=r"SPH, $r_c$=0.05")
         else:
-            plt.plot(y_axis - 3 * args.dx, u_val, "ko", mfc="none")
+            plt.plot(y_axis - 3 * dx, u_val, "ko", mfc="none")
 
     # plot layout
 

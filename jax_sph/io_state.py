@@ -1,9 +1,7 @@
 """Input-output utilities."""
 
-import json
 import os
 import time
-from argparse import Namespace
 from typing import Dict
 
 import h5py
@@ -11,40 +9,21 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 import pyvista
+from omegaconf import DictConfig, OmegaConf
 
 
-def write_args(args: Namespace, file_path: str):
-    """Write argparse arguments to a .txt file using json.
-
-    Args:
-        args: full set of input arguments incl. defaults
-        file_path: e.g. "./data/3D_TGV_<...>/args.txt"
-    """
-
-    with open(file_path, "w") as f:
-        json.dump(vars(args), f)
-
-
-def read_args(file_path: str):
-    """Read argparse arguments from a .txt file using json."""
-    with open(file_path, "r") as f:
-        args_dict = json.load(f)
-    args = Namespace(**(args_dict))
-    return args
-
-
-def io_setup(args: Namespace):
+def io_setup(cfg: DictConfig):
     """Setup the output directory and write the arguments to a .txt file."""
-    case, solver, dim = args.case, args.solver, args.dim
-    dir = args.data_path
+    case, solver, dim = cfg.case.name.upper(), cfg.solver.name, cfg.case.dim
+    dir = cfg.io.data_path
     if not dir.endswith("/"):
         dir += "/"
-    if (args.write_h5 or args.write_vtk) and args.mode != "rlx":
-        dir += str(dim) + "D_" + case + "_" + solver + "_" + str(args.seed)
+    if len(cfg.io.write_type) > 0 and cfg.case.mode == "sim":
+        dir += str(dim) + "D_" + case + "_" + solver + "_" + str(cfg.seed)
         dir += "_" + time.strftime("%Y%m%d-%H%M%S")
 
     os.makedirs(dir, exist_ok=True)
-    write_args(args, os.path.join(dir, "args.txt"))
+    OmegaConf.save(cfg, os.path.join(dir, "config.yaml"))
 
     return dir
 
@@ -63,27 +42,28 @@ def write_vtk(data_dict: Dict, path: str):
     data_pv.save(path)
 
 
-def write_state(step: int, step_max: int, state: Dict, dir: str, args: Namespace):
+def write_state(step: int, state: Dict, dir: str, cfg: DictConfig):
     """Write state to .h5 or .vtk file while simulation is running."""
+    step_max = cfg.solver.sequence_length
     write_normal = (
-        (args.mode != "rlx") and ((step % args.write_every) == 0) and (step >= 0)
+        (cfg.case.mode == "sim") and ((step % cfg.io.write_every) == 0) and (step >= 0)
     )
-    write_relax = (args.mode == "rlx") and (step == (step_max - 1))
+    write_relax = (cfg.case.mode == "rlx") and (step == (step_max - 1))
 
     if write_normal or write_relax:
         digits = len(str(step_max))
         step_str = str(step).zfill(digits)
 
-        if args.mode == "rlx":
-            name = [args.case.lower(), str(args.dim), str(args.dx), str(args.seed)]
-            name = "_".join(name)
+        if cfg.case.mode == "rlx":
+            name = [cfg.case.name, str(cfg.case.dim), str(cfg.case.dx), str(cfg.seed)]
+            name = "_".join(name)  # e.g. "tgv_3_0.02_42"
         else:
             name = "traj_" + step_str
 
-        if args.write_h5:
+        if "h5" in cfg.io.write_type:
             path = os.path.join(dir, name + ".h5")
             write_h5(state, path)
-        if args.write_vtk:
+        if "vtk" in cfg.io.write_type:
             path = os.path.join(dir, name + ".vtk")
             write_vtk(state, path)
 

@@ -1,6 +1,7 @@
 h5py
 jax-md==0.2.8
 jax[cpu]==0.4.23
+omegaconf
 pandas
 pyvista
 scipy==1.12.0

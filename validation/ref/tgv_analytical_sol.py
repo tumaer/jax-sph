@@ -19,7 +19,7 @@ Re = 100  # Reynolds Number
 ### Time step calculation
 
 rho_ref = 1.00
-eta_ref = 0.01
+viscosity = 0.01
 u_ref = 1.0
 gamma_eos = 1.0
 
@@ -34,7 +34,7 @@ mass_ref = volume_ref * rho_ref
 # time integration step dt
 CFL = 0.25
 dt_convective = CFL * h / (c_ref + u_ref)
-dt_viscous = CFL * h**2 * rho_ref / eta_ref
+dt_viscous = CFL * h**2 * rho_ref / viscosity
 dt = np.amin([dt_convective, dt_viscous])
 
 print("dt_convective :", dt_convective)

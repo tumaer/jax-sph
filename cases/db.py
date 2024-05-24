@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import numpy as np
+from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
 from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
@@ -10,16 +11,8 @@ from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
 class DB(SimulationSetup):
     """Dam Break"""
 
-    def __init__(self, args):
-        super().__init__(args)
-
-        if self.args.g_ext_magnitude is None:
-            self.args.g_ext_magnitude = 1.0
-        self.args.is_bc_trick = True
-        if self.args.p_bg_factor is None:
-            self.args.p_bg_factor = 0.0
-        if self.args.u_ref is None:
-            self.args.u_ref = (2 * self.args.g_ext_magnitude * self.H) ** 0.5
+    def __init__(self, cfg: DictConfig):
+        super().__init__(cfg)
 
         # height and length are as presented in
         # A. Colagrossi, "Numerical simulation of interfacial flows by smoothed
@@ -31,39 +24,34 @@ class DB(SimulationSetup):
         # | --------------------------|
         #  <          L_wall         >
 
-        self.L_wall = 5.366
-        self.H_wall = 2.0
-        self.L = 2.0  # length
-        self.H = 1.0  # height
-        self.W = 0.2  # width
-
-        # a trick to reduce computation using PBC in z-direction
-        self.box_offset = 0.1
-
         # relaxation configurations
-        if self.args.mode == "rlx":
-            self.L_wall = self.L
-            self.H_wall = self.H
+        if self.case.mode == "rlx":
+            self.special.L_wall = self.special.L
+            self.special.H_wall = self.special.H
             self._set_default_rlx()
 
-        if args.r0_type == "relaxed":
+        if self.case.r0_type == "relaxed":
             self._load_only_fluid = True
 
     def _box_size2D(self):
-        dx, bo = self.args.dx, self.box_offset
-        return np.array([self.L_wall + 6 * dx + bo, self.H_wall + 6 * dx + bo])
+        dx, bo = self.case.dx, self.special.box_offset
+        return np.array(
+            [self.special.L_wall + 6 * dx + bo, self.special.H_wall + 6 * dx + bo]
+        )
 
     def _box_size3D(self):
-        dx, bo = self.args.dx, self.box_offset
-        return np.array([self.L_wall + 6 * dx + bo, self.H_wall + 6 * dx + bo, self.W])
+        dx, bo = self.case.dx, self.box_offset
+        sp = self.special
+        return np.array([sp.L_wall + 6 * dx + bo, sp.H_wall + 6 * dx + bo, sp.W])
 
     def _init_pos2D(self, box_size, dx):
-        if self.args.r0_type == "cartesian":
-            r_fluid = 3 * dx + pos_init_cartesian_2d(np.array([self.L, self.H]), dx)
+        sp = self.special
+        if self.case.r0_type == "cartesian":
+            r_fluid = 3 * dx + pos_init_cartesian_2d(np.array([sp.L, sp.H]), dx)
         else:
             r_fluid = self._get_relaxed_r0(None, dx)
 
-        walls = pos_box_2d(self.L_wall, self.H_wall, dx)
+        walls = pos_box_2d(sp.L_wall, sp.H_wall, dx)
         res = np.concatenate([walls, r_fluid])
         return res
 
@@ -80,11 +68,11 @@ class DB(SimulationSetup):
         return r_xyz
 
     def _tag2D(self, r):
-        dx3 = 3 * self.args.dx
+        dx3 = 3 * self.case.dx
         mask_left = jnp.where(r[:, 0] < dx3, True, False)
         mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
-        mask_right = jnp.where(r[:, 0] > self.L_wall + dx3, True, False)
-        mask_top = jnp.where(r[:, 1] > self.H_wall + dx3, True, False)
+        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dx3, True, False)
+        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dx3, True, False)
 
         mask_wall = mask_left + mask_bottom + mask_right + mask_top
 
@@ -103,7 +91,7 @@ class DB(SimulationSetup):
 
     def _external_acceleration_fn(self, r):
         res = jnp.zeros_like(r)
-        res = res.at[:, 1].set(-self.args.g_ext_magnitude)
+        res = res.at[:, 1].set(-self.case.g_ext_magnitude)
         return res
 
     def _boundary_conditions_fn(self, state):
