@@ -14,7 +14,7 @@ from jax_sph.case_setup import set_relaxation
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver import WCSPH
-from jax_sph.utils import Tag, get_ekin, get_val_max
+from jax_sph.utils import Logger, Tag
 
 
 def simulate(cfg: DictConfig):
@@ -97,12 +97,18 @@ def simulate(cfg: DictConfig):
 
     # create data directory and dump config.yaml
     dir = io_setup(cfg)
+    # set up progress bar logging
+    logger = Logger(
+        dt=cfg.solver.dt,
+        dx=cfg.case.dx,
+        print_props=cfg.io.print_props,
+        sequence_length=cfg.solver.sequence_length,
+    )
 
     # compile kernel and initialize accelerations
     _state, _neighbors = advance(0.0, state, neighbors)
     _state["v"].block_until_ready()
 
-    digits = len(str(cfg.solver.sequence_length))
     start = time.time()
     for step in range(cfg.solver.sequence_length + 2):
         write_state(step - 1, state, dir, cfg)
@@ -124,14 +130,6 @@ def simulate(cfg: DictConfig):
 
         # update the progress bar
         if step % cfg.io.write_every == 0:
-            t_ = (step + 1) * cfg.solver.dt
-            ekin_ = get_ekin(state, cfg.case.dx)
-            u_max_ = get_val_max(state, "u")
-            T_max_ = get_val_max(state, "T")
-
-            msg = f"{str(step).zfill(digits)}/{cfg.solver.sequence_length}"
-            msg += f", t={t_:.4f}, Ekin={ekin_:.7f}, u_max={u_max_:.4f}"
-            msg += f", T_max={T_max_:.4f}" if cfg.solver.heat_conduction else ""
-            print(msg)
+            logger.print_stats(state, step)
 
     print(f"time: {time.time() - start:.2f} s")
