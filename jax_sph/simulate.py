@@ -8,9 +8,8 @@ from jax import jit
 from jax_md.partition import Sparse
 from omegaconf import DictConfig, OmegaConf
 
-from cases import select_case
 from jax_sph import partition
-from jax_sph.case_setup import set_relaxation
+from jax_sph.case_setup import load_case, set_relaxation
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
 from jax_sph.solver import WCSPH
@@ -27,9 +26,7 @@ def simulate(cfg: DictConfig):
     """
 
     # Case setup
-    # get the config file name, e.g. "cases/cw.py" -> "cw"
-    cfg.case.name = os.path.splitext(os.path.basename(cfg.config))[0]
-    Case = select_case(cfg.case.name)
+    Case = load_case(os.path.dirname(cfg.config), cfg.case.source)
     # if in relaxation mode, wrap the case with the relaxation case
     if cfg.case.mode == "rlx":
         case = set_relaxation(Case, cfg)

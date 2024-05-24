@@ -1,5 +1,6 @@
 """Simulation setup."""
 
+import importlib
 import os
 import warnings
 from abc import ABC, abstractmethod
@@ -34,6 +35,9 @@ class SimulationSetup(ABC):
 
         if cfg.case.r0_type == "relaxed":
             assert (cfg.case.state0_path is not None) and ("r" in cfg.case.state0_keys)
+
+        # get the config file name, e.g. "cases/db.yaml" -> "db"
+        cfg.case.name = os.path.splitext(os.path.basename(cfg.config))[0]
 
     def initialize(self):
         """Initialize and return everything needed for the numerical setup.
@@ -338,3 +342,24 @@ def set_relaxation(Case, cfg):
             return state
 
     return Rlx(cfg)
+
+
+def load_case(case_root: str, case_py_file: str) -> SimulationSetup:
+    """Load Case if `force.py` exists in dataset_path.
+
+    Args:
+        case_root (str): Path to the case root directory, e.g. "cases/".
+        case_py_file (str): Name of the Python case file, e.g. "db.py".
+    """
+
+    file_path = os.path.join(case_root, case_py_file)
+    spec = importlib.util.spec_from_file_location("case_module", file_path)
+    case_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(case_module)
+
+    # the class name has to be capital version of case_py_file without .py extension
+    # e.g. "db.py" -> "DB"
+    class_name = case_py_file.split(".")[0].upper()
+    Case = getattr(case_module, class_name)
+
+    return Case
