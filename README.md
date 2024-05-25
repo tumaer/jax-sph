@@ -66,9 +66,18 @@ python main.py config=cases/tgv.yaml solver.name=RIE solver.tvf=0.0
  ```
 -  Thermal diffusion
 ```bash
-python main.py config=ht.yaml
+python main.py config=cases/ht.yaml
 ```
 
+### Notebooks
+We provide four notebooks demonstrating how to use JAX-SPH:
+- [`tutorial.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/tutorial.ipynb), with a general overview of JAX-SPH and an example how to run the channel flow with hot bottom wall.
+- [`iclr24_grads.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_grads.ipynb), with a validation of the gradients through the solver.
+- [`iclr24_inverse.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_inverse.ipynb), solving the inverse problem of finding the initial state of a 100-step-long SPH simulation.
+- [`iclr24_sitl.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_sitl.ipynb), including training and testing a Solver-in-the-Loop model using the [LagrangeBench](https://github.com/tumaer/lagrangebench) library.
+
+
+<!--
 ### Solver-in-the-Loop
 To train and test our Solver-in-the-Loop model, run the script in [./experiments/sitl.py](./experiments/sitl.py). This file relies on [LagrangeBench](https://github.com/tumaer/lagrangebench), which can be installed by `pip install lagrangebench`. For more information on the training and inference setup, visit the LagrangeBench website.
 
@@ -77,6 +86,7 @@ The presented inverse problem of finding the initial state of a 100-step-long SP
 
 ### Gradient Validation
 The presented validation of the gradients through the solver can be fully reproduced using the notebook [./experiments/grads.ipynb](./experiments/grads.ipynb)
+-->
 
 ## Setting up a case
 To set up a case, just add a `my_case.py` and a `my_case.yaml` file to the `cases/` directory. Every *.py case should inherit from `SimulationSetup` in `jax_sph/case_setup.py` or another case, and every *.yaml config file should either contain a complete set of parameters (see `jax_sph/defaults.py`) or extend `JAX_SPH_DEFAULTS`. Running a case in relaxation mode `case.mode=rlx` overwrites certain parts of the selected case. Passed CLI arguments overwrite any argument.

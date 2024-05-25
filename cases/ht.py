@@ -73,7 +73,7 @@ class HT(SimulationSetup):
 
         # set incoming fluid temperature to reference_temperature
         mask_inflow = mask_fluid * (state["r"][:, 0] < 3 * self.case.dx)
-        state["T"] = jnp.where(mask_inflow, self.cfg.T_ref, state["T"])
+        state["T"] = jnp.where(mask_inflow, self.case.T_ref, state["T"])
         state["dTdt"] = jnp.where(mask_inflow, 0.0, state["dTdt"])
 
         # set the hot wall to hot_wall_temperature.
@@ -83,7 +83,7 @@ class HT(SimulationSetup):
 
         # set the fixed wall to reference_temperature.
         mask_solid = state["tag"] == Tag.SOLID_WALL  # fixed wall
-        state["T"] = jnp.where(mask_solid, self.cfg.T_ref, state["T"])
+        state["T"] = jnp.where(mask_solid, self.case.T_ref, state["T"])
         state["dTdt"] = jnp.where(mask_solid, 0, state["dTdt"])
 
         # ensure static walls have no velocity or acceleration

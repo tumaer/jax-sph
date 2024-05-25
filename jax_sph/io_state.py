@@ -6,7 +6,6 @@ from typing import Dict
 
 import h5py
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 import pyvista
 from omegaconf import DictConfig, OmegaConf
@@ -143,14 +142,6 @@ def dict2pyvista(data_dict):
         data_pv[k] = np.asarray(v)
 
     return data_pv
-
-
-def _plot(r, x, ttl, vmin=None, vmax=None):
-    plt.figure()
-    plt.scatter(r[:, 0], r[:, 1], c=np.array(x), vmin=vmin, vmax=vmax)
-    plt.colorbar()
-    plt.title(ttl)
-    plt.show()
 
 
 if __name__ == "__main__":
