@@ -345,7 +345,7 @@ def set_relaxation(Case, cfg):
 
 
 def load_case(case_root: str, case_py_file: str) -> SimulationSetup:
-    """Load Case if `force.py` exists in dataset_path.
+    """Load Case class from Python file.
 
     Args:
         case_root (str): Path to the case root directory, e.g. "cases/".
