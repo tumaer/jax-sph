@@ -1,0 +1,36 @@
+extends: JAX_SPH_DEFAULTS
+
+case:
+  source: "db_multi.py"
+  dim: 2
+  dx: 0.02
+  g_ext_magnitude: 1.0
+  u_ref: 2 # u_ref of low density fluid
+  viscosity: 0.00005
+  special:
+    L_wall: 5.366
+    H_wall: 2.0
+    L: 2.0  # water column length
+    H: 1.0  # water column height
+    W: 0.2  # width in 3D case
+    box_offset: 0.1 # trick to reduce computation using PBC in z-direction
+    rho_ref_factor: 1000 # rho_ref of high density fluid
+    u_ref_factor: 0.04 # u_ref of high density fluid
+
+solver:
+  is_bc_trick: True
+  free_slip: True
+  density_evolution: True
+  artificial_alpha: 0.0
+  t_end: 0.05
+  dt: 0.0001
+  multiphase: True
+  high_rho_ratio: True
+
+eos:
+  p_bg_factor: 0.002
+
+io:
+  write_type: ["vtk"]
+  write_every: 5
+  data_path: "data/debug"

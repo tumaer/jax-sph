@@ -2,6 +2,7 @@
 
 from cases.cw import CW
 from cases.db import DB
+from cases.db_multi import DB_Multi
 from cases.ht import HT
 from cases.ldc import LDC
 from cases.pf import PF
@@ -20,6 +21,7 @@ def select_case(case_name):
         "pf": PF,
         "cw": CW,
         "db": DB,
+        "db_multi": DB_Multi,
         "rti": RTI,
         "ut": UTSetup,
         "ht": HT,

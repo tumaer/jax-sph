@@ -66,6 +66,7 @@ def simulate(cfg: DictConfig):
         cfg.solver.density_renormalize,
         cfg.solver.heat_conduction,
         cfg.solver.multiphase,
+        cfg.solver.high_rho_ratio,
     )
     forward = solver.forward_wrapper()
 

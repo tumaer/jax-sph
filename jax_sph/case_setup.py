@@ -10,7 +10,7 @@ import numpy as np
 from jax import vmap
 from jax_md import space
 
-from jax_sph.eos import MultiphaseTaitEoS, RIEMANNEoS, TaitEoS
+from jax_sph.eos import MultiphaseHighRhoTaitEoS, MultiphaseTaitEoS, RIEMANNEoS, TaitEoS
 from jax_sph.io_state import read_h5
 from jax_sph.utils import (
     Phase,
@@ -83,6 +83,7 @@ class SimulationSetup(ABC):
         h = dx
         volume_ref = h**dim
 
+        # TODO: timestep should be the minimun of both phases
         # time integration step dt
         dt_convective = cfl * h / (c_ref + u_ref)
         dt_viscous = cfl * h**2 * rho_ref / (viscosity + EPS)
@@ -127,9 +128,18 @@ class SimulationSetup(ABC):
         # Equation of state
         if cfg.solver.name == "RIE":
             eos = RIEMANNEoS(rho_ref, p_bg, u_ref)
-        elif cfg.solver.multiphase:
+        elif cfg.solver.multiphase and not cfg.solver.high_rho_ratio:
             eos = MultiphaseTaitEoS(
                 p_ref, rho_ref, self.special.rho_ref_factor, p_bg, cfg.eos.gamma
+            )
+        elif cfg.solver.multiphase and cfg.solver.high_rho_ratio:
+            eos = MultiphaseHighRhoTaitEoS(
+                u_ref,
+                self.special.u_ref_factor,
+                rho_ref,
+                self.special.rho_ref_factor,
+                p_bg,
+                cfg.eos.gamma,
             )
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, cfg.eos.gamma)

@@ -66,6 +66,34 @@ class MultiphaseTaitEoS(BaseEoS):
         return self.rho_ref[phase] * (p_temp / self.p_ref[phase]) ** (1 / self.gamma)
 
 
+class MultiphaseHighRhoTaitEoS(BaseEoS):
+    """Tait equation of state for multiphase simulations with high densitz ratios.
+
+    From: "A simple SPH algorithm for multi-fluid flow with high density ratios",
+    Monaghan and Rafiee 2012
+    """
+
+    def __init__(
+        self, u_ref, u_ref_factor, rho_ref, rho_ref_factor, p_background, gamma
+    ):
+        const = jnp.ones(1)
+        rho_fac = jnp.array(rho_ref_factor).ravel()
+        u_fac = jnp.array(u_ref_factor).ravel()
+        self.rho_ref = rho_ref * jnp.concatenate((const, rho_fac))
+        self.p_bg = p_background  # TODO: unified pb correct?
+        self.u_ref = u_ref * jnp.concatenate((const, u_fac))
+        self.gamma = gamma
+
+    def p_fn(self, rho, phase):
+        coeff = self.rho_ref[phase] * self.u_ref[phase] ** 2 / self.gamma
+        return coeff * ((rho / self.rho_ref[phase]) ** self.gamma - 1) + self.p_bg
+
+    def rho_fn(self, p, phase):
+        coeff = self.rho_ref[phase] * self.u_ref[phase] ** 2 / self.gamma
+        p_temp = p + coeff - self.p_bg
+        return self.rho_ref[phase] * (p_temp / coeff) ** (1 / self.gamma)
+
+
 class RIEMANNEoS(BaseEoS):
     """Riemann SPH equation of state.
 

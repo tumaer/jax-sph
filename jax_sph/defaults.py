@@ -90,6 +90,8 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver.heat_conduction = False  # previously: heat-conduction
     # Specify whether it is a multiphase simulation
     cfg.solver.multiphase = False
+    # Specify whether a multiphase simulation includes high density rations (> 2)
+    cfg.solver.high_rho_ratio = False
     # Whether to apply boundaty conditions
     cfg.solver.is_bc_trick = False  # new
 

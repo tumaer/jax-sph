@@ -71,12 +71,15 @@ def pos_box_2d(L: float, H: float, dx: float, num_wall_layers: int = 3):
     # horizontal and vertical blocks
     vertical = pos_init_cartesian_2d(np.array([dx3, H + 2 * dx3]), dx)
     horiz = pos_init_cartesian_2d(np.array([L, dx3]), dx)
+    n = np.array((jnp.array([L, H]) / dx).round(), dtype=int)
+    L_round = n[0] * dx
+    H_round = n[1] * dx
 
     # wall: left, bottom, right, top
     wall_l = vertical.copy()
     wall_b = horiz.copy() + np.array([dx3, 0.0])
-    wall_r = vertical.copy() + np.array([L + dx3, 0.0])
-    wall_t = horiz.copy() + np.array([dx3, H + dx3])
+    wall_r = vertical.copy() + np.array([L_round + dx3, 0.0])
+    wall_t = horiz.copy() + np.array([dx3, H_round + dx3])
 
     res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
     return res
