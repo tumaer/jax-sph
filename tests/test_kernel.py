@@ -4,11 +4,28 @@ import numpy as np
 import pytest
 from jax import vmap
 
-from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
+from jax_sph.kernel import (
+    CubicKernel,
+    GaussianKernel,
+    QuinticKernel,
+    SuperGaussianKernel,
+    WendlandC2Kernel,
+    WendlandC4Kernel,
+    WendlandC6Kernel,
+)
 
 
 @pytest.mark.parametrize(
-    "Kernel, dx_factor", [(QuinticKernel, 1), (WendlandC2Kernel, 1.3)]
+    "Kernel, dx_factor",
+    [
+        (CubicKernel, 1),
+        (QuinticKernel, 1),
+        (WendlandC2Kernel, 1.3),
+        (WendlandC4Kernel, 1.3),
+        (WendlandC6Kernel, 1.3),
+        (GaussianKernel, 1),
+        (SuperGaussianKernel, 1),
+    ],
 )
 def test_kernel_1d(Kernel, dx_factor):
     """Test the interpolation kernels in 1 dimension."""

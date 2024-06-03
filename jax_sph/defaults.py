@@ -94,7 +94,14 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     ### kernel
     cfg.kernel = OmegaConf.create({})
 
-    # Kernel name. One of "QSK" (quintic spline kernel) or "WC2K" (Wendland C2 kernel)
+    # Kernel name, choose one of:
+    # "CSK" (cubic spline kernel)
+    # "QSK" (quintic spline kernel)
+    # "WC2K" (Wendland C2 kernel)
+    # "WC4K" (Wendland C4 kernel)
+    # "WC6K" (Wendland C4 kernel)
+    # "GK" (gaussian kernel)
+    # "SGK" (super gaussian kernel)
     cfg.kernel.name = "QSK"  # previously: kernel
     # Smoothing length factor
     cfg.kernel.h_factor = 1.0  # new. Should default to 1.3 WC2K and 1.0 QSK
