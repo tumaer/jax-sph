@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate validation data and validate 2D TGV
-# with number of particles per direction nx = [20, 50, 100]
+# with number of particles per direction nx = [50, 100]
 # Reference result from:
 # "A Transport Velocty [...]", Adami 2012
 

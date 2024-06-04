@@ -166,7 +166,6 @@ class WendlandC6Kernel(BaseKernel):
 
 
 class GaussianKernel(BaseKernel):
-    # TODO: check header
     """The gaussian kernel function of Monaghan."""
 
     def __init__(self, h, dim=3):
@@ -184,7 +183,7 @@ class GaussianKernel(BaseKernel):
 
 
 class SuperGaussianKernel(BaseKernel):
-    # TODO: check header
+    # TODO: We want this? Intendent but negativ in some regions
     """The supergaussian kernel function of Monaghan."""
 
     def __init__(self, h, dim=3):
