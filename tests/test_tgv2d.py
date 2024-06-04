@@ -1,9 +1,9 @@
-import jax.numpy as jnp
-import numpy as np
 import os
-import pytest
 
+import numpy as np
+import pytest
 from omegaconf import OmegaConf
+
 from jax_sph.io_state import read_h5
 from jax_sph.utils import get_ekin, get_val_max
 
@@ -21,10 +21,18 @@ u_max = np.loadtxt("tests/ref/tgv_2d_u_max_ref_Rie.txt")
 ref_Rie = np.vstack((Ekin, u_max))
 
 # get 2D Taylor Green flow SPH solutions by running various simulations
-os.system("python main.py config=cases/tgv.yaml case.mode=rlx solver.tvf=1.0 case.dim=2 case.dx=0.02 seed=123 case.r0_noise_factor=0.25 io.data_path=/tmp/tgv2d_relaxed/ eos.p_bg_factor=0.02")
-os.system("python main.py config=cases/tgv.yaml solver.name=SPH solver.tvf=1.0 case.dim=2 case.dx=0.02 solver.t_end=5 io.write_every=25 case.state0_path=/tmp/tgv2d_relaxed/tgv_2_0.02_123.h5 io.data_path=/tmp/tgv2d_tvf/")
-os.system("python main.py config=cases/tgv.yaml solver.name=SPH solver.tvf=0.0 case.dim=2 case.dx=0.02 solver.t_end=5 io.write_every=25 case.state0_path=/tmp/tgv2d_relaxed/tgv_2_0.02_123.h5 io.data_path=/tmp/tgv2d/")
-os.system("python main.py config=cases/tgv.yaml solver.name=RIE solver.tvf=0.0 case.dim=2 case.dx=0.02 solver.t_end=5 io.write_every=25 case.state0_path=/tmp/tgv2d_relaxed/tgv_2_0.02_123.h5 io.data_path=/tmp/tgv2d_Rie/ solver.density_evolution=True")
+os.system(
+    "python main.py config=cases/tgv.yaml case.mode=rlx solver.tvf=1.0 case.dim=2 case.dx=0.02 seed=123 case.r0_noise_factor=0.25 io.data_path=/tmp/tgv2d_relaxed/ eos.p_bg_factor=0.02"
+)
+os.system(
+    "python main.py config=cases/tgv.yaml solver.name=SPH solver.tvf=1.0 case.dim=2 case.dx=0.02 solver.t_end=5 io.write_every=25 case.state0_path=/tmp/tgv2d_relaxed/tgv_2_0.02_123.h5 io.data_path=/tmp/tgv2d_tvf/"
+)
+os.system(
+    "python main.py config=cases/tgv.yaml solver.name=SPH solver.tvf=0.0 case.dim=2 case.dx=0.02 solver.t_end=5 io.write_every=25 case.state0_path=/tmp/tgv2d_relaxed/tgv_2_0.02_123.h5 io.data_path=/tmp/tgv2d/"
+)
+os.system(
+    "python main.py config=cases/tgv.yaml solver.name=RIE solver.tvf=0.0 case.dim=2 case.dx=0.02 solver.t_end=5 io.write_every=25 case.state0_path=/tmp/tgv2d_relaxed/tgv_2_0.02_123.h5 io.data_path=/tmp/tgv2d_Rie/ solver.density_evolution=True"
+)
 
 dirs = os.listdir("/tmp/tgv2d/")
 dirs_tvf = os.listdir("/tmp/tgv2d_tvf/")
@@ -73,10 +81,15 @@ for i, filename in enumerate(files_h5_Rie):
     Ekin[i] = get_ekin(state, 0.02)
 sol_Rie = np.vstack((Ekin, u_max))
 
-@pytest.mark.parametrize("solution, ref_solution, cfg", [(sol_tvf, ref_tvf, cfg_tvf), (sol, ref, cfg), (sol_Rie, ref_Rie, cfg_Rie)])
+
+@pytest.mark.parametrize(
+    "solution, ref_solution, cfg",
+    [(sol_tvf, ref_tvf, cfg_tvf), (sol, ref, cfg), (sol_Rie, ref_Rie, cfg_Rie)],
+)
 def test_pf2d(solution, ref_solution, cfg):
     """Test whether the Taylor Green flow simulation matches the refernce solution"""
     name = str(cfg.solver.name)
     tvf = str(cfg.solver.tvf)
-    assert np.allclose(solution, ref_solution, atol=1e-2), f"{name} solution with {tvf} tvf does not match the reference solution."
-    
+    assert np.allclose(
+        solution, ref_solution, atol=1e-2
+    ), f"{name} solution with {tvf} tvf does not match the reference solution."

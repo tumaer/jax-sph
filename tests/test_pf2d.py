@@ -1,6 +1,7 @@
+import os
+
 import jax.numpy as jnp
 import numpy as np
-import os
 import pytest
 from omegaconf import OmegaConf
 
@@ -36,6 +37,7 @@ def u_series_exp(y, t, n_max=10):
 
     return res
 
+
 # get analytical solution
 y_axis = np.linspace(0, 1, 21)
 t_dimless = [0.0005, 0.001, 0.005, 0.01]
@@ -43,8 +45,12 @@ for t_val in t_dimless:
     ref = u_series_exp(y_axis, t_val)
 
 # get 2D poiseuille flow SPH solution by running a simulation
-os.system("python main.py config=cases/pf.yaml solver.tvf=1.0 io.write_every=1000 io.data_path=/tmp/pf_tvf_test")
-os.system("python main.py config=cases/pf.yaml solver.tvf=0.0 io.write_every=1000 io.data_path=/tmp/pf_test")
+os.system(
+    "python main.py config=cases/pf.yaml solver.tvf=1.0 io.write_every=1000 io.data_path=/tmp/pf_tvf_test"
+)
+os.system(
+    "python main.py config=cases/pf.yaml solver.tvf=0.0 io.write_every=1000 io.data_path=/tmp/pf_test"
+)
 
 dirs = os.listdir("/tmp/pf_test/")
 dirs = [d for d in dirs if ("2D_PF_SPH" in d)]
@@ -63,7 +69,9 @@ y_axis += 3 * cfg.case.dx
 rs = 0.2 * jnp.ones([y_axis.shape[0], 2])
 rs = rs.at[:, 1].set(y_axis)
 for i in range(len(t_dimless)):
-    file_name = "traj_" + str(int(t_dimless[i] / tvf_cfg.solver.dt)).zfill(digits) + ".h5"
+    file_name = (
+        "traj_" + str(int(t_dimless[i] / tvf_cfg.solver.dt)).zfill(digits) + ".h5"
+    )
     tvf_src_path = os.path.join("/tmp/pf_tvf_test/", dirs_tvf[0], file_name)
     interp_vel_fn_tvf = sph_interpolator(tvf_cfg, tvf_src_path)
     sol_tvf = interp_vel_fn_tvf(tvf_src_path, rs, prop="u", dim_ind=0)
@@ -72,7 +80,10 @@ for i in range(len(t_dimless)):
     interp_vel_fn = sph_interpolator(cfg, src_path)
     sol = interp_vel_fn(src_path, rs, prop="u", dim_ind=0)
 
+
 @pytest.mark.parametrize("solution, ref_solution", [(sol_tvf, ref), (sol, ref)])
 def test_pf2d(solution, ref_solution):
     """Test whether the poiseuille flow simulation matches the analytical solution"""
-    assert np.allclose(solution, ref_solution, atol=1e-2), f"Velocity profile does not match."
+    assert np.allclose(
+        solution, ref_solution, atol=1e-2
+    ), "Velocity profile does not match."
