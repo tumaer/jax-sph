@@ -46,10 +46,12 @@ for t_val in t_dimless:
 
 # get 2D poiseuille flow SPH solution by running a simulation
 os.system(
-    "python main.py config=cases/pf.yaml solver.tvf=1.0 io.write_every=1000 io.data_path=/tmp/pf_tvf_test"
+    "python main.py config=cases/pf.yaml solver.tvf=1.0"
+    + " io.write_every=1000 io.data_path=/tmp/pf_tvf_test"
 )
 os.system(
-    "python main.py config=cases/pf.yaml solver.tvf=0.0 io.write_every=1000 io.data_path=/tmp/pf_test"
+    "python main.py config=cases/pf.yaml solver.tvf=0.0"
+    + " io.write_every=1000 io.data_path=/tmp/pf_test"
 )
 
 dirs = os.listdir("/tmp/pf_test/")
