@@ -44,7 +44,7 @@ Later, you just need to `source venv/bin/activate` to activate the environment.
 If you want to use a CUDA GPU, you first need a running Nvidia driver. And then just follow the instructions [here](https://jax.readthedocs.io/en/latest/installation.html). The whole process could look like this:
 ```bash
 source .venv/bin/activate
-pip install --upgrade "jax[cuda12_pip]==0.4.23" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+pip install -U "jax[cuda12]"
 ```
 
 ## Getting Started

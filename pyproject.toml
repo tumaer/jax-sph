@@ -15,9 +15,9 @@ python = ">=3.9,<=3.11"
 h5py = ">=3.9.0"
 pandas = ">=2.1.4" # for validation
 pyvista = ">=0.42.2" # for visualization
-jax = "0.4.23"
-jaxlib = "0.4.23"
-jax-md = "0.2.8"
+jax = {version = "0.4.28", extras = ["cpu"]}
+jaxlib = "0.4.28"
+jax-md = {git = "https://github.com/jax-md/jax-md.git", rev = "c451353f6ddcab031f660befda256d8a4f657855"}
 omegaconf = "^2.3.0"
 
 [tool.poetry.group.dev.dependencies]
