@@ -1,7 +1,6 @@
 h5py
-jax-md==0.2.8
-jax[cpu]==0.4.23
+-e git+https://github.com/jax-md/jax-md.git@c451353f6ddcab031f660befda256d8a4f657855#egg=jax-md
+jax[cpu]==0.4.28
 omegaconf
 pandas
 pyvista
-scipy==1.12.0
