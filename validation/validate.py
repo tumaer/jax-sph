@@ -11,7 +11,7 @@ import pandas as pd
 from omegaconf import OmegaConf
 
 from jax_sph.io_state import read_h5
-from jax_sph.utils import get_ekin, get_val_max, sph_interpolator, wall_tags
+from jax_sph.utils import get_array_stats, get_ekin, sph_interpolator, wall_tags
 
 EPS = jnp.finfo(float).eps
 
@@ -112,7 +112,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
             elif i == 440:
                 rend = state["r"]
                 uend = state["u"]
-            u_max_vec_tvf[i] = get_val_max(state, "v")
+            u_max_vec_tvf[i] = get_array_stats(state, "v")
             e_kin_vec_tvf[i] = get_ekin(state, cfg_tvf.case.dx)
         e_kin_vec_tvf /= side_length**dim
         dEdt_tvf = -(e_kin_vec_tvf[1:] - e_kin_vec_tvf[:-1]) / (
@@ -121,7 +121,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
 
         for i, filename in enumerate(files_h5_notvf):
             state = read_h5(os.path.join(val_root, notvf, dir_path_notvf, filename))
-            u_max_vec_notvf[i] = get_val_max(state, "v")
+            u_max_vec_notvf[i] = get_array_stats(state, "v")
             e_kin_vec_notvf[i] = get_ekin(state, cfg_notvf.case.dx)
         e_kin_vec_notvf /= side_length**dim
         dEdt_notvf = -(e_kin_vec_notvf[1:] - e_kin_vec_notvf[:-1]) / (
@@ -130,7 +130,7 @@ def val_TGV(val_root, dim=2, nxs=[50, 100], save_fig=False):
 
         for i, filename in enumerate(files_h5_Rie):
             state = read_h5(os.path.join(val_root, Rie, dir_path_Rie, filename))
-            u_max_vec_Rie[i] = get_val_max(state, "v")
+            u_max_vec_Rie[i] = get_array_stats(state, "v")
             e_kin_vec_Rie[i] = get_ekin(state, cfg_Rie.case.dx)
         e_kin_vec_Rie /= side_length**dim
         dEdt_Rie = -(e_kin_vec_Rie[1:] - e_kin_vec_Rie[:-1]) / (

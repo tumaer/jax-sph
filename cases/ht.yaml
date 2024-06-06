@@ -25,3 +25,4 @@ io:
   write_type: ["h5"]
   write_every: 100
   data_path: "data/debug"
+  print_props: ["Ekin", "u_max", "T_max"]

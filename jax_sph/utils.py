@@ -87,16 +87,58 @@ def get_ekin(state: Dict, dx: float):
     return 0.5 * ekin * dx ** v.shape[1]
 
 
-def get_val_max(state: Dict, var: str = "u"):
-    """Extract the largest magnitude of `state["var"]`.
+def get_array_stats(state: Dict, var: str = "u", operation="max"):
+    """Extract the min, max, or mean of `state["var"]`.
 
-    For vectorial quantities, the magnitude is the Euclidean norm.
+    For vectorial quantities, use the Euclidean norm.
+
+    Args:
+        state: Simulation state dictionary.
+        var: Variable to extract, i.e. dict key.
+        operation: One of "min", "max", "mean".
     """
+    operations = {"min": jnp.min, "max": jnp.max, "mean": jnp.mean}
+    func = operations[operation]
+
     if jnp.size(state[var].shape) > 1:
-        max = jnp.sqrt(jnp.square(state[var]).sum(axis=1)).max()
+        val_array = jnp.sqrt(jnp.square(state[var]).sum(axis=1))
     else:
-        max = jnp.absolute(state[var]).max()
-    return max
+        val_array = state[var]  # TODO: check difference to jnp.absolute(state[var])
+    return func(val_array)
+
+
+def get_stats(state: Dict, props: list, dx: float):
+    """Extract values from `state` for printing."""
+
+    res = {}
+    for prop in props:
+        if prop == "Ekin":
+            res[prop] = get_ekin(state, dx)
+        else:
+            var, operation = prop.split("_")  # e.g. "u_max"
+            res[prop] = get_array_stats(state, var, operation)
+    return res
+
+
+class Logger:
+    """Logger for printing stats to stdout."""
+
+    def __init__(self, dt, dx, print_props, sequence_length) -> None:
+        self.dt = dt
+        self.dx = dx
+        self.print_props = print_props
+        self.sequence_length = sequence_length
+        self.digits = len(str(sequence_length))
+
+    def print_stats(self, state, step):
+        t_ = (step + 1) * self.dt
+
+        stats_dict = get_stats(state, self.print_props, self.dx)
+        stats_str = ", ".join([f"{k}={v:.5f}" for k, v in stats_dict.items()])
+
+        msg = f"{str(step).zfill(self.digits)}/{self.sequence_length}"
+        msg += f", t={t_:.4f}, {stats_str}"
+        print(msg)
 
 
 def sph_interpolator(cfg: DictConfig, src_path: str, prop_type: str = "vector"):
