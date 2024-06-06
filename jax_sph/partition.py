@@ -22,10 +22,10 @@ from jax_md.partition import (
     NeighborListFormat,
     _displacement_or_metric_to_metric_sq,
     _neighboring_cells,
-    _shift_array,
     cell_list,
     is_format_valid,
     is_sparse,
+    shift_array,
     space,
 )
 from jax_md.partition import neighbor_list as vmap_neighbor_list
@@ -190,7 +190,7 @@ def _scan_neighbor_list(
         ):  # here the expansion happens over all adjacent cells happens
             if onp.all(dindex == 0):
                 continue
-            cell_idx += [_shift_array(idx, dindex)]  # 27* (nx,ny,nz,cell_capacity, 1)
+            cell_idx += [shift_array(idx, dindex)]  # 27* (nx,ny,nz,cell_capacity, 1)
 
         cell_idx = jnp.concatenate(cell_idx, axis=-2)
         cell_idx = cell_idx[..., jnp.newaxis, :, :]  # (nx,ny,nz,1,27*cell_capacity, 1)
@@ -290,7 +290,7 @@ def _scan_neighbor_list(
                     if onp.all(dindex == 0):
                         continue
                     cell_idx += [
-                        _shift_array(idx, dindex)
+                        shift_array(idx, dindex)
                     ]  # 27* (nx,ny,nz,cell_capacity, 1)
 
                 cell_idx = jnp.concatenate(cell_idx, axis=-2)
@@ -440,7 +440,7 @@ def _scan_neighbor_list(
                     if onp.all(dindex == 0):
                         continue
                     cell_idx += [
-                        _shift_array(idx, dindex)
+                        shift_array(idx, dindex)
                     ]  # 27* (nx,ny,nz,cell_capacity)
 
                 cell_idx = jnp.concatenate(cell_idx, axis=-2)  # (5, 5, 5, 2376, 1)

@@ -1,21 +1,26 @@
-import argparse
 import os
 import os.path as osp
-import pprint
 from datetime import datetime
 from typing import Dict, Tuple
+
+# specify cuda device
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152 from TensorFlow
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.75"
 
 import haiku as hk
 import jax
 import jax.numpy as jnp
 import jmp
 import numpy as np
-import wandb
-import yaml
+from jax import config
 from jax_md import space
 from jax_md.partition import Sparse
-from lagrangebench import GNS, H5Dataset, Trainer, case_builder, infer
+from lagrangebench import GNS, Trainer, case_builder, infer
+from lagrangebench.defaults import defaults
 from lagrangebench.evaluate import averaged_metrics
+from lagrangebench.runner import setup_data, setup_model
+from omegaconf import DictConfig, OmegaConf
 
 from jax_sph import partition
 from jax_sph.eos import TaitEoS
@@ -43,6 +48,8 @@ class SolverInTheLoop(hk.Module):
         sph_nbrs_upd_fn,
         gnn_nbrs_upd_fn,
         normalization_stats,
+        sph_prefactor: float,
+        gnn_prefactor: float,
     ):
         super().__init__()
 
@@ -56,6 +63,8 @@ class SolverInTheLoop(hk.Module):
         self.dim = dim
         self.base_viscosity = base_viscosity
         self.normalization_stats = normalization_stats
+        self.sph_prefactor = sph_prefactor
+        self.gnn_prefactor = gnn_prefactor
 
         if ext_force_fn is None:
 
@@ -90,7 +99,7 @@ class SolverInTheLoop(hk.Module):
             eta_limiter,
             solver,
             kernel,
-        )
+        ).forward_wrapper()
 
         self.shift_fn = shift_fn
         self.disp_fn_vmap = jax.vmap(displacement_fn)
@@ -200,6 +209,10 @@ class SolverInTheLoop(hk.Module):
             "p": p,
             "mass": mass,
             "eta": eta,
+            "kappa": None,
+            "Cp": None,
+            "T": None,
+            "dTdt": None,
         }
 
         return state
@@ -234,7 +247,9 @@ class SolverInTheLoop(hk.Module):
 
             # integrate
             # 1. Twice 1/2dt integration of u and v
-            state["u"] += self.stil_dt * (acc_sph + acc_gns)
+            state["u"] += self.stil_dt * (
+                self.sph_prefactor * acc_sph + self.gnn_prefactor * acc_gns
+            )
             state["v"] = state["u"]
 
             # 2. Integrate position with velocity v
@@ -248,23 +263,18 @@ class SolverInTheLoop(hk.Module):
         return {"acc": acc}
 
 
-def train_or_infer(args: argparse.Namespace):
-    if not osp.isabs(args.data_dir):
-        args.data_dir = osp.join(os.getcwd(), args.data_dir)
+def train_or_infer(cfg: DictConfig):
+    mode = cfg.mode
+    load_ckp = cfg.load_ckp
+    is_test = cfg.eval.test
 
-    os.makedirs("ckp", exist_ok=True)
-    os.makedirs("rollouts", exist_ok=True)
+    if cfg.dtype == "float64":
+        config.update("jax_enable_x64", True)
 
-    # dataloader
-    data_train = H5Dataset("train", dataset_path=args.data_dir, input_seq_length=2)
-    data_valid = H5Dataset(
-        "valid", dataset_path=args.data_dir, input_seq_length=2, extra_seq_length=20
-    )
-    data_test = H5Dataset(
-        "test", dataset_path=args.data_dir, input_seq_length=2, extra_seq_length=20
-    )
+    data_train, data_valid, data_test = setup_data(cfg)
 
     metadata = data_train.metadata
+    # neighbors search
     bounds = np.array(metadata["bounds"])
     box = bounds[:, 1] - bounds[:, 0]
 
@@ -272,16 +282,17 @@ def train_or_infer(args: argparse.Namespace):
     case = case_builder(
         box=box,
         metadata=metadata,
-        input_seq_length=2,  # single velocity input
-        noise_std=args.noise_std,
+        input_seq_length=cfg.model.input_seq_length,
+        cfg_neighbors=cfg.neighbors,
+        cfg_model=cfg.model,
+        noise_std=cfg.train.noise_std,
         external_force_fn=data_train.external_force_fn,
-        neighbor_list_multiplier=1.5,
-        dtype=jnp.float32,
+        dtype=cfg.dtype,
     )
 
-    features, _ = data_train[0]
+    features, particle_type = data_train[0]
 
-    pbc = jnp.array(metadata["pbc"])
+    pbc = jnp.array(metadata["periodic_boundary_conditions"])
 
     if pbc.any():
         displacement_fn, shift_fn = space.periodic(side=jnp.array(box))
@@ -289,14 +300,14 @@ def train_or_infer(args: argparse.Namespace):
         displacement_fn, shift_fn = space.free()
 
     # setup model from configs
-    if args.model == "sitl":
+    if cfg.model.name == "sitl":
         # neighbor lists for SitL SPH and GNN part
         num_particles = metadata["num_particles_max"]
         sph_neighbor_fn = partition.neighbor_list(
             displacement_fn,
             jnp.array(box),
             r_cutoff=3.0 * metadata["dx"],
-            capacity_multiplier=2.5,
+            capacity_multiplier=cfg.neighbors.multiplier,
             mask_self=False,
             format=Sparse,
             num_particles_max=num_particles,
@@ -306,7 +317,7 @@ def train_or_infer(args: argparse.Namespace):
             displacement_fn,
             jnp.array(box),
             r_cutoff=metadata["default_connectivity_radius"],
-            capacity_multiplier=2.5,
+            capacity_multiplier=cfg.neighbors.multiplier,
             mask_self=False,
             format=Sparse,
             num_particles_max=num_particles,
@@ -323,11 +334,11 @@ def train_or_infer(args: argparse.Namespace):
 
         def model(x):
             return SolverInTheLoop(
-                latent_size=args.latent_dim,
-                blocks_per_step=args.num_mlp_layers,
-                num_mp_steps=args.num_mp_steps,
+                latent_size=cfg.model.latent_dim,
+                blocks_per_step=cfg.model.num_mlp_layers,
+                num_mp_steps=cfg.model.num_mp_steps,
                 dim=metadata["dim"],
-                num_sitl_steps=args.num_sitl_steps,
+                num_sitl_steps=cfg.model.num_sitl_steps,
                 dt=metadata["dt"] * metadata["write_every"],
                 p_bg_factor=0.0,
                 base_viscosity=metadata["viscosity"],
@@ -339,166 +350,139 @@ def train_or_infer(args: argparse.Namespace):
                 sph_nbrs_upd_fn=sph_neighbors_update_fn,
                 gnn_nbrs_upd_fn=gnn_neighbors_update_fn,
                 normalization_stats=case.normalization_stats,
+                sph_prefactor=cfg.model.sph_prefactor,
+                gnn_prefactor=cfg.model.gnn_prefactor,
             )(x)
 
-    elif args.model == "gns":
-
-        def model(x):
-            return GNS(
-                metadata["dim"],
-                latent_size=args.latent_dim,
-                blocks_per_step=args.num_mlp_layers,
-                num_mp_steps=args.num_mp_steps,
-                particle_type_embedding_size=16,
-            )(x)
+        MODEL = SolverInTheLoop
+    else:
+        # setup model from configs
+        model, MODEL = setup_model(
+            cfg,
+            metadata=metadata,
+            homogeneous_particles=particle_type.max() == particle_type.min(),
+            has_external_force=data_train.external_force_fn is not None,
+            normalization_stats=case.normalization_stats,
+        )
 
     model = hk.without_apply_rng(hk.transform_with_state(model))
 
     # mixed precision training based on this reference:
     # https://github.com/deepmind/dm-haiku/blob/main/examples/imagenet/train.py
     policy = jmp.get_policy("params=float32,compute=float32,output=float32")
-    hk.mixed_precision.set_policy(SolverInTheLoop, policy)
+    hk.mixed_precision.set_policy(MODEL, policy)
 
-    if args.mode == "train" or args.mode == "all":
+    if mode == "train" or mode == "all":
         print("Start training...")
-        # save config file
-        run_prefix = f"{args.model}_{data_train.name}"
-        data_and_time = datetime.today().strftime("%Y%m%d-%H%M%S")
-        run_name = f"{run_prefix}_{data_and_time}"
 
-        args.new_checkpoint = os.path.join("ckp/", run_name)
-        os.makedirs(args.new_checkpoint, exist_ok=True)
-        os.makedirs(os.path.join(args.new_checkpoint, "best"), exist_ok=True)
-        with open(os.path.join(args.new_checkpoint, "config.yaml"), "w") as f:
-            yaml.dump(vars(args), f)
-        with open(os.path.join(args.new_checkpoint, "best", "config.yaml"), "w") as f:
-            yaml.dump(vars(args), f)
+        if cfg.logging.run_name is None:
+            run_prefix = f"{cfg.model.name}_{data_train.name}"
+            data_and_time = datetime.today().strftime("%Y%m%d-%H%M%S")
+            cfg.logging.run_name = f"{run_prefix}_{data_and_time}"
 
-        if args.wandb:
-            wandb_run = wandb.init(
-                project=args.wandb_project,
-                entity=args.wandb_entity,
-                name=run_name,
-                config=vars(args),
-                save_code=True,
-            )
-        else:
-            wandb_run = None
+        store_ckp = os.path.join(cfg.logging.ckp_dir, cfg.logging.run_name)
+        os.makedirs(store_ckp, exist_ok=True)
+        os.makedirs(os.path.join(store_ckp, "best"), exist_ok=True)
+        with open(os.path.join(store_ckp, "config.yaml"), "w") as f:
+            OmegaConf.save(config=cfg, f=f.name)
+        with open(os.path.join(store_ckp, "best", "config.yaml"), "w") as f:
+            OmegaConf.save(config=cfg, f=f.name)
+
+        # dictionary of configs which will be stored on W&B
+        wandb_config = OmegaConf.to_container(cfg)
 
         trainer = Trainer(
             model,
             case,
             data_train,
             data_valid,
-            seed=args.seed,
-            batch_size=args.batch_size,
-            input_seq_length=2,  # single velocity input
-            noise_std=args.noise_std,
-            lr_start=args.lr,
-            eval_n_trajs=10,
+            cfg.train,
+            cfg.eval,
+            cfg.logging,
+            input_seq_length=cfg.model.input_seq_length,
+            seed=cfg.seed,
         )
 
-        _, _, _ = trainer(
-            step_max=args.step_max,
-            load_checkpoint=args.model_dir,
-            store_checkpoint=args.new_checkpoint,
-            wandb_run=wandb_run,
+        _, _, _ = trainer.train(
+            step_max=cfg.train.step_max,
+            load_ckp=load_ckp,
+            store_ckp=store_ckp,
+            wandb_config=wandb_config,
         )
 
-        if args.wandb:
-            wandb.finish()
-
-    if args.mode == "infer" or args.mode == "all":
+    if mode == "infer" or mode == "all":
         print("Start inference...")
-        if args.mode == "all":
-            args.model_dir = os.path.join(args.new_checkpoint, "best")
-            assert osp.isfile(os.path.join(args.model_dir, "params_tree.pkl"))
 
-        assert args.model_dir, "model_dir must be specified for inference."
+        if mode == "infer":
+            model_dir = load_ckp
+        if mode == "all":
+            model_dir = os.path.join(store_ckp, "best")
+            assert osp.isfile(os.path.join(model_dir, "params_tree.pkl"))
+
+            cfg.eval.rollout_dir = model_dir.replace("ckp", "rollout")
+            os.makedirs(cfg.eval.rollout_dir, exist_ok=True)
+
+            if cfg.eval.infer.n_trajs is None:
+                cfg.eval.infer.n_trajs = cfg.eval.train.n_trajs
+
+        assert model_dir, "model_dir must be specified for inference."
         metrics = infer(
             model,
             case,
-            data_test if args.test else data_valid,
-            load_checkpoint=args.model_dir,
-            metrics=["mse", "ekin", "sinkhorn"],
-            rollout_dir=osp.join("rollouts", run_name),
-            eval_n_trajs=data_valid.num_samples,
-            out_type="vtk",
-            n_extrap_steps=args.n_extrap_steps,
-            seed=args.seed,
+            data_test if is_test else data_valid,
+            load_ckp=model_dir,
+            cfg_eval_infer=cfg.eval.infer,
+            rollout_dir=cfg.eval.rollout_dir,
+            n_rollout_steps=cfg.eval.n_rollout_steps,
+            seed=cfg.seed,
         )
 
-        split = "test" if args.test else "valid"
-        print(f"Metrics of {args.model_dir} on {split} split:")
+        split = "test" if is_test else "valid"
+        print(f"Metrics of {model_dir} on {split} split:")
         print(averaged_metrics(metrics))
 
 
+def load_configs(cli_args: DictConfig, config_path: str = None) -> DictConfig:
+    """Loads the SitL configs and merge them with the cli overwrites."""
+
+    cfgs = [OmegaConf.load(config_path)] if config_path is not None else []
+
+    # SitL-specific default overwrites on top of the lagrangebench defaults
+    defaults.dataset_path = "datasets/2D_RPF_3200_10kevery20"
+    defaults.dtype = "float32"  # to speed up training
+    defaults.model.name = "sitl"
+    defaults.model.input_seq_length = 2  # one past velocity for SitL
+    defaults.model.latent_dim = 64
+    defaults.model.num_sitl_steps = 3
+    defaults.train.step_max = 500_000
+    defaults.train.noise_std = 1e-5
+    defaults.train.pushforward.steps = [-1]
+    defaults.train.pushforward.unrolls = [0]
+    defaults.train.pushforward.probs = [1]
+    defaults.eval.train.n_trajs = 10
+    defaults.neighbors.multiplier = 2.5
+    defaults.model.sph_prefactor = 1.0
+    defaults.model.gnn_prefactor = 1.0
+
+    cfgs = [defaults] + cfgs
+
+    # merge all embedded configs and give highest priority to cli_args
+    cfg = OmegaConf.merge(*cfgs, cli_args)
+    return cfg
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="LagrangeBench")
-    parser.add_argument("--model_dir", type=str, help="Path to the model directory")
+    cli_args = OmegaConf.from_cli()
 
-    # training
-    parser.add_argument(
-        "--data_dir",
-        type=str,
-        # NOTE: the simpler dataset "2D_RPF_3200_20kevery20" is not in lagrangebench
-        default="datasets/2D_RPF_3200_20kevery100",
-        help="Path to the dataset directory",
-    )
-    parser.add_argument(
-        "--mode", type=str, default="train", help="train, infer, or all"
-    )
-    parser.add_argument(
-        "--test", action="store_true", help="Whether to use the test set"
-    )
-    parser.add_argument("--seed", type=int, default=0, help="Random seed")
-    parser.add_argument("--batch_size", type=int, default=1, help="Training batch size")
-    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-    parser.add_argument(
-        "--step_max", type=int, default=10000, help="Max number of steps"
-    )
-    parser.add_argument("--noise_std", type=float, default=1e-4, help="Noise std")
-    parser.add_argument(
-        "--n_extrap_steps",
-        type=int,
-        default=0,
-        help="Number of inference extrapolation steps",
-    )
+    if "load_ckp" in cli_args:  # start from a checkpoint
+        config_path = os.path.join(cli_args.load_ckp, "config.yaml")
+    else:
+        config_path = None
 
-    # model
-    parser.add_argument("--model", type=str, default="sitl", help="Model name")
-    parser.add_argument("--latent_dim", type=int, default=64, help="Latent dimension")
-    parser.add_argument(
-        "--num_mp_steps", type=int, default=10, help="Number of message passing steps"
-    )
-    parser.add_argument(
-        "--num_mlp_layers", type=int, default=2, help="Number of MLP layers"
-    )
-    parser.add_argument(
-        "--num_sitl_steps", type=int, default=3, help="Number of SitL steps"
-    )
-
-    # wandb
-    parser.add_argument(
-        "--wandb", action="store_true", help="Whether to use wandb for logging."
-    )
-    parser.add_argument(
-        "--wandb_project", type=str, help="Name of the wandb project to log to"
-    )
-    parser.add_argument(
-        "--wandb_entity", type=str, help="Name of the wandb entity to log to"
-    )
-    args = parser.parse_args()
-
-    if args.model_dir is not None:  # to run inference
-        config_path = os.path.join(args.model_dir, "config.yaml")
-        with open(config_path, "r") as f:
-            loaded_args = yaml.safe_load(f)
-        loaded_args.update(vars(args))
-        args = argparse.Namespace(**loaded_args)
+    cfg = load_configs(cli_args, config_path)
 
     print("#" * 79, "\nStarting a LagrangeBench run with the following configs:")
-    pprint.pprint(vars(args))
+    print(OmegaConf.to_yaml(cfg))
     print("#" * 79)
 
-    train_or_infer(args)
+    train_or_infer(cfg)
