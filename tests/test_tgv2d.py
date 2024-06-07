@@ -5,7 +5,7 @@ import pytest
 from omegaconf import OmegaConf
 
 from jax_sph.io_state import read_h5
-from jax_sph.utils import get_ekin, get_val_max
+from jax_sph.utils import get_array_stats, get_ekin
 
 # get refernce solutions
 Ekin = np.loadtxt("tests/ref/tgv_2d_Ekin_ref.txt")
@@ -76,19 +76,19 @@ Ekin = np.zeros((len(files_h5)))
 
 for i, filename in enumerate(files_h5):
     state = read_h5(os.path.join("/tmp/tgv2d/", dirs[0], filename))
-    u_max[i] = get_val_max(state, "v")
+    u_max[i] = get_array_stats(state, "v", "max")
     Ekin[i] = get_ekin(state, 0.02)
 sol = np.vstack((Ekin, u_max))
 
 for i, filename in enumerate(files_h5_tvf):
     state = read_h5(os.path.join("/tmp/tgv2d_tvf/", dirs_tvf[0], filename))
-    u_max[i] = get_val_max(state, "v")
+    u_max[i] = get_array_stats(state, "v", "max")
     Ekin[i] = get_ekin(state, 0.02)
 sol_tvf = np.vstack((Ekin, u_max))
 
 for i, filename in enumerate(files_h5_Rie):
     state = read_h5(os.path.join("/tmp/tgv2d_Rie/", dirs_Rie[0], filename))
-    u_max[i] = get_val_max(state, "v")
+    u_max[i] = get_array_stats(state, "v", "max")
     Ekin[i] = get_ekin(state, 0.02)
 sol_Rie = np.vstack((Ekin, u_max))
 
