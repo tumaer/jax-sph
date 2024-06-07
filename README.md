@@ -1,11 +1,25 @@
 # JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework
 
-![HT_T.gif](https://s9.gifyu.com/images/SUwUD.gif)
+<div align="center">
+
+[![Paper](http://img.shields.io/badge/paper-arxiv.2403.04750-B31B1B.svg)](https://arxiv.org/abs/2403.04750)
+[![Docs](https://img.shields.io/readthedocs/jax-sph/latest)](https://jax-sph.readthedocs.io/en/latest/index.html)
+[![PyPI - Version](https://img.shields.io/pypi/v/jax-sph)](https://pypi.org/project/jax-sph/)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/tutorial.ipynb)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2?logo=discord&logoColor=white)](https://discord.gg/Ds8jRZ78hU)
+
+[![Tests](https://github.com/tumaer/jax-sph/actions/workflows/tests.yml/badge.svg)](https://github.com/tumaer/jax-sph/actions/workflows/tests.yml)
+[![CodeCov](https://codecov.io/gh/tumaer/jax-sph/graph/badge.svg?token=ULMGSY71R1)](https://codecov.io/gh/tumaer/jax-sph)
+[![License](https://img.shields.io/pypi/l/jax-sph)](https://github.com/tumaer/jax-sph/blob/main/LICENSE)
+
+</div>
 
 JAX-SPH [(Toshev et al., 2024)](https://arxiv.org/abs/2403.04750) is a modular JAX-based weakly compressible SPH framework, which implements the following SPH routines:
 - Standard SPH [(Adami et al., 2012)](https://www.sciencedirect.com/science/article/pii/S002199911200229X)
 - Transport velocity SPH [(Adami et al., 2013)](https://www.sciencedirect.com/science/article/pii/S002199911300096X)
 - Riemann SPH [(Zhang et al., 2017)](https://www.sciencedirect.com/science/article/abs/pii/S0021999117300438)
+
+![HT_T.gif](https://s9.gifyu.com/images/SUwUD.gif)
 
 ## Installation
 
