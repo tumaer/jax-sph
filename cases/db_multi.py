@@ -47,14 +47,16 @@ class DB_Multi(SimulationSetup):
     def _init_pos2D(self, box_size, dx):
         sp = self.special
         if self.case.r0_type == "cartesian":
-            r_fluid = 3 * dx + pos_init_cartesian_2d(jnp.array([sp.L_wall, sp.H_wall]), dx)
+            r_fluid = 3 * dx + pos_init_cartesian_2d(
+                jnp.array([sp.L_wall, sp.H_wall]), dx
+            )
         else:
             r_fluid = self._get_relaxed_r0(None, dx)
 
         walls = pos_box_2d(sp.L_wall, sp.H_wall, dx)
         res = jnp.concatenate([walls, r_fluid])
         return res
-    
+
     def _init_pos3D(self, box_size, dx):
         # cartesian coordinates in z
         Lz = box_size[2]
@@ -82,7 +84,7 @@ class DB_Multi(SimulationSetup):
 
     def _tag3D(self, r):
         return self._tag2D(r)
-    
+
     def _phase2D(self, r):
         sp = self.special
         dx = self.case.dx
@@ -91,8 +93,18 @@ class DB_Multi(SimulationSetup):
         temp = jnp.logical_and(temp, temp2)
         phase = jnp.full(len(r), Phase.FLUID_PHASE0, dtype=int)
         phase = jnp.where(temp, Phase.FLUID_PHASE1, phase)
+
+        dx3 = 3 * self.case.dx
+        mask_left = jnp.where(r[:, 0] < dx3, True, False)
+        mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
+        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dx3, True, False)
+        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dx3, True, False)
+
+        mask_wall = mask_left + mask_bottom + mask_right + mask_top
+
+        phase = jnp.where(mask_wall, Phase.FLUID_PHASE1, phase)
         return phase
-    
+
     def _phase3D(self, r):
         return self._phase2D(r)
 
@@ -116,7 +128,7 @@ class DB_Multi(SimulationSetup):
         state["dvdt"] = jnp.where(mask_wall[:, None], 0.0, state["dvdt"])
         state["p"] = jnp.where(mask_wall, 0.0, state["p"])
         return state
-    
+
     def _set_field_properties(self, num_particles, volume_ref, r, case):
         sp = self.special
         temp = jnp.where(r[:, 0] <= sp.L, True, False)

@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jax import ops, vmap
 from jax_md import space
 
-from jax_sph.eos import MultiphaseTaitEoS, RIEMANNEoS, TaitEoS
+from jax_sph.eos import MultiphaseHighRhoTaitEoS, MultiphaseTaitEoS, RIEMANNEoS, TaitEoS
 from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 from jax_sph.utils import Tag, wall_tags
 
@@ -131,44 +131,6 @@ def tvf_stress_fn(rho: float, u, v):
     return jnp.outer(rho * u, v - u)
 
 
-# def acceleration_standard_fn_wrapper(kernel_fn):
-#     """Standard SPH acceleration according to Adami et al. 2012."""
-
-#     def acceleration_standard_fn(
-#         r_ij,
-#         d_ij,
-#         rho_i,
-#         rho_j,
-#         u_i,
-#         u_j,
-#         v_i,
-#         v_j,
-#         m_i,
-#         m_j,
-#         eta_i,
-#         eta_j,
-#         p_i,
-#         p_j,
-#     ):
-#         # (Eq. 6) - inter-particle-averaged shear viscosity (harmonic mean)
-#         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
-#         # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
-#         p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
-
-#         # compute the common prefactor `_c`
-#         _weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
-#         _kernel_grad = kernel_fn.grad_w(d_ij)
-#         _c = _weighted_volume * _kernel_grad / (d_ij + EPS)
-
-#         # (Eq. 8): \boldsymbol{e}_{ij} is computed as r_ij/d_ij here.
-#         _A = (tvf_stress_fn(rho_i, u_i, v_i) + tvf_stress_fn(rho_j, u_j, v_j)) / 2
-#         _u_ij = u_i - u_j
-#         a_eq_8 = _c * (-p_ij * r_ij + jnp.dot(_A, r_ij) + eta_ij * _u_ij)
-#         return a_eq_8
-
-#     return acceleration_standard_fn
-
-
 def acceleration_standard_fn_wrapper(kernel_fn):
     """Standard SPH acceleration according to Adami et al. 2012."""
 
@@ -191,7 +153,7 @@ def acceleration_standard_fn_wrapper(kernel_fn):
         # (Eq. 6) - inter-particle-averaged shear viscosity (harmonic mean)
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
         # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
-        p_ij = (p_i + p_j) / (rho_i * rho_j)
+        p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
 
         # compute the common prefactor `_c`
         _weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
@@ -201,10 +163,48 @@ def acceleration_standard_fn_wrapper(kernel_fn):
         # (Eq. 8): \boldsymbol{e}_{ij} is computed as r_ij/d_ij here.
         _A = (tvf_stress_fn(rho_i, u_i, v_i) + tvf_stress_fn(rho_j, u_j, v_j)) / 2
         _u_ij = u_i - u_j
-        a_eq_8 = _c * (jnp.dot(_A, r_ij) + eta_ij * _u_ij)
-        return a_eq_8 - m_j * p_ij * _kernel_grad / (d_ij + EPS) * r_ij
+        a_eq_8 = _c * (-p_ij * r_ij + jnp.dot(_A, r_ij) + eta_ij * _u_ij)
+        return a_eq_8
 
     return acceleration_standard_fn
+
+
+# def acceleration_standard_fn_wrapper(kernel_fn):
+#     """Standard SPH acceleration according to Adami et al. 2012."""
+
+#     def acceleration_standard_fn(
+#         r_ij,
+#         d_ij,
+#         rho_i,
+#         rho_j,
+#         u_i,
+#         u_j,
+#         v_i,
+#         v_j,
+#         m_i,
+#         m_j,
+#         eta_i,
+#         eta_j,
+#         p_i,
+#         p_j,
+#     ):
+#         # (Eq. 6) - inter-particle-averaged shear viscosity (harmonic mean)
+#         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
+#         # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
+#         p_ij = (p_i + p_j) / (rho_i * rho_j)
+
+#         # compute the common prefactor `_c`
+#         _weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
+#         _kernel_grad = kernel_fn.grad_w(d_ij)
+#         _c = _weighted_volume * _kernel_grad / (d_ij + EPS)
+
+#         # (Eq. 8): \boldsymbol{e}_{ij} is computed as r_ij/d_ij here.
+#         _A = (tvf_stress_fn(rho_i, u_i, v_i) + tvf_stress_fn(rho_j, u_j, v_j)) / 2
+#         _u_ij = u_i - u_j
+#         a_eq_8 = _c * (jnp.dot(_A, r_ij) + eta_ij * _u_ij)
+#         return a_eq_8 - m_j * p_ij * _kernel_grad / (d_ij + EPS) * r_ij
+
+#     return acceleration_standard_fn
 
 
 def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
@@ -305,7 +305,7 @@ def artificial_viscosity_fn_wrapper(dx, artificial_alpha, u_ref=1.0):
 
         mask_fluid = tag == Tag.FLUID
         mask_fluid_edges = mask_fluid[j_s] * mask_fluid[i_s]
-        res = mask_fluid_edges[:, None] * numerator / denominator
+        res = mask_fluid_edges[:, None] * numerator / (denominator + EPS)
         dudt_artif = ops.segment_sum(res, i_s, N)
         return dudt_artif
 
@@ -315,16 +315,22 @@ def artificial_viscosity_fn_wrapper(dx, artificial_alpha, u_ref=1.0):
 def repulsive_force_fn_wrapper(eos):
     """Multiphase repulsive force according to Monaghan and Rafiee 2012."""
 
-    def repulsive_force_fn(phase_i, phase_j, p_i, p_j, rho_i, rho_j, mass_j, grad_w):
+    def repulsive_force_fn(phase_i, phase_j, p_i, p_j, rho_i, rho_j, m_i, m_j, grad_w):
         # reference density weighting eq. (2.14), Monaghan 2012
         rho_ref_i = eos.rho_ref[phase_i]
         rho_ref_j = eos.rho_ref[phase_j]
         rho_coef = jnp.absolute((rho_ref_i - rho_ref_j) / (rho_ref_i + rho_ref_j))
 
-        # pressure contribution eq. (2.14), Monaghan 2012
-        p_term = jnp.absolute((p_i + p_j) / (rho_i * rho_j))
+        # pressure contribution based on eq. (2.14), Monaghan 2012
+        # p_term = jnp.absolute((p_i + p_j) / (rho_i * rho_j))
+        # -> changed by Jonas to account for Adami wall BC into:
+        p_term = jnp.absolute((rho_j * p_i + rho_i * p_j) / (rho_i + rho_j))
 
-        return -0.08 * mass_j * rho_coef * p_term * grad_w
+        weighted_volume = ((m_i / (rho_i + EPS)) ** 2 + (m_j / (rho_j + EPS)) ** 2) / (
+            m_i + EPS
+        )
+
+        return -0.08 * weighted_volume * rho_coef * p_term * grad_w
 
     return repulsive_force_fn
 
@@ -492,7 +498,7 @@ class WCSPH:
     def __init__(
         self,
         displacement_fn: Callable,
-        eos: Union[TaitEoS, RIEMANNEoS, MultiphaseTaitEoS],
+        eos: Union[TaitEoS, RIEMANNEoS, MultiphaseTaitEoS, MultiphaseHighRhoTaitEoS],
         g_ext_fn: Callable,
         dx: float,
         dim: int,
@@ -816,6 +822,7 @@ class WCSPH:
                     p[j_s],
                     rho[i_s],
                     rho[j_s],
+                    mass[i_s],
                     mass[j_s],
                     grad_w_dist,
                 )

@@ -74,24 +74,34 @@ class MultiphaseHighRhoTaitEoS(BaseEoS):
     """
 
     def __init__(
-        self, u_ref, u_ref_factor, rho_ref, rho_ref_factor, p_background, gamma
+        self,
+        u_ref,
+        u_ref_factor,
+        rho_ref,
+        rho_ref_factor,
+        p_background,
+        gamma,
+        gamma_factor,
     ):
         const = jnp.ones(1)
         rho_fac = jnp.array(rho_ref_factor).ravel()
         u_fac = jnp.array(u_ref_factor).ravel()
+        gamma_fac = jnp.array(gamma_factor).ravel()
         self.rho_ref = rho_ref * jnp.concatenate((const, rho_fac))
         self.p_bg = p_background  # TODO: unified pb correct?
         self.u_ref = u_ref * jnp.concatenate((const, u_fac))
-        self.gamma = gamma
+        self.gamma = gamma * jnp.concatenate((const, gamma_fac))
 
-    def p_fn(self, rho, phase):
-        coeff = self.rho_ref[phase] * self.u_ref[phase] ** 2 / self.gamma
-        return coeff * ((rho / self.rho_ref[phase]) ** self.gamma - 1) + self.p_bg
+    def p_fn(self, rho, phase):  # changed these, DON'T FORGET
+        coeff = 1 / self.rho_ref[phase] * self.u_ref[phase] ** 2 * self.gamma[phase]
+        return (
+            coeff * ((rho / self.rho_ref[phase]) ** self.gamma[phase] - 1) + self.p_bg
+        )
 
     def rho_fn(self, p, phase):
-        coeff = self.rho_ref[phase] * self.u_ref[phase] ** 2 / self.gamma
+        coeff = 1 / self.rho_ref[phase] * self.u_ref[phase] ** 2 * self.gamma[phase]
         p_temp = p + coeff - self.p_bg
-        return self.rho_ref[phase] * (p_temp / coeff) ** (1 / self.gamma)
+        return self.rho_ref[phase] * (p_temp / coeff) ** (1 / self.gamma[phase])
 
 
 class RIEMANNEoS(BaseEoS):

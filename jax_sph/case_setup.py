@@ -140,6 +140,7 @@ class SimulationSetup(ABC):
                 self.special.rho_ref_factor,
                 p_bg,
                 cfg.eos.gamma,
+                self.special.gamma_factor,
             )
         else:
             eos = TaitEoS(p_ref, rho_ref, p_bg, cfg.eos.gamma)
