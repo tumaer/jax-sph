@@ -7,7 +7,15 @@ from jax import ops, vmap
 from jax_md import space
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
-from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
+from jax_sph.kernel import (
+    CubicKernel,
+    GaussianKernel,
+    QuinticKernel,
+    SuperGaussianKernel,
+    WendlandC2Kernel,
+    WendlandC4Kernel,
+    WendlandC6Kernel,
+)
 from jax_sph.utils import Tag, wall_tags
 
 EPS = jnp.finfo(float).eps
@@ -478,10 +486,21 @@ class WCSPH:
         self.is_heat_conduction = is_heat_conduction
 
         _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
-        if kernel == "QSK":
-            self._kernel_fn = QuinticKernel(h=dx, dim=dim)
-        elif kernel == "WC2K":
-            self._kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
+        match kernel:
+            case "CSK":
+                self._kernel_fn = CubicKernel(h=dx, dim=dim)
+            case "QSK":
+                self._kernel_fn = QuinticKernel(h=dx, dim=dim)
+            case "WC2K":
+                self._kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
+            case "WC4K":
+                self._kernel_fn = WendlandC4Kernel(h=1.3 * dx, dim=dim)
+            case "WC6K":
+                self._kernel_fn = WendlandC6Kernel(h=1.3 * dx, dim=dim)
+            case "GK":
+                self._kernel_fn = GaussianKernel(h=dx, dim=dim)
+            case "SGK":
+                self._kernel_fn = SuperGaussianKernel(h=dx, dim=dim)
 
         self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
         self._free_weight, self._heat_bc = gwbc_fn_riemann_wrapper(
