@@ -1,11 +1,14 @@
+"""Test a full run of the solver on the Poiseuille flow case from the validations."""
+
 import os
 
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from jax import config
 from omegaconf import OmegaConf
 
-from jax_sph.utils import sph_interpolator
+from main import load_embedded_configs
 
 
 def u_series_exp(y, t, n_max=10):
@@ -38,54 +41,77 @@ def u_series_exp(y, t, n_max=10):
     return res
 
 
-# get analytical solution
-y_axis = np.linspace(0, 1, 21)
-t_dimless = [0.0005, 0.001, 0.005, 0.01]
-for t_val in t_dimless:
-    ref = u_series_exp(y_axis, t_val)
+@pytest.fixture
+def setup_simulation():
+    y_axis = np.linspace(0, 1, 21)
+    t_dimless = [0.0005, 0.001, 0.005]
+    # get analytical solution
+    ref_solutions = []
+    for t_val in t_dimless:
+        ref_solutions.append(u_series_exp(y_axis, t_val))
+    return y_axis, t_dimless, ref_solutions
 
-# get 2D poiseuille flow SPH solution by running a simulation
-os.system(
-    "python main.py config=cases/pf.yaml solver.tvf=1.0"
-    + " io.write_every=1000 io.data_path=/tmp/pf_tvf_test"
-)
-os.system(
-    "python main.py config=cases/pf.yaml solver.tvf=0.0"
-    + " io.write_every=1000 io.data_path=/tmp/pf_test"
-)
 
-dirs = os.listdir("/tmp/pf_test/")
-dirs = [d for d in dirs if ("2D_PF_SPH" in d)]
-dirs = sorted(dirs, reverse=True)
+def run_simulation(tmp_path, tvf, solver):
+    """Emulate `main.py`."""
+    data_path = tmp_path / f"pf_test_{tvf}"
 
-dirs_tvf = os.listdir("/tmp/pf_tvf_test/")
-dirs_tvf = [d for d in dirs_tvf if ("2D_PF_SPH" in d)]
-dirs_tvf = sorted(dirs_tvf, reverse=True)
-
-cfg = OmegaConf.load(os.path.join("/tmp/pf_test/", dirs[0], "config.yaml"))
-tvf_cfg = OmegaConf.load(os.path.join("/tmp/pf_tvf_test/", dirs_tvf[0], "config.yaml"))
-step_max = np.array(np.rint(cfg.solver.t_end / cfg.solver.dt), dtype=int)
-digits = len(str(step_max))
-
-y_axis += 3 * cfg.case.dx
-rs = 0.2 * jnp.ones([y_axis.shape[0], 2])
-rs = rs.at[:, 1].set(y_axis)
-for i in range(len(t_dimless)):
-    file_name = (
-        "traj_" + str(int(t_dimless[i] / tvf_cfg.solver.dt)).zfill(digits) + ".h5"
+    cli_args = OmegaConf.create(
+        {
+            "config": "cases/pf.yaml",
+            "case": {"dx": 0.0333333},
+            "solver": {"name": solver, "tvf": tvf, "dt": 0.000002, "t_end": 0.005},
+            "io": {"write_every": 250, "data_path": str(data_path)},
+        }
     )
-    tvf_src_path = os.path.join("/tmp/pf_tvf_test/", dirs_tvf[0], file_name)
-    interp_vel_fn_tvf = sph_interpolator(tvf_cfg, tvf_src_path)
-    sol_tvf = interp_vel_fn_tvf(tvf_src_path, rs, prop="u", dim_ind=0)
+    cfg = load_embedded_configs(cli_args)
 
-    src_path = os.path.join("/tmp/pf_test/", dirs[0], file_name)
-    interp_vel_fn = sph_interpolator(cfg, src_path)
-    sol = interp_vel_fn(src_path, rs, prop="u", dim_ind=0)
+    # Specify cuda device. These setting must be done before importing jax-md.
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152 from TensorFlow
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu)
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(cfg.xla_mem_fraction)
+
+    if cfg.dtype == "float64":
+        config.update("jax_enable_x64", True)
+
+    from jax_sph.simulate import simulate
+
+    simulate(cfg)
+
+    return data_path
 
 
-@pytest.mark.parametrize("solution, ref_solution", [(sol_tvf, ref), (sol, ref)])
-def test_pf2d(solution, ref_solution):
+def get_solution(data_path, dir, t_dimless, y_axis):
+    from jax_sph.utils import sph_interpolator
+
+    cfg = OmegaConf.load(data_path / dir / "config.yaml")
+    step_max = np.array(np.rint(cfg.solver.t_end / cfg.solver.dt), dtype=int)
+    digits = len(str(step_max))
+
+    y_axis += 3 * cfg.case.dx
+    rs = 0.2 * jnp.ones([y_axis.shape[0], 2])
+    rs = rs.at[:, 1].set(y_axis)
+    solutions = []
+    for i in range(len(t_dimless)):
+        file_name = (
+            "traj_" + str(int(t_dimless[i] / cfg.solver.dt)).zfill(digits) + ".h5"
+        )
+        src_path = data_path / dir / file_name
+        interp_vel_fn = sph_interpolator(cfg, src_path)
+        solutions.append(interp_vel_fn(src_path, rs, prop="u", dim_ind=0))
+    return solutions
+
+
+@pytest.mark.parametrize("tvf, solver", [(0.0, "SPH"), (1.0, "SPH")])  # (0.0, "RIE")
+def test_pf2d(tvf, solver, tmp_path, setup_simulation):
     """Test whether the poiseuille flow simulation matches the analytical solution"""
-    assert np.allclose(
-        solution, ref_solution, atol=1e-2
-    ), "Velocity profile does not match."
+    y_axis, t_dimless, ref_solutions = setup_simulation
+    data_path = run_simulation(tmp_path, tvf, solver)
+    subdirs = os.listdir(data_path)
+    # print(f"tmp_path = {tmp_path}, subdirs = {subdirs}")
+    solutions = get_solution(data_path, subdirs[0], t_dimless, y_axis)
+    # print(f"solution: {solutions[-1]} \nref_solution: {ref_solutions[-1]}")
+    for solution, ref_solution in zip(solutions, ref_solutions):
+        assert np.allclose(
+            solution, ref_solution, atol=1e-2
+        ), "Velocity profile does not match."

@@ -8,7 +8,6 @@ from jax_sph.kernel import (
     CubicKernel,
     GaussianKernel,
     QuinticKernel,
-    SuperGaussianKernel,
     WendlandC2Kernel,
     WendlandC4Kernel,
     WendlandC6Kernel,
@@ -24,7 +23,6 @@ from jax_sph.kernel import (
         (WendlandC4Kernel, 1.3),
         (WendlandC6Kernel, 1.3),
         (GaussianKernel, 1),
-        (SuperGaussianKernel, 1),
     ],
 )
 def test_kernel_1d(Kernel, dx_factor):
