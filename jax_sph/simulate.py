@@ -86,7 +86,7 @@ def simulate(cfg: DictConfig):
     # Instantiate advance function for our use case
     advance = si_euler(cfg.solver.tvf, forward, shift_fn, bc_fn)
 
-    advance = advance if cfg.no_jit else jit(advance)  # TODO: is this even needed?
+    advance = advance if cfg.no_jit else jit(advance)
 
     print("#" * 79, "\nStarting a JAX-SPH run with the following configs:")
     print(OmegaConf.to_yaml(cfg))

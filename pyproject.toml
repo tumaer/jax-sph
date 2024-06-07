@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jax-sph"
-version = "0.0.0a1"
+version = "0.0.1"
 description = "JAX-SPH: Smoothed Particle Hydrodynamics in JAX"
 authors = ["Artur Toshev <artur.toshev@tum.de>",]
 maintainers = ["Artur Toshev <artur.toshev@tum.de>",]
@@ -29,6 +29,7 @@ ruff = ">=0.1.8"
 [tool.poetry.group.temp.dependencies]
 ott-jax = ">=0.4.2"
 ipykernel = ">=6.25.1"
+matscipy = ">=0.8.0"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "7.2.6"
@@ -58,7 +59,7 @@ select = [
 
 [tool.pytest.ini_options]
 testpaths = "tests/"
-addopts = "--cov=jax_sph --cov-fail-under=1"  # TODO: increase later e.g. to 50
+addopts = "--cov=jax_sph --cov-fail-under=50"
 filterwarnings = [
     # ignore all deprecation warnings except from jax-sph
     "ignore::DeprecationWarning:^(?!.*jax_sph).*"
