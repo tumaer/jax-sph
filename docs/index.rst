@@ -23,11 +23,10 @@ Check out our `GitHub repository <https://github.com/tumaer/jax-sph>`_ for more 
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: API
 
    pages/defaults
    pages/case_setup
    pages/solver
    pages/simulate
    pages/utils
-   pages/neighbors

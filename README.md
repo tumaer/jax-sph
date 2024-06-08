@@ -88,11 +88,13 @@ python main.py config=cases/ht.yaml
 ```
 
 ### Notebooks
-We provide four notebooks demonstrating how to use JAX-SPH:
+We provide various notebooks demonstrating how to use JAX-SPH:
 - [`tutorial.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/tutorial.ipynb), with a general overview of JAX-SPH and an example how to run the channel flow with hot bottom wall.
-- [`iclr24_grads.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_grads.ipynb), with a validation of the gradients through the solver.
-- [`iclr24_inverse.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_inverse.ipynb), solving the inverse problem of finding the initial state of a 100-step-long SPH simulation.
-- [`iclr24_sitl.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_sitl.ipynb), including training and testing a Solver-in-the-Loop model using the [LagrangeBench](https://github.com/tumaer/lagrangebench) library.
+- [`iclr24_grads.ipynb`](notebooks/iclr24_grads.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_grads.ipynb), with a validation of the gradients through the solver.
+- [`iclr24_inverse.ipynb`](notebooks/iclr24_inverse.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_inverse.ipynb), solving the inverse problem of finding the initial state of a 100-step-long SPH simulation.
+- [`iclr24_sitl.ipynb`](notebooks/iclr24_sitl.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_sitl.ipynb), including training and testing a Solver-in-the-Loop model using the [LagrangeBench](https://github.com/tumaer/lagrangebench) library.
+- [`neighbors.ipynb`](notebooks/neighbors.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/neighbors.ipynb), explaining the difference between the three neighbor search implementations and comparing their performance.
+- [`kernel_plots.ipynb`](notebooks/kernel_plots.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/kernel_plots.ipynb), visualizing the SPH kernels.
 
 ## Setting up a Case
 To set up a case, just add a `my_case.py` and a `my_case.yaml` file to the `cases/` directory. Every *.py case should inherit from `SimulationSetup` in `jax_sph/case_setup.py` or another case, and every *.yaml config file should either contain a complete set of parameters (see `jax_sph/defaults.py`) or extend `JAX_SPH_DEFAULTS`. Running a case in relaxation mode `case.mode=rlx` overwrites certain parts of the selected case. Passed CLI arguments overwrite any argument.
