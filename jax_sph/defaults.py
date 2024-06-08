@@ -9,7 +9,7 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     ### global and hardware-related configs
 
     # .yaml case configuration file
-    cfg.config = None  # previously: case
+    cfg.config = None
     # Seed for random number generator
     cfg.seed = 123
     # Whether to disable jitting compilation
@@ -17,7 +17,7 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     # Which GPU to use. -1 for CPU
     cfg.gpu = 0
     # Data type. One of "float32" or "float64"
-    cfg.dtype = "float64"  # previously: no_f64
+    cfg.dtype = "float64"
     # XLA memory fraction to be preallocated. The JAX default is 0.75.
     # Should be specified before importing the library.
     cfg.xla_mem_fraction = 0.75
@@ -30,30 +30,30 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     # Simulation mode. One of "sim" (run simulation) or "rlx" (run relaxation)
     cfg.case.mode = "sim"
     # Dimension of the simulation. One of 2 or 3
-    cfg.case.dim = 3  # previously: dim
+    cfg.case.dim = 3
     # Average distance between particles [0.001, 0.1]
-    cfg.case.dx = 0.05  # previously: dx
+    cfg.case.dx = 0.05
     # Initial state h5 path. Overrides `r0_type`. Can be useful to restart a simulation.
-    cfg.case.state0_path = None  # previously: state0-path
+    cfg.case.state0_path = None
     # Which properties to adopt from state0_path. Include all to restart a simulation.
     cfg.case.state0_keys = ["r"]
     # Position initialization type. One of "cartesian" or "relaxed". Cartesian can have
     # `r0_noise_factor` and relaxed requires a state to be present in `data_relaxed`.
-    cfg.case.r0_type = "cartesian"  # previously: r0-type
+    cfg.case.r0_type = "cartesian"
     # How much Gaussian noise to add to r0. ( _ * dx)
-    cfg.case.r0_noise_factor = 0.0  # previously: r0-noise-factor
+    cfg.case.r0_noise_factor = 0.0
     # Magnitude of external force field
-    cfg.case.g_ext_magnitude = 0.0  # previously: g-ext-magnitude
+    cfg.case.g_ext_magnitude = 0.0
     # Reference dynamic viscosity. Inversely proportional to Re.
-    cfg.case.viscosity = 0.01  # previously: viscosity
+    cfg.case.viscosity = 0.01
     # Estimate max flow velocity to calculate artificial speed of sound.
-    cfg.case.u_ref = 1.0  # previously: u_ref
+    cfg.case.u_ref = 1.0
     # Reference speed of sound factor w.r.t. u_ref.
-    cfg.case.c_ref_factor = 10.0  # previously: p-bg-factor
+    cfg.case.c_ref_factor = 10.0
     # Reference density
     cfg.case.rho_ref = 1.0
     # Reference temperature
-    cfg.case.T_ref = 1.0  # previously: T-ref
+    cfg.case.T_ref = 1.0
     # Reference thermal conductivity
     cfg.case.kappa_ref = 0.0
     # Reference heat capacity at constant pressure
@@ -65,29 +65,29 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver = OmegaConf.create({})
 
     # Solver name. One of "SPH" (standard SPH) or "RIE" (Riemann SPH)
-    cfg.solver.name = "SPH"  # previously: solver
+    cfg.solver.name = "SPH"
     # Transport velocity inclusion factor [0,...,1]
-    cfg.solver.tvf = 0.0  # previously: tvf
+    cfg.solver.tvf = 0.0
     # CFL condition factor
-    cfg.solver.cfl = 0.25  # previously: cfl
+    cfg.solver.cfl = 0.25
     # Density evolution vs density summation
-    cfg.solver.density_evolution = False  # previously: density-evolution
+    cfg.solver.density_evolution = False
     # Density renormalization when density evolution
-    cfg.solver.density_renormalize = False  # previously: density-renormalize
+    cfg.solver.density_renormalize = False
     # Integration time step. If None, it is calculated from the CFL condition.
-    cfg.solver.dt = None  # previously: dt
+    cfg.solver.dt = None
     # Physical time length of simulation
-    cfg.solver.t_end = 0.2  # previously: t-end
+    cfg.solver.t_end = 0.2
     # Parameter alpha of artificial viscosity term
-    cfg.solver.artificial_alpha = 0.0  # previously: artificial-alpha
+    cfg.solver.artificial_alpha = 0.0
     # Whether to turn on free-slip boundary condition
-    cfg.solver.free_slip = False  # previously: free-slip
+    cfg.solver.free_slip = False
     # Riemann dissipation limiter parameter, -1 = off
-    cfg.solver.eta_limiter = 3  # previously: eta-limiter
+    cfg.solver.eta_limiter = 3
     # Thermal conductivity (non-dimensional)
-    cfg.solver.kappa = 0  # previously: kappa
+    cfg.solver.kappa = 0
     # Whether to apply the heat conduction term
-    cfg.solver.heat_conduction = False  # previously: heat-conduction
+    cfg.solver.heat_conduction = False
     # Whether to apply boundaty conditions
     cfg.solver.is_bc_trick = False  # new
 
@@ -102,7 +102,7 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     # "WC6K" (Wendland C4 kernel)
     # "GK" (gaussian kernel)
     # "SGK" (super gaussian kernel)
-    cfg.kernel.name = "QSK"  # previously: kernel
+    cfg.kernel.name = "QSK"
     # Smoothing length factor
     cfg.kernel.h_factor = 1.0  # new. Should default to 1.3 WC2K and 1.0 QSK
 
@@ -110,29 +110,29 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.eos = OmegaConf.create({})
 
     # EoS name. One of "Tait" or "RIEMANN"
-    cfg.eos.name = "Tait"  # previously: eos
+    cfg.eos.name = "Tait"
     # power in the Tait equation of state
     cfg.eos.gamma = 1.0
     # background pressure factor w.r.t. p_ref
-    cfg.eos.p_bg_factor = 0.0  # previously: p-bg-factor
+    cfg.eos.p_bg_factor = 0.0
 
     ### neighbor list
     cfg.nl = OmegaConf.create({})
 
     # Neighbor list backend. One of "jaxmd_vmap", "jaxmd_scan", "matscipy"
-    cfg.nl.backend = "jaxmd_vmap"  # previously: nl-backend
+    cfg.nl.backend = "jaxmd_vmap"
     # Number of partitions for neighbor list. Applies to jaxmd_scan only.
-    cfg.nl.num_partitions = 1  # previously: num-partitions
+    cfg.nl.num_partitions = 1
 
     ### output writing
     cfg.io = OmegaConf.create({})
 
     # In which format to write states. A subset of ["h5", "vtk"]
-    cfg.io.write_type = []  # previously: write-h5, write-vtk
+    cfg.io.write_type = []
     # Every `write_every` step will be saved
-    cfg.io.write_every = 1  # previously: write-every
+    cfg.io.write_every = 1
     # Where to write and read data
-    cfg.io.data_path = "./"  # previously: data-path
+    cfg.io.data_path = "./"
     # What to print to stdout. As list of possible properties.
     cfg.io.print_props = ["Ekin", "u_max"]
 
