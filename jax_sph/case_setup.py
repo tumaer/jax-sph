@@ -9,10 +9,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import vmap
-from jax_md import space
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
 from jax_sph.io_state import read_h5
+from jax_sph.jax_md import space
 from jax_sph.utils import (
     Tag,
     get_noise_masked,

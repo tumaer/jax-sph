@@ -14,8 +14,6 @@ import jax.numpy as jnp
 import jmp
 import numpy as np
 from jax import config
-from jax_md import space
-from jax_md.partition import Sparse
 from lagrangebench import GNS, Trainer, case_builder, infer
 from lagrangebench.defaults import defaults
 from lagrangebench.evaluate import averaged_metrics
@@ -24,6 +22,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from jax_sph import partition
 from jax_sph.eos import TaitEoS
+from jax_sph.jax_md import space
+from jax_sph.jax_md.partition import Sparse
 from jax_sph.kernel import QuinticKernel
 from jax_sph.solver import WCSPH
 from jax_sph.utils import Tag

@@ -9,8 +9,9 @@ import jax.numpy as jnp
 import numpy as np
 import numpy as onp
 from jax import jit
-from jax_md import space
-from jax_md.partition import (
+
+from jax_sph.jax_md import space
+from jax_sph.jax_md.partition import (
     MaskFn,
     NeighborFn,
     NeighborList,
@@ -25,7 +26,7 @@ from jax_md.partition import (
     is_sparse,
     shift_array,
 )
-from jax_md.partition import neighbor_list as vmap_neighbor_list
+from jax_sph.jax_md.partition import neighbor_list as vmap_neighbor_list
 
 PEC = PartitionErrorCode
 
