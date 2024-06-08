@@ -18,6 +18,10 @@ pyvista = ">=0.42.2" # for visualization
 jax = {version = "0.4.28", extras = ["cpu"]}
 jaxlib = "0.4.28"
 omegaconf = "^2.3.0"
+matscipy = ">=0.8.0"
+dataclasses = "0.6"  # for jax-md
+jraph = "^0.0.6.dev0"  # for jax-md
+absl-py = "^2.1.0"  # for jax-md
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = ">=3.3.1"
@@ -28,18 +32,12 @@ ruff = ">=0.1.8"
 [tool.poetry.group.temp.dependencies]
 ott-jax = ">=0.4.2"
 ipykernel = ">=6.25.1"
-matscipy = ">=0.8.0"
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "7.2.6"
 sphinx-exec-code = "0.12"
 sphinx-rtd-theme = "1.3.0"
 toml = "^0.10.2"
-
-[tool.poetry.group.jaxmd.dependencies]
-dataclasses = "0.6"
-jraph = "^0.0.6.dev0"
-absl-py = "^2.1.0"
 
 [tool.ruff]
 ignore = ["F821", "E402"]
