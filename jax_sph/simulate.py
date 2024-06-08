@@ -5,13 +5,13 @@ import time
 
 import numpy as np
 from jax import jit
-from jax_md.partition import Sparse
 from omegaconf import DictConfig, OmegaConf
 
 from jax_sph import partition
 from jax_sph.case_setup import load_case, set_relaxation
 from jax_sph.integrator import si_euler
 from jax_sph.io_state import io_setup, write_state
+from jax_sph.jax_md.partition import Sparse
 from jax_sph.solver import WCSPH
 from jax_sph.utils import Logger, Tag
 

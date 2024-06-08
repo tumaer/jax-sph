@@ -4,9 +4,9 @@ from typing import Callable, Union
 
 import jax.numpy as jnp
 from jax import ops, vmap
-from jax_md import space
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
+from jax_sph.jax_md import space
 from jax_sph.kernel import (
     CubicKernel,
     GaussianKernel,

@@ -7,11 +7,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import ops, vmap
-from jax_md import partition, space
 from numpy import array
 from omegaconf import DictConfig
 
 from jax_sph.io_state import read_h5
+from jax_sph.jax_md import partition, space
 from jax_sph.kernel import QuinticKernel
 
 EPS = jnp.finfo(float).eps
