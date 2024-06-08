@@ -22,10 +22,16 @@ JAX-SPH `(Toshev et al., 2024) <https://arxiv.org/abs/2403.04750>`_ is a Smoothe
 Check out our `GitHub repository <https://github.com/tumaer/jax-sph>`_ for more information including installation instructions and tutorial notebooks.
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Getting Started
+
+   pages/tutorials
+   pages/defaults
+
+.. toctree::
    :maxdepth: 2
    :caption: API
 
-   pages/defaults
    pages/case_setup
    pages/solver
    pages/simulate

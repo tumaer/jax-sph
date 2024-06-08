@@ -1,6 +1,10 @@
 Defaults
 ===================================
 
+The defaults are defined through a function ``jax_sph.defaults.set_defaults()``, which
+takes a potentially empty ``omegaconf.DictConfig`` object and creates or overwrites the
+default values. One can also directly call ``from jax_sph.defaults import defaults``,
+with ``defaults=set_defaults()``, to get the default DictConfig, which we unpack below.
 
 .. exec_code::
     :hide_code:
