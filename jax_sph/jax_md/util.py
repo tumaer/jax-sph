@@ -1,5 +1,5 @@
 # Source: https://github.com/jax-md/jax-md
-# 
+#
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,8 +36,9 @@ f64 = jnp.float64
 
 @partial(jit, static_argnums=(1,))
 def safe_mask(mask, fn, operand, placeholder=0):
-  masked = jnp.where(mask, operand, 0)
-  return jnp.where(mask, fn(masked), placeholder)
+    masked = jnp.where(mask, operand, 0)
+    return jnp.where(mask, fn(masked), placeholder)
+
 
 def is_array(x: Any) -> bool:
-  return isinstance(x, (jnp.ndarray, onp.ndarray))
+    return isinstance(x, (jnp.ndarray, onp.ndarray))
