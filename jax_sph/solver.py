@@ -197,6 +197,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         mask,
         n_w_j,
         g_ext_i,
+        u_tilde_j,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij = e_s
@@ -211,9 +212,12 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         rho_L = rho_i
 
         #  u_w from eq. (15), Yang (2020)
+        # u_d = 2 * u_i - u_j
+        u_d = 2 * u_i - u_tilde_j
         u_R = jnp.where(
             wall_mask_j == 1,
-            -u_L + 2 * jnp.dot(u_j, n_w_j),
+            # -u_L + 2 * jnp.dot(u_j, n_w_j),
+            jnp.dot(u_d, -n_w_j),
             jnp.dot(u_j, -e_ij),
         )
         p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
@@ -236,7 +240,13 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad
 
         # viscosity term eq. (6), Zhang (2019)
-        v_ij = u_i - u_j
+        # TODO: u_j is supposed to be u_i, but why is it not working?
+        u_d = 2 * u_j - u_tilde_j
+        v_ij = jnp.where(
+            wall_mask_j == 1,
+            u_i - u_d,
+            u_i - u_j,
+        )
         eq_6 = 2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS)
         eq_6 *= kernel_part_diff * mask
 
@@ -388,10 +398,21 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
 
         def free_weight(fluid_mask_i, tag_i):
             return fluid_mask_i
+
+        def Riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N):
+            u_tilde = jnp.empty_like(u)
+            return u_tilde
     else:
 
         def free_weight(fluid_mask_i, tag_i):
             return jnp.ones_like(tag_i)
+
+        def Riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N):
+            w_dist_fluid = w_dist * fluid_mask[j_s]
+            u_wall_nom = ops.segment_sum(w_dist_fluid[:, None] * u[j_s], i_s, N)
+            u_wall_denom = ops.segment_sum(w_dist_fluid, i_s, N)
+            u_tilde = u_wall_nom / (u_wall_denom[:, None] + EPS)
+            return u_tilde
 
     if is_heat_conduction:
 
@@ -410,7 +431,7 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
         def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
             return temperature
 
-    return free_weight, heat_bc
+    return free_weight, Riemann_velocities, heat_bc
 
 
 def limiter_fn_wrapper(eta_limiter, c_ref):
@@ -503,9 +524,11 @@ class WCSPH:
                 self._kernel_fn = SuperGaussianKernel(h=dx, dim=dim)
 
         self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
-        self._free_weight, self._heat_bc = gwbc_fn_riemann_wrapper(
-            is_free_slip, is_heat_conduction
-        )
+        (
+            self._free_weight,
+            self._Riemann_velocities,
+            self._heat_bc,
+        ) = gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction)
         self._acceleration_tvf_fn = acceleration_tvf_fn_wrapper(self._kernel_fn)
         self._acceleration_riemann_fn = acceleration_riemann_fn_wrapper(
             self._kernel_fn, eos, _beta_fn, eta_limiter
@@ -621,6 +644,7 @@ class WCSPH:
                 )
             elif self.is_bc_trick and (self.solver == "RIE"):
                 mask = self._free_weight(fluid_mask[i_s], tag[i_s])
+                u_tilde = self._Riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N)
                 temperature = self._heat_bc(
                     fluid_mask[j_s], w_dist, temperature, i_s, j_s, tag, N
                 )
@@ -687,6 +711,7 @@ class WCSPH:
                     mask,
                     n_w[j_s],
                     g_ext[i_s],
+                    u_tilde[j_s],
                 )
             dudt = ops.segment_sum(out, i_s, N)
 
