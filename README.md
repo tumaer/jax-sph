@@ -14,12 +14,16 @@
 
 </div>
 
-JAX-SPH [(Toshev et al., 2024)](https://arxiv.org/abs/2403.04750) is a modular JAX-based weakly compressible SPH framework, which implements the following SPH routines:
-- Standard SPH [(Adami et al., 2012)](https://www.sciencedirect.com/science/article/pii/S002199911200229X)
-- Transport velocity SPH [(Adami et al., 2013)](https://www.sciencedirect.com/science/article/pii/S002199911300096X)
-- Riemann SPH [(Zhang et al., 2017)](https://www.sciencedirect.com/science/article/abs/pii/S0021999117300438)
-
 ![HT_T.gif](https://s9.gifyu.com/images/SUwUD.gif)
+
+## Table of Contents
+
+1. [**Installation**](#installation)
+1. [**Getting Started**](#getting-started)
+1. [**Setting up a case**](#setting-up-a-case)
+1. [**Contributing**](#contributing)
+1. [**Citation**](#citation)
+1. [**Acknowledgements**](#acknowledgements)
 
 ## Installation
 
@@ -90,10 +94,10 @@ We provide four notebooks demonstrating how to use JAX-SPH:
 - [`iclr24_inverse.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_inverse.ipynb), solving the inverse problem of finding the initial state of a 100-step-long SPH simulation.
 - [`iclr24_sitl.ipynb`](notebooks/tutorial.ipynb) [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/tumaer/jax-sph/blob/main/notebooks/iclr24_sitl.ipynb), including training and testing a Solver-in-the-Loop model using the [LagrangeBench](https://github.com/tumaer/lagrangebench) library.
 
-## Setting up a case
+## Setting up a Case
 To set up a case, just add a `my_case.py` and a `my_case.yaml` file to the `cases/` directory. Every *.py case should inherit from `SimulationSetup` in `jax_sph/case_setup.py` or another case, and every *.yaml config file should either contain a complete set of parameters (see `jax_sph/defaults.py`) or extend `JAX_SPH_DEFAULTS`. Running a case in relaxation mode `case.mode=rlx` overwrites certain parts of the selected case. Passed CLI arguments overwrite any argument.
 
-## Development and Contribution
+## Contributing
 If you wish to contribute, please run
 ```bash
 pre-commit install
