@@ -62,12 +62,9 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
         rho_L = rho_i
 
         #  u_w from eq. (15), Yang (2020)
-        # u_d = 2 * u_i - u_j
-        u_d = 2 * u_i - u_tilde_j
         u_R = jnp.where(
             wall_mask_j == 1,
-            # -u_L + 2 * jnp.dot(u_j, n_w_j),
-            jnp.dot(u_d, -n_w_j),
+            -u_L + 2 * jnp.dot(u_j, -n_w_j),
             jnp.dot(u_j, -e_ij),
         )
         p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
@@ -215,13 +212,10 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         p_L = p_i
         rho_L = rho_i
 
-        #  u_w from eq. (15), Yang (2020)
-        # u_d = 2 * u_i - u_j
-        u_d = 2 * u_i - u_tilde_j
+        # u_w from eq. (15), Yang (2020)
         u_R = jnp.where(
             wall_mask_j == 1,
-            # -u_L + 2 * jnp.dot(u_j, n_w_j),
-            jnp.dot(u_d, -n_w_j),
+            -u_L + 2 * jnp.dot(u_j, -n_w_j),
             jnp.dot(u_j, -e_ij),
         )
         p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
@@ -244,7 +238,6 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad
 
         # viscosity term eq. (6), Zhang (2019)
-        # TODO: u_j is supposed to be u_i, but why is it not working?
         u_d = 2 * u_j - u_tilde_j
         v_ij = jnp.where(
             wall_mask_j == 1,
@@ -404,8 +397,7 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
             return fluid_mask_i
 
         def Riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N):
-            u_tilde = jnp.empty_like(u)
-            return u_tilde
+            return u
     else:
 
         def free_weight(fluid_mask_i, tag_i):
