@@ -47,6 +47,7 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
         wall_mask_j,
         n_w_j,
         g_ext_i,
+        u_tilde_j,
         **kwargs,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
@@ -56,18 +57,22 @@ def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
         kernel_grad = kernel_fn.grad_w(d_ij) * (e_ij)
 
         # Compute average states eq. (6)/(12)/(13), Zhang (2017)
-        u_L = jnp.where(wall_mask_j == 1, jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij))
+        u_L = jnp.where(
+            jnp.isin(wall_mask_j, wall_tags), jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij)
+        )
         p_L = p_i
         rho_L = rho_i
 
         #  u_w from eq. (15), Yang (2020)
         u_R = jnp.where(
-            wall_mask_j == 1,
+            jnp.isin(wall_mask_j, wall_tags),
             -u_L + 2 * jnp.dot(u_j, n_w_j),
             jnp.dot(u_j, -e_ij),
         )
-        p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
-        rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
+        p_R = jnp.where(
+            jnp.isin(wall_mask_j, wall_tags), p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j
+        )
+        rho_R = jnp.where(jnp.isin(wall_mask_j, wall_tags), eos.rho_fn(p_R), rho_j)
 
         U_avg = (u_L + u_R) / 2
         v_avg = (u_i + u_j) / 2
@@ -197,6 +202,7 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         mask,
         n_w_j,
         g_ext_i,
+        u_tilde_j,
     ):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij = e_s
@@ -206,18 +212,22 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         kernel_grad = kernel_part_diff * (e_ij)
 
         # Compute average states eq. (6)/(12)/(13), Zhang (2017)
-        u_L = jnp.where(wall_mask_j == 1, jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij))
+        u_L = jnp.where(
+            jnp.isin(wall_mask_j, wall_tags), jnp.dot(u_i, -n_w_j), jnp.dot(u_i, -e_ij)
+        )
         p_L = p_i
         rho_L = rho_i
 
-        #  u_w from eq. (15), Yang (2020)
+        # u_w from eq. (15), Yang (2020)
         u_R = jnp.where(
-            wall_mask_j == 1,
+            jnp.isin(wall_mask_j, wall_tags),
             -u_L + 2 * jnp.dot(u_j, n_w_j),
             jnp.dot(u_j, -e_ij),
         )
-        p_R = jnp.where(wall_mask_j == 1, p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j)
-        rho_R = jnp.where(wall_mask_j == 1, eos.rho_fn(p_R), rho_j)
+        p_R = jnp.where(
+            jnp.isin(wall_mask_j, wall_tags), p_L + rho_L * jnp.dot(g_ext_i, -r_ij), p_j
+        )
+        rho_R = jnp.where(jnp.isin(wall_mask_j, wall_tags), eos.rho_fn(p_R), rho_j)
 
         P_avg = (p_L + p_R) / 2
         rho_avg = (rho_L + rho_R) / 2
@@ -227,16 +237,18 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
 
         # Compute Riemann states eq. (7) and (10), Zhang (2017)
-        # u_R = jnp.where(
-        # wall_mask_j == 1, -u_L - 2 * jnp.dot(v_j, -n_w_j), jnp.dot(v_j, -e_ij)
-        # )
         P_star = P_avg + 0.5 * rho_avg * (u_L - u_R) * beta_fn(u_L, u_R, eta_limiter)
 
         # pressure term with linear Riemann solver eq. (9), Zhang (2017)
         eq_9 = -2 * m_j * (P_star / (rho_i * rho_j)) * kernel_grad
 
         # viscosity term eq. (6), Zhang (2019)
-        v_ij = u_i - u_j
+        u_d = 2 * u_j - u_tilde_j
+        v_ij = jnp.where(
+            jnp.isin(wall_mask_j, wall_tags),
+            u_i - u_d,
+            u_i - u_j,
+        )
         eq_6 = 2 * m_j * eta_ij / (rho_i * rho_j) * v_ij / (d_ij + EPS)
         eq_6 *= kernel_part_diff * mask
 
@@ -388,10 +400,20 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
 
         def free_weight(fluid_mask_i, tag_i):
             return fluid_mask_i
+
+        def riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N):
+            return u
     else:
 
         def free_weight(fluid_mask_i, tag_i):
             return jnp.ones_like(tag_i)
+
+        def riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N):
+            w_dist_fluid = w_dist * fluid_mask[j_s]
+            u_wall_nom = ops.segment_sum(w_dist_fluid[:, None] * u[j_s], i_s, N)
+            u_wall_denom = ops.segment_sum(w_dist_fluid, i_s, N)
+            u_tilde = u_wall_nom / (u_wall_denom[:, None] + EPS)
+            return u_tilde
 
     if is_heat_conduction:
 
@@ -410,7 +432,7 @@ def gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction):
         def heat_bc(mask_j_s_fluid, w_dist, temperature, i_s, j_s, tag, N):
             return temperature
 
-    return free_weight, heat_bc
+    return free_weight, riemann_velocities, heat_bc
 
 
 def limiter_fn_wrapper(eta_limiter, c_ref):
@@ -503,9 +525,11 @@ class WCSPH:
                 self._kernel_fn = SuperGaussianKernel(h=dx, dim=dim)
 
         self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
-        self._free_weight, self._heat_bc = gwbc_fn_riemann_wrapper(
-            is_free_slip, is_heat_conduction
-        )
+        (
+            self._free_weight,
+            self._riemann_velocities,
+            self._heat_bc,
+        ) = gwbc_fn_riemann_wrapper(is_free_slip, is_heat_conduction)
         self._acceleration_tvf_fn = acceleration_tvf_fn_wrapper(self._kernel_fn)
         self._acceleration_riemann_fn = acceleration_riemann_fn_wrapper(
             self._kernel_fn, eos, _beta_fn, eta_limiter
@@ -572,6 +596,10 @@ class WCSPH:
             )
             n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
 
+            ##### Riemann velocity BCs
+            if self.is_bc_trick and (self.solver == "RIE"):
+                u_tilde = self._riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N)
+
             ##### Density summation or evolution
 
             # update evolution
@@ -598,6 +626,7 @@ class WCSPH:
                     wall_mask[j_s],
                     n_w[j_s],
                     g_ext[i_s],
+                    u_tilde[j_s],
                 )
                 drhodt = ops.segment_sum(temp, i_s, N) * fluid_mask
                 rho = rho + self.dt * drhodt
@@ -687,6 +716,7 @@ class WCSPH:
                     mask,
                     n_w[j_s],
                     g_ext[i_s],
+                    u_tilde[j_s],
                 )
             dudt = ops.segment_sum(out, i_s, N)
 
