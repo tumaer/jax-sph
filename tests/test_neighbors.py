@@ -6,9 +6,9 @@ from jax import config
 config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 from jax import jit
-from jax_md import space
 
 from jax_sph import partition
+from jax_sph.jax_md import space
 
 
 @jit

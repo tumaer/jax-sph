@@ -8,12 +8,12 @@ import os
 import jax.numpy as jnp
 import numpy as np
 from jax import ops, vmap
-from jax_md import space
-from jax_md.partition import Sparse
 from omegaconf import OmegaConf
 
 from jax_sph import partition
 from jax_sph.io_state import read_h5
+from jax_sph.jax_md import space
+from jax_sph.jax_md.partition import Sparse
 from jax_sph.kernel import QuinticKernel, WendlandC2Kernel
 from jax_sph.utils import Tag, pos_init_cartesian_2d
 
