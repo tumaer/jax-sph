@@ -33,21 +33,26 @@ class DB(SimulationSetup):
         if self.case.r0_type == "relaxed":
             self._load_only_fluid = True
 
-    def _box_size2D(self):
+    def _box_size2D(self, n_walls):
         dx, bo = self.case.dx, self.special.box_offset
         return np.array(
-            [self.special.L_wall + 6 * dx + bo, self.special.H_wall + 6 * dx + bo]
+            [
+                self.special.L_wall + 2 * n_walls * dx + bo,
+                self.special.H_wall + 2 * n_walls * dx + bo,
+            ]
         )
 
-    def _box_size3D(self):
+    def _box_size3D(self, n_walls):
         dx, bo = self.case.dx, self.box_offset
         sp = self.special
-        return np.array([sp.L_wall + 6 * dx + bo, sp.H_wall + 6 * dx + bo, sp.W])
+        return np.array(
+            [sp.L_wall + 2 * n_walls * dx + bo, sp.H_wall + 2 * n_walls * dx + bo, sp.W]
+        )
 
-    def _init_pos2D(self, box_size, dx):
+    def _init_pos2D(self, box_size, dx, n_walls):
         sp = self.special
         if self.case.r0_type == "cartesian":
-            r_fluid = 3 * dx + pos_init_cartesian_2d(np.array([sp.L, sp.H]), dx)
+            r_fluid = n_walls * dx + pos_init_cartesian_2d(np.array([sp.L, sp.H]), dx)
         else:
             r_fluid = self._get_relaxed_r0(None, dx)
 
@@ -67,12 +72,12 @@ class DB(SimulationSetup):
         r_xyz = np.vstack([xy_ext * [1, 1, z] for z in zs])
         return r_xyz
 
-    def _tag2D(self, r):
-        dx3 = 3 * self.case.dx
-        mask_left = jnp.where(r[:, 0] < dx3, True, False)
-        mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
-        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dx3, True, False)
-        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dx3, True, False)
+    def _tag2D(self, r, n_walls):
+        dxn = n_walls * self.case.dx
+        mask_left = jnp.where(r[:, 0] < dxn, True, False)
+        mask_bottom = jnp.where(r[:, 1] < dxn, True, False)
+        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dxn, True, False)
+        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dxn, True, False)
 
         mask_wall = mask_left + mask_bottom + mask_right + mask_top
 

@@ -122,13 +122,13 @@ class SimulationSetup(ABC):
 
         # initialize box and positions of particles
         if dim == 2:
-            box_size = self._box_size2D()
-            r = self._init_pos2D(box_size, dx)
-            tag = self._tag2D(r)
+            box_size = self._box_size2D(cfg.solver.n_walls)
+            r = self._init_pos2D(box_size, dx, cfg.solver.n_walls)
+            tag = self._tag2D(r, cfg.solver.n_walls)
         elif dim == 3:
-            box_size = self._box_size3D()
-            r = self._init_pos3D(box_size, dx)
-            tag = self._tag3D(r)
+            box_size = self._box_size3D(cfg.solver.n_walls)
+            r = self._init_pos3D(box_size, dx, cfg.solver.n_walls)
+            tag = self._tag3D(r, cfg.solver.n_walls)
         displacement_fn, shift_fn = space.periodic(side=box_size)
 
         num_particles = len(r)

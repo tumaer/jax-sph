@@ -120,6 +120,40 @@ def get_stats(state: Dict, props: list, dx: float):
     return res
 
 
+def get_nws(dx, dim, r, rho, m, tag, neighbors, displacement_fn):
+    """Computes the wall normal vectors at boundaries"""
+
+    N = len(r)
+    i_s, j_s = neighbors.idx
+    dr_ij = vmap(displacement_fn)(r[i_s], r[j_s])
+    dist = space.distance(dr_ij)
+    wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
+    kernel_fn = QuinticKernel(h=dx, dim=dim)
+
+    def wall_phi_vec(rho_j, m_j, dr_ij, dist, tag_j, tag_i):
+        # Compute unit vector, above eq. (6), Zhang (2017)
+        e_ij_w = dr_ij / (dist + EPS)
+
+        # Compute kernel gradient
+        kernel_grad = kernel_fn.grad_w(dist) * (e_ij_w)
+
+        # compute phi eq. (15), Zhang (2017)
+        phi = -1.0 * m_j / rho_j * kernel_grad * tag_j * tag_i
+
+        return phi
+
+    temp = vmap(wall_phi_vec)(
+        rho[j_s], m[j_s], dr_ij, dist, wall_mask[j_s], wall_mask[i_s]
+    )
+    phi = ops.segment_sum(temp, i_s, N)
+    n_w = (
+        phi / (jnp.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None] * wall_mask[:, None]
+    )
+    n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
+
+    return n_w
+
+
 class Logger:
     """Logger for printing stats to stdout."""
 

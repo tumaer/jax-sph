@@ -86,6 +86,8 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver.eta_limiter = 3  # previously: eta-limiter
     # Thermal conductivity (non-dimensional)
     cfg.solver.kappa = 0  # previously: kappa
+    # Number of wall boundary particle layers
+    cfg.solver.n_walls = 3
     # Whether to apply the heat conduction term
     cfg.solver.heat_conduction = False  # previously: heat-conduction
     # Whether to apply boundaty conditions
