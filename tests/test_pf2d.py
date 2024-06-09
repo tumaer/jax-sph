@@ -108,8 +108,6 @@ def test_pf2d(tvf, solver, tmp_path, setup_simulation):
     """Test whether the poiseuille flow simulation matches the analytical solution"""
     y_axis, t_dimless, ref_solutions = setup_simulation
     data_path = run_simulation(tmp_path, tvf, solver)
-    # print(f"tmp_path = {tmp_path}, subdirs = {subdirs}")
     solutions = get_solution(data_path, t_dimless, y_axis)
-    # print(f"solution: {solutions[-1]} \nref_solution: {ref_solutions[-1]}")
     for sol, ref_sol in zip(solutions, ref_solutions):
         assert np.allclose(sol, ref_sol, atol=1e-2), "Velocity profile does not match."
