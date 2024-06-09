@@ -9,7 +9,7 @@ case:
   viscosity: 0.00005
   special:
     L_wall: 5.366
-    H_wall: 2.0
+    H_wall: 5.366 #2.0
     L: 2.0  # water column length
     H: 1.0  # water column height
     W: 0.2  # width in 3D case
