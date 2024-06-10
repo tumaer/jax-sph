@@ -9,12 +9,14 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import vmap
+from scipy.spatial import KDTree
 
 from jax_sph.eos import RIEMANNEoS, TaitEoS
 from jax_sph.io_state import read_h5
 from jax_sph.jax_md import space
 from jax_sph.utils import (
     Tag,
+    get_box_nws,
     get_noise_masked,
     pos_init_cartesian_2d,
     pos_init_cartesian_3d,
@@ -153,6 +155,22 @@ class SimulationSetup(ABC):
             num_particles, mass_ref, cfg.case
         )
 
+        # calculate wall normal vectors and match indices
+        # TODO: this works only for the box walls -> e.g. clinder flow not working.
+        #       Should we use another approach and scrap this one?
+        # TODO: adapt other cases besides DB
+        # TODO: PF won't work because KDTree does not know periodic BCs, right?
+        # TODO: check whether free slip works for standard SPH
+        nws, r_nws = get_box_nws(
+            box_size - cfg.case.special.box_offset,  # TODO: How to treat offset?
+            cfg.case.dx,
+            cfg.solver.n_walls,
+            cfg.case.dim,
+            rho,
+            mass,
+        )
+        nw = self._match_nws(r, r_nws, nws)
+
         # initialize the state dictionary
         state = {
             "r": r,
@@ -170,6 +188,7 @@ class SimulationSetup(ABC):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
+            "nw": nw,
         }
 
         # overwrite the state dictionary with the provided one
@@ -289,6 +308,14 @@ class SimulationSetup(ABC):
         self._init_pos3D_rlx = self._init_pos3D
         self._tag2D_rlx = self._tag2D
         self._tag3D_rlx = self._tag3D
+
+    def _match_nws(self, r, r_nws, nws):
+        tree = KDTree(r)
+        dist, match_idx = tree.query(r_nws, k=1)
+        nw = jnp.zeros_like(r)
+        nw = nw.at[match_idx].set(nws)
+
+        return nw
 
 
 def set_relaxation(Case, cfg):

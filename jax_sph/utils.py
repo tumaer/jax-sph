@@ -9,6 +9,7 @@ import numpy as np
 from jax import ops, vmap
 from numpy import array
 from omegaconf import DictConfig
+from scipy.spatial import KDTree
 
 from jax_sph.io_state import read_h5
 from jax_sph.jax_md import partition, space
@@ -57,16 +58,16 @@ def pos_box_2d(L: float, H: float, dx: float, num_wall_layers: int = 3):
     The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx).
     The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
     """
-    dx3 = num_wall_layers * dx
+    dxn = num_wall_layers * dx
     # horizontal and vertical blocks
-    vertical = pos_init_cartesian_2d(np.array([dx3, H + 2 * dx3]), dx)
-    horiz = pos_init_cartesian_2d(np.array([L, dx3]), dx)
+    vertical = pos_init_cartesian_2d(np.array([dxn, H + 2 * dxn]), dx)
+    horiz = pos_init_cartesian_2d(np.array([L, dxn]), dx)
 
     # wall: left, bottom, right, top
     wall_l = vertical.copy()
-    wall_b = horiz.copy() + np.array([dx3, 0.0])
-    wall_r = vertical.copy() + np.array([L + dx3, 0.0])
-    wall_t = horiz.copy() + np.array([dx3, H + dx3])
+    wall_b = horiz.copy() + np.array([dxn, 0.0])
+    wall_r = vertical.copy() + np.array([L + dxn, 0.0])
+    wall_t = horiz.copy() + np.array([dxn, H + dxn])
 
     res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
     return res
@@ -120,17 +121,27 @@ def get_stats(state: Dict, props: list, dx: float):
     return res
 
 
-def get_nws(dx, dim, r, rho, m, tag, neighbors, displacement_fn):
-    """Computes the wall normal vectors at boundaries"""
+def get_box_nws(box_size, dx, n_walls, dim, rho, m):
+    """Computes the normal vectors at box wall boundaries"""
 
-    N = len(r)
-    i_s, j_s = neighbors.idx
-    dr_ij = vmap(displacement_fn)(r[i_s], r[j_s])
-    dist = space.distance(dr_ij)
-    wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
+    # TODO: having a pos_box_3d would be useful
+    # TODO: pos_box_* having array as input would also be useful
+    length = box_size[0] - 2 * n_walls * dx
+    height = box_size[1] - 2 * n_walls * dx
+
+    # define 5 layers of wall BC partilces and position them accordingly
+    layers = {}
+    idx_len = {}
+    for i in range(5):
+        layer = pos_box_2d(length + 2 * i * dx, height + 2 * i * dx, dx, 1)
+        layers[f"layer_{i}"] = layer + np.ones(2) * ((n_walls - 1) - i) * dx
+        idx_len[f"len_{i}"] = len(layer)
+
+    # define kernel function
     kernel_fn = QuinticKernel(h=dx, dim=dim)
 
-    def wall_phi_vec(rho_j, m_j, dr_ij, dist, tag_j, tag_i):
+    # define function to calculate phi, Zhang (2017)
+    def wall_phi_vec(rho_j, m_j, dr_ij, dist):
         # Compute unit vector, above eq. (6), Zhang (2017)
         e_ij_w = dr_ij / (dist + EPS)
 
@@ -138,20 +149,54 @@ def get_nws(dx, dim, r, rho, m, tag, neighbors, displacement_fn):
         kernel_grad = kernel_fn.grad_w(dist) * (e_ij_w)
 
         # compute phi eq. (15), Zhang (2017)
-        phi = -1.0 * m_j / rho_j * kernel_grad * tag_j * tag_i
+        phi = -1.0 * m_j / rho_j * kernel_grad
 
         return phi
 
-    temp = vmap(wall_phi_vec)(
-        rho[j_s], m[j_s], dr_ij, dist, wall_mask[j_s], wall_mask[i_s]
-    )
-    phi = ops.segment_sum(temp, i_s, N)
-    n_w = (
-        phi / (jnp.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None] * wall_mask[:, None]
-    )
-    n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
+    nw = []
+    for i in range(3):
+        # setup of the temporary box, consisting out of 3 particle layers
+        temp_box = np.concatenate(
+            (
+                layers[f"layer_{i}"],
+                layers[f"layer_{i + 1}"],
+                layers[f"layer_{i + 2}"],
+            ),
+            axis=0,
+        )
+        # define KD tree and get neighbors
+        tree = KDTree(temp_box)
+        neighbors = tree.query_ball_point(
+            temp_box[0 : idx_len[f"len_{i}"]], 3 * dx, p=2.0
+        )
+        # get neighbor and nw indices
+        neighbors_idx = np.concatenate(neighbors, axis=0)
+        nw_idx = np.repeat(range(idx_len[f"len_{i}"]), [len(x) for x in neighbors])
 
-    return n_w
+        # calculate distances
+        dr_ij = vmap(space.pairwise_displacement)(
+            temp_box[nw_idx], temp_box[neighbors_idx]
+        )
+        dist = space.distance(dr_ij)
+
+        # calculate normal vectors
+        temp = vmap(wall_phi_vec)(rho[neighbors_idx], m[neighbors_idx], dr_ij, dist)
+        phi = ops.segment_sum(temp, nw_idx, idx_len[f"len_{i}"])
+        nw_temp = phi / (np.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None]
+        nw.append(nw_temp)
+
+    nw = np.concatenate(nw, axis=0)
+    nw = np.where(np.absolute(nw) < EPS, 0.0, nw)
+    r_nw = np.concatenate(
+        (
+            layers["layer_0"],
+            layers["layer_1"],
+            layers["layer_2"],
+        ),
+        axis=0,
+    )
+
+    return nw, r_nw
 
 
 class Logger:
