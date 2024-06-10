@@ -74,6 +74,30 @@ def pos_box_2d(fluid_box: array, dx: float, num_wall_layers: int = 3):
     return res
 
 
+def pos_box_3d(fluid_box: array, dx: float, num_wall_layers: int = 3):
+    """Create an z-periodic empty box of particles in 3D.
+
+    fluid_box is an array of the form: [L, H, D]
+    The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx) x D.
+    The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
+    """
+    dxn = num_wall_layers * dx
+    # horizontal and vertical blocks
+    vertical = pos_init_cartesian_3d(
+        np.array([dxn, fluid_box[1] + 2 * dxn, fluid_box[2]]), dx
+    )
+    horiz = pos_init_cartesian_3d(np.array([fluid_box[0], dxn, fluid_box[2]]), dx)
+
+    # wall: left, bottom, right, top
+    wall_l = vertical.copy()
+    wall_b = horiz.copy() + np.array([dxn, 0.0, 0.0])
+    wall_r = vertical.copy() + np.array([fluid_box[0] + dxn, 0.0, 0.0])
+    wall_t = horiz.copy() + np.array([dxn, fluid_box[1] + dxn, 0.0])
+
+    res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
+    return res
+
+
 def get_noise_masked(shape: tuple, mask: array, key: jax.random.PRNGKey, std: float):
     """Generate Gaussian noise with `std` where `mask` is True."""
     noise = std * jax.random.normal(key, shape)
@@ -199,7 +223,7 @@ def get_box_nws(box_size, dx, n_walls, dim, rho, m):
 
 
 def get_nws(r, tag, fluid_size, dx, offset_vec, wall_part_fn):
-    """Computes the normal vectors all wall boundaries"""
+    """Computes the normal vectors of all wall boundaries"""
 
     # align fluid to [0, 0]
     r_aligned = r - offset_vec

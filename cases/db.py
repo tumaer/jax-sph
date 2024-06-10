@@ -26,6 +26,8 @@ class DB(SimulationSetup):
 
         # define offset vector
         self.offset_vec = np.ones(2) * cfg.solver.n_walls * cfg.case.dx
+
+        # set fluid domain size
         self.fluid_size = np.array([self.special.L_wall, self.special.H_wall])
 
         # relaxation configurations

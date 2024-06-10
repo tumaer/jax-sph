@@ -18,6 +18,7 @@ from jax_sph.utils import (
     get_noise_masked,
     get_nws,
     pos_box_2d,
+    pos_box_3d,
     pos_init_cartesian_2d,
     pos_init_cartesian_3d,
     wall_tags,
@@ -155,9 +156,6 @@ class SimulationSetup(ABC):
             num_particles, mass_ref, cfg.case
         )
 
-        wall_part_fn = self._get_boundary_particles_fn()
-        nw = get_nws(r, tag, self.fluid_size, dx, self.offset_vec, wall_part_fn)
-
         # initialize the state dictionary
         state = {
             "r": r,
@@ -175,8 +173,12 @@ class SimulationSetup(ABC):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
-            "nw": nw,
+            "nw": jnp.zeros_like(r),
         }
+        if cfg.solver.is_bc_trick:
+            wall_part_fn = self._get_boundary_particles_fn()
+            nw = get_nws(r, tag, self.fluid_size, dx, self.offset_vec, wall_part_fn)
+            state["nw"] = nw
 
         # overwrite the state dictionary with the provided one
         if cfg.case.state0_path is not None:
@@ -215,25 +217,25 @@ class SimulationSetup(ABC):
         )
 
     @abstractmethod
-    def _box_size2D(self, cfg):
+    def _box_size2D(self, n_walls):
         pass
 
     @abstractmethod
-    def _box_size3D(self, cfg):
+    def _box_size3D(self, n_walls):
         pass
 
-    def _init_pos2D(self, box_size, dx):
+    def _init_pos2D(self, box_size, dx, n_walls):
         return pos_init_cartesian_2d(box_size, dx)
 
-    def _init_pos3D(self, box_size, dx):
+    def _init_pos3D(self, box_size, dx, n_walls):
         return pos_init_cartesian_3d(box_size, dx)
 
     @abstractmethod
-    def _tag2D(self, r):
+    def _tag2D(self, r, n_walls):
         pass
 
     @abstractmethod
-    def _tag3D(self, r):
+    def _tag3D(self, r, n_walls):
         pass
 
     @abstractmethod
@@ -255,6 +257,8 @@ class SimulationSetup(ABC):
     def _get_boundary_particles_fn(self):
         if self.case.dim == 2:
             boundary_particles_fn = pos_box_2d
+        elif self.case.dim == 3:
+            boundary_particles_fn = pos_box_3d
         return boundary_particles_fn
 
     def _get_relaxed_r0(self, box_size, dx):
