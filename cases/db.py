@@ -24,6 +24,10 @@ class DB(SimulationSetup):
         # | --------------------------|
         #  <          L_wall         >
 
+        # define offset vector
+        self.offset_vec = np.ones(2) * cfg.solver.n_walls * cfg.case.dx
+        self.fluid_size = np.array([self.special.L_wall, self.special.H_wall])
+
         # relaxation configurations
         if self.case.mode == "rlx":
             self.special.L_wall = self.special.L
@@ -56,17 +60,19 @@ class DB(SimulationSetup):
         else:
             r_fluid = self._get_relaxed_r0(None, dx)
 
-        walls = pos_box_2d(sp.L_wall, sp.H_wall, dx)
+        walls = pos_box_2d(
+            np.array([sp.L_wall, sp.H_wall]), dx, self.cfg.solver.n_walls
+        )
         res = np.concatenate([walls, r_fluid])
         return res
 
-    def _init_pos3D(self, box_size, dx):
+    def _init_pos3D(self, box_size, dx, n_walls):
         # cartesian coordinates in z
         Lz = box_size[2]
         zs = np.arange(0, Lz, dx) + 0.5 * dx
 
         # extend 2D points to 3D
-        xy = self._init_pos2D(box_size, dx)
+        xy = self._init_pos2D(box_size, dx, n_walls)
         xy_ext = np.hstack([xy, np.ones((len(xy), 1))])
 
         r_xyz = np.vstack([xy_ext * [1, 1, z] for z in zs])

@@ -52,22 +52,23 @@ def pos_init_cartesian_3d(box_size: array, dx: float):
     return r
 
 
-def pos_box_2d(L: float, H: float, dx: float, num_wall_layers: int = 3):
+def pos_box_2d(fluid_box: array, dx: float, num_wall_layers: int = 3):
     """Create an empty box of particles in 2D.
 
+    fluid_box is an array of the form: [L, H]
     The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx).
     The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
     """
     dxn = num_wall_layers * dx
     # horizontal and vertical blocks
-    vertical = pos_init_cartesian_2d(np.array([dxn, H + 2 * dxn]), dx)
-    horiz = pos_init_cartesian_2d(np.array([L, dxn]), dx)
+    vertical = pos_init_cartesian_2d(np.array([dxn, fluid_box[1] + 2 * dxn]), dx)
+    horiz = pos_init_cartesian_2d(np.array([fluid_box[0], dxn]), dx)
 
     # wall: left, bottom, right, top
     wall_l = vertical.copy()
     wall_b = horiz.copy() + np.array([dxn, 0.0])
-    wall_r = vertical.copy() + np.array([L + dxn, 0.0])
-    wall_t = horiz.copy() + np.array([dxn, H + dxn])
+    wall_r = vertical.copy() + np.array([fluid_box[0] + dxn, 0.0])
+    wall_t = horiz.copy() + np.array([dxn, fluid_box[1] + dxn])
 
     res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
     return res
@@ -125,15 +126,13 @@ def get_box_nws(box_size, dx, n_walls, dim, rho, m):
     """Computes the normal vectors at box wall boundaries"""
 
     # TODO: having a pos_box_3d would be useful
-    # TODO: pos_box_* having array as input would also be useful
-    length = box_size[0] - 2 * n_walls * dx
-    height = box_size[1] - 2 * n_walls * dx
+    box = box_size - 2 * n_walls * dx
 
     # define 5 layers of wall BC partilces and position them accordingly
     layers = {}
     idx_len = {}
     for i in range(5):
-        layer = pos_box_2d(length + 2 * i * dx, height + 2 * i * dx, dx, 1)
+        layer = pos_box_2d(box + 2 * i * dx, dx, 1)
         layers[f"layer_{i}"] = layer + np.ones(2) * ((n_walls - 1) - i) * dx
         idx_len[f"len_{i}"] = len(layer)
 
@@ -197,6 +196,27 @@ def get_box_nws(box_size, dx, n_walls, dim, rho, m):
     )
 
     return nw, r_nw
+
+
+def get_nws(r, tag, fluid_size, dx, offset_vec, wall_part_fn):
+    """Computes the normal vectors all wall boundaries"""
+
+    # align fluid to [0, 0]
+    r_aligned = r - offset_vec
+
+    # define fine layer of wall BC partilces and position them accordingly
+    layer = wall_part_fn(fluid_size, dx / 5, 1) - np.ones(2) * dx / 5
+
+    # match thin layer to particles
+    tree = KDTree(layer)
+    dist, match_idx = tree.query(r_aligned, k=1)
+    dr = layer[match_idx] - r_aligned
+
+    # compute normal vectors
+    nw = dr / (dist[:, None] + EPS)
+    nw = np.where(np.isin(tag, wall_tags)[:, None], nw, np.zeros(2))
+
+    return nw
 
 
 class Logger:
