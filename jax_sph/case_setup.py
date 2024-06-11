@@ -17,8 +17,6 @@ from jax_sph.utils import (
     Tag,
     get_noise_masked,
     get_nws,
-    pos_box_2d,
-    pos_box_3d,
     pos_init_cartesian_2d,
     pos_init_cartesian_3d,
     wall_tags,
@@ -126,12 +124,10 @@ class SimulationSetup(ABC):
         # initialize box and positions of particles
         if dim == 2:
             box_size = self._box_size2D(cfg.solver.n_walls)
-            r = self._init_pos2D(box_size, dx, cfg.solver.n_walls)
-            tag = self._tag2D(r, cfg.solver.n_walls)
+            r, tag = self._init_pos2D(box_size, dx, cfg.solver.n_walls)
         elif dim == 3:
             box_size = self._box_size3D(cfg.solver.n_walls)
-            r = self._init_pos3D(box_size, dx, cfg.solver.n_walls)
-            tag = self._tag3D(r, cfg.solver.n_walls)
+            r, tag = self._init_pos3D(box_size, dx, cfg.solver.n_walls)
         displacement_fn, shift_fn = space.periodic(side=box_size)
 
         num_particles = len(r)
@@ -175,9 +171,24 @@ class SimulationSetup(ABC):
             "Cp": Cp,
             "nw": jnp.zeros_like(r),
         }
+
+        # calculate wall normals if necessary
         if cfg.solver.is_bc_trick:
-            wall_part_fn = self._get_boundary_particles_fn()
-            nw = get_nws(r, tag, self.fluid_size, dx, self.offset_vec, wall_part_fn)
+            if dim == 2:
+                wall_part_fn = self._init_walls_2d
+            elif dim == 3:
+                wall_part_fn = self._init_walls_3d
+            else:
+                raise NotImplementedError("1D wall BCs not yet implemented")
+            nw = get_nws(
+                r,
+                tag,
+                dx,
+                cfg.solver.n_walls,
+                dim,
+                self.offset_vec,
+                wall_part_fn,
+            )
             state["nw"] = nw
 
         # overwrite the state dictionary with the provided one
@@ -225,17 +236,23 @@ class SimulationSetup(ABC):
         pass
 
     def _init_pos2D(self, box_size, dx, n_walls):
-        return pos_init_cartesian_2d(box_size, dx)
+        r = pos_init_cartesian_2d(box_size, dx)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        return r, tag
 
     def _init_pos3D(self, box_size, dx, n_walls):
-        return pos_init_cartesian_3d(box_size, dx)
+        r = pos_init_cartesian_3d(box_size, dx)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        return r, tag
 
     @abstractmethod
-    def _tag2D(self, r, n_walls):
+    def _init_walls_2d(self):
+        """Create all solid walls of a 2D case."""
         pass
 
     @abstractmethod
-    def _tag3D(self, r, n_walls):
+    def _init_walls_3d(self):
+        """Create all solid walls of a 3D case."""
         pass
 
     @abstractmethod
@@ -253,13 +270,6 @@ class SimulationSetup(ABC):
     @abstractmethod
     def _boundary_conditions_fn(self, state):
         pass
-
-    def _get_boundary_particles_fn(self):
-        if self.case.dim == 2:
-            boundary_particles_fn = pos_box_2d
-        elif self.case.dim == 3:
-            boundary_particles_fn = pos_box_3d
-        return boundary_particles_fn
 
     def _get_relaxed_r0(self, box_size, dx):
         assert hasattr(self, "_load_only_fluid"), AttributeError
@@ -281,7 +291,7 @@ class SimulationSetup(ABC):
         if self._load_only_fluid:
             return state["r"][state["tag"] == Tag.FLUID]
         else:
-            return state["r"]
+            return state["r"], state["tag"]
 
     def _set_field_properties(self, num_particles, mass_ref, case):
         rho = jnp.ones(num_particles) * case.rho_ref
@@ -302,8 +312,6 @@ class SimulationSetup(ABC):
         self._box_size3D_rlx = self._box_size3D
         self._init_pos2D_rlx = self._init_pos2D
         self._init_pos3D_rlx = self._init_pos3D
-        self._tag2D_rlx = self._tag2D
-        self._tag3D_rlx = self._tag3D
 
 
 def set_relaxation(Case, cfg):
@@ -333,8 +341,6 @@ def set_relaxation(Case, cfg):
             self._init_pos3D = self._init_pos3D_rlx
             self._box_size2D = self._box_size2D_rlx
             self._box_size3D = self._box_size3D_rlx
-            self._tag2D = self._tag2D_rlx
-            self._tag3D = self._tag3D_rlx
 
         def _init_velocity2D(self, r):
             return jnp.zeros_like(r)

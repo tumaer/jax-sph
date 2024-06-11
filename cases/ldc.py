@@ -6,7 +6,13 @@ import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag
+from jax_sph.utils import (
+    Tag,
+    pos_box_2d,
+    pos_box_3d,
+    pos_init_cartesian_2d,
+    pos_init_cartesian_3d,
+)
 
 
 class LDC(SimulationSetup):
@@ -20,6 +26,9 @@ class LDC(SimulationSetup):
             self.u_lid = jnp.array([self.special.u_x_lid, 0.0])
         elif self.case.dim == 3:
             self.u_lid = jnp.array([self.special.u_x_lid, 0.0, 0.0])
+
+        # define offset vector
+        self.offset_vec = self._offset_vec()
 
         # relaxation configurations
         if self.case.mode == "rlx":
@@ -37,19 +46,68 @@ class LDC(SimulationSetup):
         dx6 = 6 * self.case.dx
         return np.array([1 + dx6, 1 + dx6, 0.5])
 
-    def _tag2D(self, r):
-        box_size = self._box_size2D() if self.case.dim == 2 else self._box_size3D()
+    def _box_size2D(self, n_walls):
+        return np.ones((2,)) + 2 * n_walls * self.case.dx
 
-        mask_lid = r[:, 1] > (box_size[1] - 3 * self.case.dx)
-        r_centered_abs = jnp.abs(r - r.mean(axis=0))
-        mask_water = jnp.where(r_centered_abs.max(axis=1) < 0.5, True, False)
-        tag = jnp.full(len(r), Tag.SOLID_WALL, dtype=int)
-        tag = jnp.where(mask_water, Tag.FLUID, tag)
+    def _box_size3D(self, n_walls):
+        dx2n = 2 * n_walls * self.case.dx
+        return np.array([1 + dx2n, 1 + dx2n, 0.5])
+
+    def _init_walls_2d(self, dx, n_walls):
+        rw = pos_box_2d(np.ones(2), dx, n_walls)
+        return rw
+
+    def _init_walls_3d(self, dx, n_walls):
+        rw = pos_box_3d(np.array([1.0, 1.0, 0.5]), dx, n_walls)
+        return rw
+
+    def _init_pos2D(self, box_size, dx, n_walls):
+        # initialize fluid phase
+        r_f = n_walls * dx + pos_init_cartesian_2d(np.ones(2), dx)
+
+        # initialize walls
+        r_w = self._init_walls_2d(dx, n_walls)
+
+        # set tags
+        tag_f = jnp.full(len(r_f), Tag.FLUID, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.SOLID_WALL, dtype=int)
+
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+
+        # set velocity wall tag
+        box_size = self._box_size2D(n_walls)
+        mask_lid = r[:, 1] > (box_size[1] - n_walls * self.case.dx)
         tag = jnp.where(mask_lid, Tag.MOVING_WALL, tag)
-        return tag
+        return r, tag
 
-    def _tag3D(self, r):
-        return self._tag2D(r)
+    def _init_pos3D(self, box_size, dx, n_walls):
+        # initialize fluid phase
+        r_f = n_walls * dx + pos_init_cartesian_3d(np.array([1.0, 1.0, 0.5]), dx)
+
+        # initialize walls
+        r_w = self._init_walls_3d(dx, n_walls)
+
+        # set tags
+        tag_f = jnp.full(len(r_f), Tag.FLUID, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.SOLID_WALL, dtype=int)
+
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+
+        # set velocity wall tag
+        box_size = self._box_size3D(n_walls)
+        mask_lid = r[:, 1] > (box_size[1] - n_walls * self.case.dx)
+        tag = jnp.where(mask_lid, Tag.MOVING_WALL, tag)
+        return r, tag
+
+    def _offset_vec(self):
+        dim = self.cfg.case.dim
+        if dim == 2:
+            res = np.ones(dim) * self.cfg.solver.n_walls * self.cfg.case.dx
+        elif dim == 3:
+            res = np.array([1.0, 1.0, 0.0]) * self.cfg.solver.n_walls * self.cfg.case.dx
+        return res
 
     def _init_velocity2D(self, r):
         u = jnp.zeros_like(r)

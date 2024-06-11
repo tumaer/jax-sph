@@ -9,6 +9,9 @@ case:
   viscosity: 100.0
   u_ref: 1.25
   g_ext_magnitude: 1000.0
+  special:
+    L: 0.4  # water column length
+    H: 1.0  # water column height
 
 solver:
   dt: 0.0000005

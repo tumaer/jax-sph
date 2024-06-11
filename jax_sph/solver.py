@@ -582,23 +582,11 @@ class WCSPH:
             wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
             fluid_mask = jnp.where(tag == Tag.FLUID, 1.0, 0.0)
 
-            # calculate normal vector of wall boundaries
-            # temp = vmap(self._wall_phi_vec)(
-            #     rho[j_s], mass[j_s], dr_i_j, dist, wall_mask[j_s], wall_mask[i_s]
-            # )
-            # phi = ops.segment_sum(temp, i_s, N)
-
-            # # compute normal vector for boundary particles eq. (15), Zhang (2017)
-            # n_w = (
-            #     phi
-            #     / (jnp.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None]
-            #     * wall_mask[:, None]
-            # )
-            # n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
-
             ##### Riemann velocity BCs
             if self.is_bc_trick and (self.solver == "RIE"):
                 u_tilde = self._riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N)
+            else:
+                u_tilde = u
 
             ##### Density summation or evolution
 

@@ -52,14 +52,16 @@ def pos_init_cartesian_3d(box_size: array, dx: float):
     return r
 
 
-def pos_box_2d(fluid_box: array, dx: float, num_wall_layers: int = 3):
+def pos_box_2d(fluid_box: array, dx: float, n_walls: int = 3):
     """Create an empty box of particles in 2D.
 
     fluid_box is an array of the form: [L, H]
-    The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx).
-    The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
+    The box is of size (L + n_walls * dx) x (H + n_walls * dx).
+    The inner part of the box starts at (n_walls * dx, n_walls * dx).
     """
-    dxn = num_wall_layers * dx
+    # thickness of wall particles
+    dxn = n_walls * dx
+
     # horizontal and vertical blocks
     vertical = pos_init_cartesian_2d(np.array([dxn, fluid_box[1] + 2 * dxn]), dx)
     horiz = pos_init_cartesian_2d(np.array([fluid_box[0], dxn]), dx)
@@ -74,14 +76,17 @@ def pos_box_2d(fluid_box: array, dx: float, num_wall_layers: int = 3):
     return res
 
 
-def pos_box_3d(fluid_box: array, dx: float, num_wall_layers: int = 3):
+def pos_box_3d(fluid_box: array, dx: float, n_walls: int = 3, z_periodic: bool = True):
     """Create an z-periodic empty box of particles in 3D.
 
     fluid_box is an array of the form: [L, H, D]
-    The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx) x D.
-    The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
+    The box is of size (L + n_walls * dx) x (H + n_walls * dx) x D.
+    The inner part of the box starts at (n_walls * dx, n_walls * dx).
+    z_periodic states whether the box is periodic in z-direction.
     """
-    dxn = num_wall_layers * dx
+    # thickness of wall particles
+    dxn = n_walls * dx
+
     # horizontal and vertical blocks
     vertical = pos_init_cartesian_3d(
         np.array([dxn, fluid_box[1] + 2 * dxn, fluid_box[2]]), dx
@@ -95,6 +100,20 @@ def pos_box_3d(fluid_box: array, dx: float, num_wall_layers: int = 3):
     wall_t = horiz.copy() + np.array([dxn, fluid_box[1] + dxn, 0.0])
 
     res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
+
+    # add walls in z-direction
+    if not z_periodic:
+        res += np.array([0.0, 0.0, dxn])
+        # front block
+        front = pos_init_cartesian_3d(
+            np.array([fluid_box[0] + 2 * dxn, fluid_box[1] + 2 * dxn, dxn]), dx
+        )
+
+        # wall: front, end
+        wall_f = front.copy()
+        wall_e = front.copy() + np.array([0.0, 0.0, fluid_box[2] + dxn])
+        res = jnp.concatenate([res, wall_f, wall_e])
+
     return res
 
 
@@ -222,14 +241,17 @@ def get_box_nws(box_size, dx, n_walls, dim, rho, m):
     return nw, r_nw
 
 
-def get_nws(r, tag, fluid_size, dx, offset_vec, wall_part_fn):
+def get_nws(r, tag, dx, n_walls, dim, offset_vec, wall_part_fn):
     """Computes the normal vectors of all wall boundaries"""
+
+    dx_fac = 5
 
     # align fluid to [0, 0]
     r_aligned = r - offset_vec
 
     # define fine layer of wall BC partilces and position them accordingly
-    layer = wall_part_fn(fluid_size, dx / 5, 1) - np.ones(2) * dx / 5
+    # layer = wall_part_fn(fluid_size, dx / dx_fac, 1) - offset_vec / n_walls / dx_fac
+    layer = wall_part_fn(dx / dx_fac, 1) - offset_vec / n_walls / dx_fac
 
     # match thin layer to particles
     tree = KDTree(layer)
@@ -238,7 +260,7 @@ def get_nws(r, tag, fluid_size, dx, offset_vec, wall_part_fn):
 
     # compute normal vectors
     nw = dr / (dist[:, None] + EPS)
-    nw = np.where(np.isin(tag, wall_tags)[:, None], nw, np.zeros(2))
+    nw = np.where(np.isin(tag, wall_tags)[:, None], nw, np.zeros(dim))
 
     return nw
 

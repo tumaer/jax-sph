@@ -5,7 +5,13 @@ import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
+from jax_sph.utils import (
+    Tag,
+    pos_box_2d,
+    pos_box_3d,
+    pos_init_cartesian_2d,
+    pos_init_cartesian_3d,
+)
 
 
 class DB(SimulationSetup):
@@ -25,10 +31,7 @@ class DB(SimulationSetup):
         #  <          L_wall         >
 
         # define offset vector
-        self.offset_vec = np.ones(2) * cfg.solver.n_walls * cfg.case.dx
-
-        # set fluid domain size
-        self.fluid_size = np.array([self.special.L_wall, self.special.H_wall])
+        self.offset_vec = self._offset_vec()
 
         # relaxation configurations
         if self.case.mode == "rlx":
@@ -55,46 +58,67 @@ class DB(SimulationSetup):
             [sp.L_wall + 2 * n_walls * dx + bo, sp.H_wall + 2 * n_walls * dx + bo, sp.W]
         )
 
+    def _init_walls_2d(self, dx, n_walls):
+        sp = self.special
+        rw = pos_box_2d(np.array([sp.L_wall, sp.H_wall]), dx, n_walls)
+        return rw
+
+    def _init_walls_3d(self, dx, n_walls):
+        sp = self.special
+        rw = pos_box_3d(np.array([sp.L_wall, sp.H_wall, 1.0]), dx, n_walls)
+        return rw
+
     def _init_pos2D(self, box_size, dx, n_walls):
         sp = self.special
-        if self.case.r0_type == "cartesian":
-            r_fluid = n_walls * dx + pos_init_cartesian_2d(np.array([sp.L, sp.H]), dx)
-        else:
-            r_fluid = self._get_relaxed_r0(None, dx)
 
-        walls = pos_box_2d(
-            np.array([sp.L_wall, sp.H_wall]), dx, self.cfg.solver.n_walls
-        )
-        res = np.concatenate([walls, r_fluid])
-        return res
+        # initialize fluid phase
+        if self.case.r0_type == "cartesian":
+            r_f = n_walls * dx + pos_init_cartesian_2d(np.array([sp.L, sp.H]), dx)
+        else:
+            r_f = self._get_relaxed_r0(None, dx)
+
+        # initialize walls
+        r_w = self._init_walls_2d(dx, n_walls)
+
+        # set tags
+        tag_f = jnp.full(len(r_f), Tag.FLUID, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.SOLID_WALL, dtype=int)
+
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+        return r, tag
 
     def _init_pos3D(self, box_size, dx, n_walls):
-        # cartesian coordinates in z
-        Lz = box_size[2]
-        zs = np.arange(0, Lz, dx) + 0.5 * dx
+        # TODO: not validated yet
+        sp = self.special
 
-        # extend 2D points to 3D
-        xy = self._init_pos2D(box_size, dx, n_walls)
-        xy_ext = np.hstack([xy, np.ones((len(xy), 1))])
+        # initialize fluid phase
+        if self.case.r0_type == "cartesian":
+            r_f = np.array([1.0, 1.0, 0.0]) * n_walls * dx + pos_init_cartesian_3d(
+                np.array([sp.L, sp.H, 1.0]), dx
+            )
+        else:
+            r_f = self._get_relaxed_r0(None, dx)
 
-        r_xyz = np.vstack([xy_ext * [1, 1, z] for z in zs])
-        return r_xyz
+        # initialize walls
+        r_w = self._init_walls_3d(dx, n_walls)
 
-    def _tag2D(self, r, n_walls):
-        dxn = n_walls * self.case.dx
-        mask_left = jnp.where(r[:, 0] < dxn, True, False)
-        mask_bottom = jnp.where(r[:, 1] < dxn, True, False)
-        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dxn, True, False)
-        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dxn, True, False)
+        # set tags
+        tag_f = jnp.full(len(r_f), Tag.FLUID, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.SOLID_WALL, dtype=int)
 
-        mask_wall = mask_left + mask_bottom + mask_right + mask_top
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
 
-        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
-        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
-        return tag
+        return r, tag
 
-    def _tag3D(self, r):
-        return self._tag2D(r)
+    def _offset_vec(self):
+        dim = self.cfg.case.dim
+        if dim == 2:
+            res = np.ones(dim) * self.cfg.solver.n_walls * self.cfg.case.dx
+        elif dim == 3:
+            res = np.array([1.0, 1.0, 0.0]) * self.cfg.solver.n_walls * self.cfg.case.dx
+        return res
 
     def _init_velocity2D(self, r):
         return jnp.zeros_like(r)

@@ -1,7 +1,8 @@
 """Integrator schemes."""
 
-
 from typing import Callable, Dict
+
+import jax.numpy as jnp
 
 from jax_sph.utils import Tag
 
@@ -24,6 +25,13 @@ def si_euler(tvf: float, model: Callable, shift_fn: Callable, bc_fn: Callable):
         # 1. Twice 1/2dt integration of u and v
         state["u"] += 1.0 * dt * state["dudt"]
         state["v"] = state["u"] + tvf * 0.5 * dt * state["dvdt"]
+
+        # TODO: put elsewhere
+        # Quick fix to stop advection of moving wall boundary particles
+        dim = jnp.shape(state["v"])[1]
+        state["v"] = jnp.where(
+            jnp.isin(state["tag"], Tag.MOVING_WALL)[:, None], jnp.zeros(dim), state["v"]
+        )
 
         # 2. Integrate position with velocity v
         state["r"] = shift_fn(state["r"], 1.0 * dt * state["v"])

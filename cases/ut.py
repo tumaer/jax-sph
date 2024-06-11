@@ -5,10 +5,10 @@ import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import pos_init_cartesian_2d, pos_init_cartesian_3d
+from jax_sph.utils import Tag, pos_init_cartesian_2d, pos_init_cartesian_3d
 
 
-class UTSetup(SimulationSetup):
+class UT(SimulationSetup):
     """Unit Test: cube of water in periodic boundary box"""
 
     def __init__(self, cfg: DictConfig):
@@ -20,25 +20,29 @@ class UTSetup(SimulationSetup):
         if self.case.mode == "rlx" or self.case.r0_type == "relaxed":
             raise NotImplementedError("Relaxation not implemented for CW")
 
-    def _box_size2D(self):
+    def _box_size2D(self, n_walls):
         return np.array([self.special.L_wall, self.special.H_wall])
 
-    def _box_size3D(self):
+    def _box_size3D(self, n_walls):
         return np.array([self.special.L_wall, self.special.L_wall, self.special.L_wall])
 
-    def _init_pos2D(self, box_size, dx):
+    def _init_walls_2d(self):
+        pass
+
+    def _init_walls_3d(self):
+        pass
+
+    def _init_pos2D(self, box_size, dx, n_walls):
         cube = np.array([self.special.L, self.special.H])
-        return self.cube_offset + pos_init_cartesian_2d(cube, dx)
+        r = self.cube_offset + pos_init_cartesian_2d(cube, dx)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        return r, tag
 
-    def _init_pos3D(self, box_size, dx):
+    def _init_pos3D(self, box_size, dx, n_walls):
         cube = np.array([self.special.L, self.special.L, self.special.H])
-        return self.cube_offset + pos_init_cartesian_3d(cube, dx)
-
-    def _tag2D(self, r):
-        return jnp.zeros(len(r), dtype=int)
-
-    def _tag3D(self, r):
-        return self._tag2D(r)
+        r = self.cube_offset + pos_init_cartesian_3d(cube, dx)
+        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
+        return r, tag
 
     def _init_velocity2D(self, r):
         return jnp.zeros_like(r)
