@@ -148,7 +148,7 @@ def get_array_stats(state: Dict, var: str = "u", operation="max"):
     if jnp.size(state[var].shape) > 1:
         val_array = jnp.sqrt(jnp.square(state[var]).sum(axis=1))
     else:
-        val_array = state[var]  # TODO: check difference to jnp.absolute(state[var])
+        val_array = state[var]
     return func(val_array)
 
 
