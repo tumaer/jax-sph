@@ -154,7 +154,9 @@ class SimulationSetup(ABC):
             num_particles, mass_ref, cfg.case
         )
         # whether to compute wall normals
-        is_nw = cfg.solver.free_slip or cfg.solver.name == "RIE"
+        is_nw = (
+            cfg.solver.free_slip or cfg.solver.name == "RIE"
+        ) and cfg.solver.is_bc_trick
         # calculate wall normals if necessary
         nw = self._compute_wall_normals("scipy")(r, tag) if is_nw else jnp.zeros_like(r)
 

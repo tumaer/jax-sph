@@ -1,5 +1,9 @@
+absl-py>=2.1.0
 h5py
 jax[cpu]==0.4.29
+
+# JAX-MD dependencies
+jraph>=0.0.6.dev0
 omegaconf
 pandas
 pyvista
@@ -7,7 +11,3 @@ sphinx==7.2.6
 sphinx-exec-code==0.12
 sphinx-rtd-theme==1.3.0
 toml==0.10.2
-
-# JAX-MD dependencies
-jraph>=0.0.6.dev0
-absl-py>=2.1.0
