@@ -19,7 +19,6 @@ jax = {version = "0.4.29", extras = ["cpu"]}
 jaxlib = "0.4.29"
 omegaconf = ">=2.3.0"
 matscipy = ">=0.8.0"
-dataclasses = "0.6"  # for jax-md
 jraph = ">=0.0.6.dev0"  # for jax-md
 absl-py = ">=2.1.0"  # for jax-md
 
