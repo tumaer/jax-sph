@@ -11,6 +11,8 @@ case:
   special:
     hot_wall_temperature: 1.23  # nondimensionalized corresponding to 100
     hot_wall_half_width: 0.25
+    L: 1.0  # water column length
+    H: 0.2  # water column height
 
 
 solver:

@@ -1,12 +1,13 @@
 """Integrator schemes."""
 
-
 from typing import Callable, Dict
 
 from jax_sph.utils import Tag
 
 
-def si_euler(tvf: float, model: Callable, shift_fn: Callable, bc_fn: Callable):
+def si_euler(
+    tvf: float, model: Callable, shift_fn: Callable, bc_fn: Callable, nw_fn: Callable
+):
     """Semi-implicit Euler integrator including Transport Velocity.
 
     The integrator advances the state of the system following the steps:
@@ -27,6 +28,10 @@ def si_euler(tvf: float, model: Callable, shift_fn: Callable, bc_fn: Callable):
 
         # 2. Integrate position with velocity v
         state["r"] = shift_fn(state["r"], 1.0 * dt * state["v"])
+
+        # recompute wall normals if needed
+        if nw_fn is not None:
+            state["nw"] = nw_fn(state["r"])
 
         # 3. Update neighbor list
 

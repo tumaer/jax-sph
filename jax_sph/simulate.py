@@ -38,6 +38,7 @@ def simulate(cfg: DictConfig):
         state,
         g_ext_fn,
         bc_fn,
+        nw_fn,
         eos_fn,
         key,
         displacement_fn,
@@ -84,7 +85,7 @@ def simulate(cfg: DictConfig):
     neighbors = neighbor_fn.allocate(state["r"], num_particles=num_particles)
 
     # Instantiate advance function for our use case
-    advance = si_euler(cfg.solver.tvf, forward, shift_fn, bc_fn)
+    advance = si_euler(cfg.solver.tvf, forward, shift_fn, bc_fn, nw_fn)
 
     advance = advance if cfg.no_jit else jit(advance)
 

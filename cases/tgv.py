@@ -6,7 +6,6 @@ import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag
 
 
 class TGV(SimulationSetup):
@@ -24,18 +23,17 @@ class TGV(SimulationSetup):
             self._init_pos2D = self._get_relaxed_r0
             self._init_pos3D = self._get_relaxed_r0
 
-    def _box_size2D(self):
+    def _box_size2D(self, n_walls):
         return np.array([1.0, 1.0])
 
-    def _box_size3D(self):
+    def _box_size3D(self, n_walls):
         return 2 * np.pi * np.array([1.0, 1.0, 1.0])
 
-    def _tag2D(self, r):
-        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
-        return tag
+    def _init_walls_2d(self):
+        pass
 
-    def _tag3D(self, r):
-        return self._tag2D(r)
+    def _init_walls_3d(self):
+        pass
 
     def _init_velocity2D(self, r):
         x, y = r

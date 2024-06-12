@@ -5,7 +5,13 @@ import numpy as np
 from omegaconf import DictConfig
 
 from jax_sph.case_setup import SimulationSetup
-from jax_sph.utils import Tag, pos_box_2d, pos_init_cartesian_2d
+from jax_sph.utils import (
+    Tag,
+    pos_box_2d,
+    pos_box_3d,
+    pos_init_cartesian_2d,
+    pos_init_cartesian_3d,
+)
 
 
 class CW(SimulationSetup):
@@ -14,40 +20,67 @@ class CW(SimulationSetup):
     def __init__(self, cfg: DictConfig):
         super().__init__(cfg)
 
+        # define offset vector
+        self.offset_vec = np.ones(cfg.case.dim) * cfg.solver.n_walls * cfg.case.dx
+
         # relaxation configurations
         if cfg.case.mode == "rlx" or cfg.case.r0_type == "relaxed":
             raise NotImplementedError("Relaxation not implemented for CW.")
 
-    def _box_size2D(self):
-        return np.array([self.special.L_wall, self.special.H_wall]) + 6 * self.case.dx
+    def _box_size2D(self, n_walls):
+        sp = self.special
+        return np.array([sp.L_wall, sp.H_wall]) + 2 * n_walls * self.case.dx
 
-    def _box_size3D(self):
-        dx6 = 6 * self.case.dx
-        return np.array([self.special.L_wall + dx6, self.special.H_wall + dx6, 0.5])
+    def _box_size3D(self, n_walls):
+        sp = self.special
+        dx2n = 2 * n_walls * self.case.dx
+        return np.array([sp.L_wall + dx2n, sp.H_wall + dx2n, 1.0 + dx2n])
 
-    def _init_pos2D(self, box_size, dx):
-        dx3 = 3 * self.case.dx
-        walls = pos_box_2d(self.special.L_wall, self.special.H_wall, dx)
+    def _init_walls_2d(self, dx, n_walls):
+        sp = self.special
+        rw = pos_box_2d(np.array([sp.L_wall, sp.H_wall]), dx, n_walls)
+        return rw
 
-        r_fluid = pos_init_cartesian_2d(np.array([self.special.L, self.special.H]), dx)
-        r_fluid += dx3 + np.array(self.special.cube_offset)
-        res = np.concatenate([walls, r_fluid])
-        return res
+    def _init_walls_3d(self, dx, n_walls):
+        sp = self.special
+        rw = pos_box_3d(np.array([sp.L_wall, sp.H_wall, 1.0]), dx, n_walls, False)
+        return rw
 
-    def _tag2D(self, r):
-        dx3 = 3 * self.case.dx
-        mask_left = jnp.where(r[:, 0] < dx3, True, False)
-        mask_bottom = jnp.where(r[:, 1] < dx3, True, False)
-        mask_right = jnp.where(r[:, 0] > self.special.L_wall + dx3, True, False)
-        mask_top = jnp.where(r[:, 1] > self.special.H_wall + dx3, True, False)
-        mask_wall = mask_left + mask_bottom + mask_right + mask_top
+    def _init_pos2D(self, box_size, dx, n_walls):
+        dxn = n_walls * self.case.dx
 
-        tag = jnp.full(len(r), Tag.FLUID, dtype=int)
-        tag = jnp.where(mask_wall, Tag.SOLID_WALL, tag)
-        return tag
+        # initialize walls
+        r_w = self._init_walls_2d(dx, n_walls)
 
-    def _tag3D(self, r):
-        return self._tag2D(r)
+        # initialize fluid phase
+        r_f = pos_init_cartesian_2d(np.array([self.special.L, self.special.H]), dx)
+        r_f += dxn + np.array(self.special.cube_offset)
+
+        # set tags
+        tag_f = jnp.full(len(r_f), Tag.FLUID, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.SOLID_WALL, dtype=int)
+
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+        return r, tag
+
+    def _init_pos3D(self, box_size, dx, n_walls):
+        dxn = n_walls * self.case.dx
+
+        # initialize walls
+        r_w = self._init_walls_3d(dx, n_walls)
+
+        # initialize fluid phase
+        r_f = pos_init_cartesian_3d(np.array([self.special.L, self.special.H, 0.3]), dx)
+        r_f += dxn + np.array(self.special.cube_offset)
+
+        # set tags
+        tag_f = jnp.full(len(r_f), Tag.FLUID, dtype=int)
+        tag_w = jnp.full(len(r_w), Tag.SOLID_WALL, dtype=int)
+
+        r = np.concatenate([r_w, r_f])
+        tag = np.concatenate([tag_w, tag_f])
+        return r, tag
 
     def _init_velocity2D(self, r):
         res = jnp.array(self.special.u_init)

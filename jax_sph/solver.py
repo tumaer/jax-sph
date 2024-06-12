@@ -311,7 +311,7 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
     particle hydrodynamics", Adami, Hu, Adams, 2012
     """
 
-    def gwbc_fn(temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N):
+    def gwbc_fn(temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, nw, N):
         mask_bc = jnp.isin(tag, wall_tags)
 
         def no_slip_bc_fn(x):
@@ -325,16 +325,16 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
             x = jnp.where(mask_bc[:, None], 2 * x - x_wall, x)
             return x
 
-        def free_slip_bc_fn(x):
+        def free_slip_bc_fn(x, wall_inner_normals):
             # # normal vectors pointing from fluid to wall
             # (1) implement via summing over fluid particles
-            wall_inner = ops.segment_sum(dr_i_j * mask_j_s_fluid[:, None], i_s, N)
-            # (2) implement using color gradient. Requires 2*rc thick wall
-            # wall_inner = - ops.segment_sum(dr_i_j*mask_j_s_wall[:, None], i_s, N)
+            # wall_inner = ops.segment_sum(dr_i_j * mask_j_s_fluid[:, None], i_s, N)
+            # # (2) implement using color gradient. Requires 2*rc thick wall
+            # # wall_inner = - ops.segment_sum(dr_i_j*mask_j_s_wall[:, None], i_s, N)
 
-            normalization = jnp.sqrt((wall_inner**2).sum(axis=1, keepdims=True))
-            wall_inner_normals = wall_inner / (normalization + EPS)
-            wall_inner_normals = jnp.where(mask_bc[:, None], wall_inner_normals, 0.0)
+            # normalization = jnp.sqrt((wall_inner**2).sum(axis=1, keepdims=True))
+            # wall_inner_normals = wall_inner / (normalization + EPS)
+            # wall_inner_normals = jnp.where(mask_bc[:, None], wall_inner_normals, 0.0)
 
             # for boundary particles, sum over fluid velocities
             x_wall_unnorm = ops.segment_sum(w_j_s_fluid[:, None] * x[j_s], i_s, N)
@@ -357,8 +357,8 @@ def gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos):
 
         if is_free_slip:
             # free-slip boundary - ignore viscous interactions with wall
-            u = free_slip_bc_fn(u)
-            v = free_slip_bc_fn(v)
+            u = free_slip_bc_fn(u, -nw)
+            v = free_slip_bc_fn(v, -nw)
         else:
             # no-slip boundary condition
             u = no_slip_bc_fn(u)
@@ -558,7 +558,7 @@ class WCSPH:
             r, tag, mass, eta = state["r"], state["tag"], state["mass"], state["eta"]
             u, v, dudt, dvdt = state["u"], state["v"], state["dudt"], state["dvdt"]
             rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
-            kappa, Cp = state["kappa"], state["Cp"]
+            nw, kappa, Cp = state["nw"], state["kappa"], state["Cp"]
             temperature, dTdt = state["T"], state["dTdt"]
             N = len(r)
 
@@ -582,23 +582,11 @@ class WCSPH:
             wall_mask = jnp.where(jnp.isin(tag, wall_tags), 1.0, 0.0)
             fluid_mask = jnp.where(tag == Tag.FLUID, 1.0, 0.0)
 
-            # calculate normal vector of wall boundaries
-            temp = vmap(self._wall_phi_vec)(
-                rho[j_s], mass[j_s], dr_i_j, dist, wall_mask[j_s], wall_mask[i_s]
-            )
-            phi = ops.segment_sum(temp, i_s, N)
-
-            # compute normal vector for boundary particles eq. (15), Zhang (2017)
-            n_w = (
-                phi
-                / (jnp.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None]
-                * wall_mask[:, None]
-            )
-            n_w = jnp.where(jnp.absolute(n_w) < EPS, 0.0, n_w)
-
             ##### Riemann velocity BCs
             if self.is_bc_trick and (self.solver == "RIE"):
                 u_tilde = self._riemann_velocities(u, w_dist, fluid_mask, i_s, j_s, N)
+            else:
+                u_tilde = u
 
             ##### Density summation or evolution
 
@@ -624,7 +612,7 @@ class WCSPH:
                     dr_i_j,
                     dist,
                     wall_mask[j_s],
-                    n_w[j_s],
+                    nw[j_s],
                     g_ext[i_s],
                     u_tilde[j_s],
                 )
@@ -646,7 +634,19 @@ class WCSPH:
 
             if self.is_bc_trick and (self.solver == "SPH"):
                 p, rho, u, v, temperature = self._gwbc_fn(
-                    temperature, rho, tag, u, v, p, g_ext, i_s, j_s, w_dist, dr_i_j, N
+                    temperature,
+                    rho,
+                    tag,
+                    u,
+                    v,
+                    p,
+                    g_ext,
+                    i_s,
+                    j_s,
+                    w_dist,
+                    dr_i_j,
+                    nw,
+                    N,
                 )
             elif self.is_bc_trick and (self.solver == "RIE"):
                 mask = self._free_weight(fluid_mask[i_s], tag[i_s])
@@ -714,7 +714,7 @@ class WCSPH:
                     eta[j_s],
                     wall_mask[j_s],
                     mask,
-                    n_w[j_s],
+                    nw[j_s],
                     g_ext[i_s],
                     u_tilde[j_s],
                 )
@@ -754,6 +754,7 @@ class WCSPH:
                 "T": temperature,
                 "kappa": kappa,
                 "Cp": Cp,
+                "nw": nw,
             }
 
             return state

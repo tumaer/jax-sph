@@ -1,7 +1,7 @@
 """General jax-sph utils."""
 
 import enum
-from typing import Dict
+from typing import Callable, Dict
 
 import jax
 import jax.numpy as jnp
@@ -9,9 +9,11 @@ import numpy as np
 from jax import ops, vmap
 from numpy import array
 from omegaconf import DictConfig
+from scipy.spatial import KDTree
 
 from jax_sph.io_state import read_h5
 from jax_sph.jax_md import partition, space
+from jax_sph.jax_md.partition import Dense
 from jax_sph.kernel import QuinticKernel
 
 EPS = jnp.finfo(float).eps
@@ -51,24 +53,68 @@ def pos_init_cartesian_3d(box_size: array, dx: float):
     return r
 
 
-def pos_box_2d(L: float, H: float, dx: float, num_wall_layers: int = 3):
+def pos_box_2d(fluid_box: array, dx: float, n_walls: int = 3):
     """Create an empty box of particles in 2D.
 
-    The box is of size (L + num_wall_layers * dx) x (H + num_wall_layers * dx).
-    The inner part of the box starts at (num_wall_layers * dx, num_wall_layers * dx).
+    fluid_box is an array of the form: [L, H]
+    The box is of size (L + n_walls * dx) x (H + n_walls * dx).
+    The inner part of the box starts at (n_walls * dx, n_walls * dx).
     """
-    dx3 = num_wall_layers * dx
+    # thickness of wall particles
+    dxn = n_walls * dx
+
     # horizontal and vertical blocks
-    vertical = pos_init_cartesian_2d(np.array([dx3, H + 2 * dx3]), dx)
-    horiz = pos_init_cartesian_2d(np.array([L, dx3]), dx)
+    vertical = pos_init_cartesian_2d(np.array([dxn, fluid_box[1] + 2 * dxn]), dx)
+    horiz = pos_init_cartesian_2d(np.array([fluid_box[0], dxn]), dx)
 
     # wall: left, bottom, right, top
     wall_l = vertical.copy()
-    wall_b = horiz.copy() + np.array([dx3, 0.0])
-    wall_r = vertical.copy() + np.array([L + dx3, 0.0])
-    wall_t = horiz.copy() + np.array([dx3, H + dx3])
+    wall_b = horiz.copy() + np.array([dxn, 0.0])
+    wall_r = vertical.copy() + np.array([fluid_box[0] + dxn, 0.0])
+    wall_t = horiz.copy() + np.array([dxn, fluid_box[1] + dxn])
 
     res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
+    return res
+
+
+def pos_box_3d(fluid_box: array, dx: float, n_walls: int = 3, z_periodic: bool = True):
+    """Create an z-periodic empty box of particles in 3D.
+
+    fluid_box is an array of the form: [L, H, D]
+    The box is of size (L + n_walls * dx) x (H + n_walls * dx) x D.
+    The inner part of the box starts at (n_walls * dx, n_walls * dx).
+    z_periodic states whether the box is periodic in z-direction.
+    """
+    # thickness of wall particles
+    dxn = n_walls * dx
+
+    # horizontal and vertical blocks
+    vertical = pos_init_cartesian_3d(
+        np.array([dxn, fluid_box[1] + 2 * dxn, fluid_box[2]]), dx
+    )
+    horiz = pos_init_cartesian_3d(np.array([fluid_box[0], dxn, fluid_box[2]]), dx)
+
+    # wall: left, bottom, right, top
+    wall_l = vertical.copy()
+    wall_b = horiz.copy() + np.array([dxn, 0.0, 0.0])
+    wall_r = vertical.copy() + np.array([fluid_box[0] + dxn, 0.0, 0.0])
+    wall_t = horiz.copy() + np.array([dxn, fluid_box[1] + dxn, 0.0])
+
+    res = jnp.concatenate([wall_l, wall_b, wall_r, wall_t])
+
+    # add walls in z-direction
+    if not z_periodic:
+        res += np.array([0.0, 0.0, dxn])
+        # front block
+        front = pos_init_cartesian_3d(
+            np.array([fluid_box[0] + 2 * dxn, fluid_box[1] + 2 * dxn, dxn]), dx
+        )
+
+        # wall: front, end
+        wall_f = front.copy()
+        wall_e = front.copy() + np.array([0.0, 0.0, fluid_box[2] + dxn])
+        res = jnp.concatenate([res, wall_f, wall_e])
+
     return res
 
 
@@ -103,7 +149,7 @@ def get_array_stats(state: Dict, var: str = "u", operation="max"):
     if jnp.size(state[var].shape) > 1:
         val_array = jnp.sqrt(jnp.square(state[var]).sum(axis=1))
     else:
-        val_array = state[var]  # TODO: check difference to jnp.absolute(state[var])
+        val_array = state[var]
     return func(val_array)
 
 
@@ -118,6 +164,115 @@ def get_stats(state: Dict, props: list, dx: float):
             var, operation = prop.split("_")  # e.g. "u_max"
             res[prop] = get_array_stats(state, var, operation)
     return res
+
+
+def compute_nws_scipy(r, tag, dx, n_walls, offset_vec, wall_part_fn):
+    """Computes the normal vectors of all wall boundaries. Jit-able pure_callback."""
+
+    dx_fac = 5
+
+    # operate only on wall particles, i.e. remove fluid
+    r_walls = r[np.isin(tag, wall_tags)]
+
+    # align fluid to [0, 0]
+    r_aligned = r_walls - offset_vec
+
+    # define fine layer of wall BC partilces and position them accordingly
+    layer = wall_part_fn(dx / dx_fac, 1) - offset_vec / n_walls / dx_fac
+
+    # match thin layer to particles
+    tree = KDTree(layer)
+    dist, match_idx = tree.query(r_aligned, k=1)
+    dr = layer[match_idx] - r_aligned
+    nw_walls = dr / (dist[:, None] + EPS)
+    nw_walls = jnp.asarray(nw_walls, dtype=r.dtype)
+
+    # compute normal vectors
+    nw = jnp.zeros_like(r)
+    nw = nw.at[np.isin(tag, wall_tags)].set(nw_walls)
+
+    return nw
+
+
+def compute_nws_jax_wrapper(
+    state0: Dict,
+    dx: float,
+    n_walls: int,
+    offset_vec: jax.Array,
+    box_size: jax.Array,
+    pbc: jax.Array,
+    cfg_nl: DictConfig,
+    displacement_fn: Callable,
+    wall_part_fn: Callable,
+):
+    """Compute wall normal vectors from wall to fluid. Jit-able JAX implementation.
+
+    For the particles from `r_walls`, find the closest particle from `layer`
+    and compute the normal vector from each `r_walls` particle.
+    """
+    r = state0["r"]
+    tag = state0["tag"]
+
+    # operate only on wall particles, i.e. remove fluid
+    r_walls = r[np.isin(tag, wall_tags)] - offset_vec
+
+    # discretize wall with one layer of 5x smaller particles
+    dx_fac = 5
+    offset = offset_vec / n_walls / dx_fac
+    layer = wall_part_fn(dx / dx_fac, 1) - offset
+
+    # construct a neighbor list over both point clouds
+    r_full = jnp.concatenate([r_walls, layer], axis=0)
+
+    neighbor_fn = partition.neighbor_list(
+        displacement_fn,
+        box_size,
+        r_cutoff=dx * n_walls * 2.0**0.5 * 1.01,
+        backend=cfg_nl.backend,
+        capacity_multiplier=1.25,
+        mask_self=False,
+        format=Dense,
+        num_particles_max=r_full.shape[0],
+        num_partitions=cfg_nl.num_partitions,
+        pbc=np.array(pbc),
+    )
+    num_particles = len(r_full)
+    neighbors = neighbor_fn.allocate(r_full, num_particles=num_particles)
+
+    # jit-able function
+    def body(r: jax.Array):
+        r_walls = r[np.isin(tag, wall_tags)] - offset_vec
+        r_full = jnp.concatenate([r_walls, layer], axis=0)
+
+        nbrs = neighbors.update(r_full, num_particles=num_particles)
+
+        # get the relevant entries from the dense neighbor list
+        idx = nbrs.idx  # dense list: [[0, 1, 5], [0, 1, 3], [2, 3, 6], ...]
+        idx = idx[: len(r_walls)]  # only the wall particle neighbors
+        mask_to_layer = idx > len(r_walls)  # mask toward `layer` particles
+        idx = jnp.where(mask_to_layer, idx, len(r_full))  # get rid of unwanted edges
+
+        # compute distances `r_wall` and `layer` particles and set others to infinity
+        r_i_s = r_full[idx]
+        dr_i_j = vmap(vmap(displacement_fn, in_axes=(0, None)))(r_i_s, r_walls)
+        dist = space.distance(dr_i_j)
+        mask_real = idx != len(r_full)  # identify padding entries
+        dist = jnp.where(mask_real, dist, jnp.inf)
+
+        # find closest `layer` particle for each `r_wall` particle and normalize
+        # displacement vector between the two to use it as the normal vector
+        idx_closest = jnp.argmin(dist, axis=1)
+        nw_walls = dr_i_j[jnp.arange(len(r_walls)), idx_closest]
+        nw_walls /= (dist[jnp.arange(len(r_walls)), idx_closest] + EPS)[:, None]
+        nw_walls = jnp.asarray(nw_walls, dtype=r.dtype)
+
+        # update normals only of wall particles
+        nw = jnp.zeros_like(r)
+        nw = nw.at[np.isin(tag, wall_tags)].set(nw_walls)
+
+        return nw
+
+    return body
 
 
 class Logger:
