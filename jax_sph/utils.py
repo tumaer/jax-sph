@@ -1,7 +1,7 @@
 """General jax-sph utils."""
 
 import enum
-from typing import Dict
+from typing import Callable, Dict
 
 import jax
 import jax.numpy as jnp
@@ -13,6 +13,7 @@ from scipy.spatial import KDTree
 
 from jax_sph.io_state import read_h5
 from jax_sph.jax_md import partition, space
+from jax_sph.jax_md.partition import Dense
 from jax_sph.kernel import QuinticKernel
 
 EPS = jnp.finfo(float).eps
@@ -165,104 +166,113 @@ def get_stats(state: Dict, props: list, dx: float):
     return res
 
 
-def get_box_nws(box_size, dx, n_walls, dim, rho, m):
-    """Computes the normal vectors at box wall boundaries"""
-
-    # TODO: having a pos_box_3d would be useful
-    box = box_size - 2 * n_walls * dx
-
-    # define 5 layers of wall BC partilces and position them accordingly
-    layers = {}
-    idx_len = {}
-    for i in range(5):
-        layer = pos_box_2d(box + 2 * i * dx, dx, 1)
-        layers[f"layer_{i}"] = layer + np.ones(2) * ((n_walls - 1) - i) * dx
-        idx_len[f"len_{i}"] = len(layer)
-
-    # define kernel function
-    kernel_fn = QuinticKernel(h=dx, dim=dim)
-
-    # define function to calculate phi, Zhang (2017)
-    def wall_phi_vec(rho_j, m_j, dr_ij, dist):
-        # Compute unit vector, above eq. (6), Zhang (2017)
-        e_ij_w = dr_ij / (dist + EPS)
-
-        # Compute kernel gradient
-        kernel_grad = kernel_fn.grad_w(dist) * (e_ij_w)
-
-        # compute phi eq. (15), Zhang (2017)
-        phi = -1.0 * m_j / rho_j * kernel_grad
-
-        return phi
-
-    nw = []
-    for i in range(3):
-        # setup of the temporary box, consisting out of 3 particle layers
-        temp_box = np.concatenate(
-            (
-                layers[f"layer_{i}"],
-                layers[f"layer_{i + 1}"],
-                layers[f"layer_{i + 2}"],
-            ),
-            axis=0,
-        )
-        # define KD tree and get neighbors
-        tree = KDTree(temp_box)
-        neighbors = tree.query_ball_point(
-            temp_box[0 : idx_len[f"len_{i}"]], 3 * dx, p=2.0
-        )
-        # get neighbor and nw indices
-        neighbors_idx = np.concatenate(neighbors, axis=0)
-        nw_idx = np.repeat(range(idx_len[f"len_{i}"]), [len(x) for x in neighbors])
-
-        # calculate distances
-        dr_ij = vmap(space.pairwise_displacement)(
-            temp_box[nw_idx], temp_box[neighbors_idx]
-        )
-        dist = space.distance(dr_ij)
-
-        # calculate normal vectors
-        temp = vmap(wall_phi_vec)(rho[neighbors_idx], m[neighbors_idx], dr_ij, dist)
-        phi = ops.segment_sum(temp, nw_idx, idx_len[f"len_{i}"])
-        nw_temp = phi / (np.linalg.norm(phi, ord=2, axis=1) + EPS)[:, None]
-        nw.append(nw_temp)
-
-    nw = np.concatenate(nw, axis=0)
-    nw = np.where(np.absolute(nw) < EPS, 0.0, nw)
-    r_nw = np.concatenate(
-        (
-            layers["layer_0"],
-            layers["layer_1"],
-            layers["layer_2"],
-        ),
-        axis=0,
-    )
-
-    return nw, r_nw
-
-
-def get_nws(r, tag, dx, n_walls, dim, offset_vec, wall_part_fn):
-    """Computes the normal vectors of all wall boundaries"""
+def compute_nws_scipy(r, tag, dx, n_walls, offset_vec, wall_part_fn):
+    """Computes the normal vectors of all wall boundaries. Jit-able pure_callback."""
 
     dx_fac = 5
 
+    # operate only on wall particles, i.e. remove fluid
+    r_walls = r[np.isin(tag, wall_tags)]
+
     # align fluid to [0, 0]
-    r_aligned = r - offset_vec
+    r_aligned = r_walls - offset_vec
 
     # define fine layer of wall BC partilces and position them accordingly
-    # layer = wall_part_fn(fluid_size, dx / dx_fac, 1) - offset_vec / n_walls / dx_fac
     layer = wall_part_fn(dx / dx_fac, 1) - offset_vec / n_walls / dx_fac
 
     # match thin layer to particles
     tree = KDTree(layer)
     dist, match_idx = tree.query(r_aligned, k=1)
     dr = layer[match_idx] - r_aligned
+    nw_walls = dr / (dist[:, None] + EPS)
+    nw_walls = jnp.asarray(nw_walls, dtype=r.dtype)
 
     # compute normal vectors
-    nw = dr / (dist[:, None] + EPS)
-    nw = np.where(np.isin(tag, wall_tags)[:, None], nw, np.zeros(dim))
+    nw = jnp.zeros_like(r)
+    nw = nw.at[np.isin(tag, wall_tags)].set(nw_walls)
 
     return nw
+
+
+def compute_nws_jax_wrapper(
+    state0: Dict,
+    dx: float,
+    n_walls: int,
+    offset_vec: jax.Array,
+    box_size: jax.Array,
+    pbc: jax.Array,
+    cfg_nl: DictConfig,
+    displacement_fn: Callable,
+    wall_part_fn: Callable,
+):
+    """Compute wall normal vectors from wall to fluid. Jit-able JAX implementation.
+
+    For the particles from `r_walls`, find the closest particle from `layer`
+    and compute the normal vector from each `r_walls` particle.
+    """
+    r = state0["r"]
+    tag = state0["tag"]
+
+    # operate only on wall particles, i.e. remove fluid
+    r_walls = r[np.isin(tag, wall_tags)] - offset_vec
+
+    # discretize wall with one layer of 5x smaller particles
+    dx_fac = 5
+    offset = offset_vec / n_walls / dx_fac
+    layer = wall_part_fn(dx / dx_fac, 1) - offset
+
+    # construct a neighbor list over both point clouds
+    r_full = jnp.concatenate([r_walls, layer], axis=0)
+
+    neighbor_fn = partition.neighbor_list(
+        displacement_fn,
+        box_size,
+        r_cutoff=dx * n_walls * 2.0**0.5 * 1.01,
+        backend=cfg_nl.backend,
+        capacity_multiplier=1.25,
+        mask_self=False,
+        format=Dense,
+        num_particles_max=r_full.shape[0],
+        num_partitions=cfg_nl.num_partitions,
+        pbc=np.array(pbc),
+    )
+    num_particles = len(r_full)
+    neighbors = neighbor_fn.allocate(r_full, num_particles=num_particles)
+
+    # jit-able function
+    def body(r: jax.Array):
+        r_walls = r[np.isin(tag, wall_tags)] - offset_vec
+        r_full = jnp.concatenate([r_walls, layer], axis=0)
+
+        nbrs = neighbors.update(r_full, num_particles=num_particles)
+
+        # get the relevant entries from the dense neighbor list
+        idx = nbrs.idx  # dense list: [[0, 1, 5], [0, 1, 3], [2, 3, 6], ...]
+        idx = idx[: len(r_walls)]  # only the wall particle neighbors
+        mask_to_layer = idx > len(r_walls)  # mask toward `layer` particles
+        idx = jnp.where(mask_to_layer, idx, len(r_full))  # get rid of unwanted edges
+
+        # compute distances `r_wall` and `layer` particles and set others to infinity
+        r_i_s = r_full[idx]
+        dr_i_j = vmap(vmap(displacement_fn, in_axes=(0, None)))(r_i_s, r_walls)
+        dist = space.distance(dr_i_j)
+        mask_real = idx != len(r_full)  # identify padding entries
+        dist = jnp.where(mask_real, dist, jnp.inf)
+
+        # find closest `layer` particle for each `r_wall` particle and normalize
+        # displacement vector between the two to use it as the normal vector
+        idx_closest = jnp.argmin(dist, axis=1)
+        nw_walls = dr_i_j[jnp.arange(len(r_walls)), idx_closest]
+        nw_walls /= (dist[jnp.arange(len(r_walls)), idx_closest] + EPS)[:, None]
+        nw_walls = jnp.asarray(nw_walls, dtype=r.dtype)
+
+        # update normals only of wall particles
+        nw = jnp.zeros_like(r)
+        nw = nw.at[np.isin(tag, wall_tags)].set(nw_walls)
+
+        return nw
+
+    return body
 
 
 class Logger:

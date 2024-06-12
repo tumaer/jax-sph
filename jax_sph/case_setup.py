@@ -15,8 +15,9 @@ from jax_sph.io_state import read_h5
 from jax_sph.jax_md import space
 from jax_sph.utils import (
     Tag,
+    compute_nws_jax_wrapper,
+    compute_nws_scipy,
     get_noise_masked,
-    get_nws,
     pos_init_cartesian_2d,
     pos_init_cartesian_3d,
     wall_tags,
@@ -60,6 +61,7 @@ class SimulationSetup(ABC):
            - state (dict): dictionary containing all field values
            - g_ext_fn (Callable): external force function
            - bc_fn (Callable): boundary conditions function (e.g. velocity at walls)
+           - nw_fn (Callable): jit-able wall normal funct. when moving walls, else None
            - eos (Callable): equation of state function
            - key (PRNGKey): random key for sampling
            - displacement_fn (Callable): displacement function for edge features
@@ -151,6 +153,10 @@ class SimulationSetup(ABC):
         rho, mass, eta, temperature, kappa, Cp = self._set_field_properties(
             num_particles, mass_ref, cfg.case
         )
+        # whether to compute wall normals
+        is_nw = cfg.solver.free_slip or cfg.solver.name == "RIE"
+        # calculate wall normals if necessary
+        nw = self._compute_wall_normals("scipy")(r, tag) if is_nw else jnp.zeros_like(r)
 
         # initialize the state dictionary
         state = {
@@ -169,27 +175,8 @@ class SimulationSetup(ABC):
             "T": temperature,
             "kappa": kappa,
             "Cp": Cp,
-            "nw": jnp.zeros_like(r),
+            "nw": nw,
         }
-
-        # calculate wall normals if necessary
-        if cfg.solver.is_bc_trick:
-            if dim == 2:
-                wall_part_fn = self._init_walls_2d
-            elif dim == 3:
-                wall_part_fn = self._init_walls_3d
-            else:
-                raise NotImplementedError("1D wall BCs not yet implemented")
-            nw = get_nws(
-                r,
-                tag,
-                dx,
-                cfg.solver.n_walls,
-                dim,
-                self.offset_vec,
-                wall_part_fn,
-            )
-            state["nw"] = nw
 
         # overwrite the state dictionary with the provided one
         if cfg.case.state0_path is not None:
@@ -215,12 +202,25 @@ class SimulationSetup(ABC):
         g_ext_fn = self._external_acceleration_fn
         bc_fn = self._boundary_conditions_fn
 
+        # whether to recompute the wall normals at every integration step
+        is_nw_recompute = (tag == Tag.MOVING_WALL).any() and is_nw
+        if is_nw_recompute:
+            assert cfg.nl.backend != "matscipy", NotImplementedError(
+                "Wall normals not yet implemented for matscipy neighbor list when "
+                "working with moving boundaries. \nIf you work with moving boundaries, "
+                "don't use one of: `nl.backend=matscipy` or `solver.free_slip=True` or "
+                "`solver.name=RIE`."
+            )
+        kwargs = {"disp_fn": displacement_fn, "box_size": box_size, "state0": state}
+        nw_fn = self._compute_wall_normals("jax", **kwargs) if is_nw_recompute else None
+
         return (
             cfg,
             box_size,
             state,
             g_ext_fn,
             bc_fn,
+            nw_fn,
             eos,
             key,
             displacement_fn,
@@ -312,6 +312,42 @@ class SimulationSetup(ABC):
         self._box_size3D_rlx = self._box_size3D
         self._init_pos2D_rlx = self._init_pos2D
         self._init_pos3D_rlx = self._init_pos3D
+
+    def _compute_wall_normals(self, backend="scipy", **kwargs):
+        if self.cfg.case.dim == 2:
+            wall_part_fn = self._init_walls_2d
+        elif self.cfg.case.dim == 3:
+            wall_part_fn = self._init_walls_3d
+        else:
+            raise NotImplementedError("1D wall BCs not yet implemented")
+
+        if backend == "scipy":
+            # If one makes `tag` static (-> `self.tag`), this function can be jitted.
+            # But it is significatly slower than `backend="jax"` due to `pure_callback`.
+            def body(r, tag):
+                return compute_nws_scipy(
+                    r,
+                    tag,
+                    self.cfg.case.dx,
+                    self.cfg.solver.n_walls,
+                    self.offset_vec,
+                    wall_part_fn,
+                )
+        elif backend == "jax":
+            # This implementation is used in the integrator when having moving walls.
+            body = compute_nws_jax_wrapper(
+                state0=kwargs["state0"],
+                dx=self.cfg.case.dx,
+                n_walls=self.cfg.solver.n_walls,
+                offset_vec=self.offset_vec,
+                box_size=kwargs["box_size"],
+                pbc=self.cfg.case.pbc,
+                cfg_nl=self.cfg.nl,
+                displacement_fn=kwargs["disp_fn"],
+                wall_part_fn=wall_part_fn,
+            )
+
+        return body
 
 
 def set_relaxation(Case, cfg):

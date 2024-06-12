@@ -104,9 +104,9 @@ class LDC(SimulationSetup):
     def _offset_vec(self):
         dim = self.cfg.case.dim
         if dim == 2:
-            res = np.ones(dim) * self.cfg.solver.n_walls * self.cfg.case.dx
+            res = jnp.ones(dim) * self.cfg.solver.n_walls * self.case.dx
         elif dim == 3:
-            res = np.array([1.0, 1.0, 0.0]) * self.cfg.solver.n_walls * self.cfg.case.dx
+            res = jnp.array([1.0, 1.0, 0.0]) * self.cfg.solver.n_walls * self.case.dx
         return res
 
     def _init_velocity2D(self, r):
