@@ -1,6 +1,6 @@
-# JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework
-
 <div align="center">
+
+# JAX-SPH: A Differentiable Smoothed Particle Hydrodynamics Framework
 
 [![Paper](http://img.shields.io/badge/paper-arxiv.2403.04750-B31B1B.svg)](https://arxiv.org/abs/2403.04750)
 [![Docs](https://img.shields.io/readthedocs/jax-sph/latest)](https://jax-sph.readthedocs.io/en/latest/index.html)
@@ -12,9 +12,9 @@
 [![CodeCov](https://codecov.io/gh/tumaer/jax-sph/graph/badge.svg?token=ULMGSY71R1)](https://codecov.io/gh/tumaer/jax-sph)
 [![License](https://img.shields.io/pypi/l/jax-sph)](https://github.com/tumaer/jax-sph/blob/main/LICENSE)
 
-</div>
-
 ![HT_T.gif](https://s9.gifyu.com/images/SUwUD.gif)
+
+</div>
 
 ## Table of Contents
 

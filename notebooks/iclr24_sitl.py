@@ -213,6 +213,7 @@ class SolverInTheLoop(hk.Module):
             "Cp": None,
             "T": None,
             "dTdt": None,
+            "nw": None,
         }
 
         return state

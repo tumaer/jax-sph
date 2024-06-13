@@ -1,9 +1,7 @@
+absl-py>=2.1.0
 h5py
 jax[cpu]==0.4.29
+jraph>=0.0.6.dev0
 omegaconf
 pandas
 pyvista
-
-# JAX-MD dependencies
-jraph>=0.0.6.dev0
-absl-py>=2.1.0
