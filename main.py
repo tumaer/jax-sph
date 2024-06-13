@@ -57,6 +57,11 @@ if __name__ == "__main__":
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152 from TensorFlow
     os.environ["CUDA_VISIBLE_DEVICES"] = str(cfg.gpu)
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(cfg.xla_mem_fraction)
+    # for reproducibility
+    os.environ[
+        "XLA_FLAGS"
+    ] = "--xla_gpu_deterministic_ops=true --xla_gpu_autotune_level=0"
+    os.environ["TF_DETERMINISTIC_OPS"] = "1"
 
     if cfg.no_jit:
         config.update("jax_disable_jit", True)
