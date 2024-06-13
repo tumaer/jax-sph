@@ -622,7 +622,8 @@ class WCSPH:
                 if self.is_rho_renorm:
                     rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
             else:
-                rho = rho_summation_fn(mass, i_s, w_dist, N)
+                rho_ = rho_summation_fn(mass, i_s, w_dist, N)
+                rho = jnp.where(fluid_mask, rho_, rho)
 
             ##### Compute primitives
 
