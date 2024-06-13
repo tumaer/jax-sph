@@ -59,6 +59,11 @@ if __name__ == "__main__":
     if cfg.gpu == "-1":
         os.environ["JAX_PLATFORMS"] = "cpu"
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(cfg.xla_mem_fraction)
+    # for reproducibility
+    os.environ[
+        "XLA_FLAGS"
+    ] = "--xla_gpu_deterministic_ops=true --xla_gpu_autotune_level=0"
+    os.environ["TF_DETERMINISTIC_OPS"] = "1"
 
     if cfg.no_jit:
         config.update("jax_disable_jit", True)
