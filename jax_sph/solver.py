@@ -257,7 +257,11 @@ def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
         _kernel_grad = kernel_fn.grad_w(d_ij)
         _c = _weighted_volume * _kernel_grad / (d_ij + EPS)
 
-        _A = (tvf_stress_fn(rho_i, u_i, u_i) + tvf_stress_fn(rho_j, u_j, u_j)) / 2
+        _A = jnp.where(
+            jnp.isin(wall_mask_j, wall_tags),
+            (tvf_stress_fn(rho_i, u_i, u_i) + tvf_stress_fn(rho_j, u_d, u_d)) / 2,
+            (tvf_stress_fn(rho_i, u_i, u_i) + tvf_stress_fn(rho_j, u_j, u_j)) / 2,
+        )
         a_eq_8 = _c * jnp.dot(_A, r_ij)
 
         return eq_9 + eq_6 + a_eq_8
