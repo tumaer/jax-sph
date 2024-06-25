@@ -180,17 +180,18 @@ class SimulationSetup(ABC):
             "nw": nw,
         }
 
-        # overwrite the state dictionary with the provided one
+        # overwrite the state dictionary with the provided one, only for the fluid
         if cfg.case.state0_path is not None:
             _state = read_h5(cfg.case.state0_path)
             for k in state:
                 if k not in cfg.case.state0_keys:
                     continue
                 assert k in _state, ValueError(f"Key {k} not found in state0 file.")
-                assert state[k].shape == _state[k].shape, ValueError(
+                mask, _mask = state["tag"]==Tag.FLUID, _state["tag"]==Tag.FLUID
+                assert state[k][mask].shape == _state[k][_mask].shape, ValueError(
                     f"Shape mismatch for key {k} in state0 file."
                 )
-                state[k] = _state[k]
+                state[k][mask] = _state[k][_mask]
 
         # the following arguments are needed for dataset generation
         cfg.case.c_ref, cfg.case.p_ref, cfg.case.p_bg = c_ref, p_ref, p_bg
