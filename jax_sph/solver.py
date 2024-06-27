@@ -30,6 +30,82 @@ def rho_evol_fn(rho, mass, u, grad_w_dist, i_s, j_s, dt, N, **kwargs):
     return rho, drhodt
 
 
+def rho_evol_fn_delta_wrapper(delta, support, c_ref, kernel_fn):
+    """Density evolution according to Marrone et al. 2011."""
+
+    def rho_evol_fn_delta(
+        rho, mass, r_ij, d_ij, u, i_s, j_s, dt, N, fluidmask_j, **kwargs
+    ):
+        # compute common quantities
+        def quantities_fn(r_ab, d_ab, m_a, m_b, rho_a, rho_b):
+            e_ab = r_ab / (d_ab + EPS)
+            kernel_grad = kernel_fn.grad_w(d_ab) * (e_ab)
+            V_a = m_a / rho_a
+            V_b = m_b / rho_b
+            return kernel_grad, V_a, V_b
+
+        kernel_grad, V_i, V_j = vmap(quantities_fn)(
+            r_ij, d_ij, mass[i_s], mass[j_s], rho[i_s], rho[j_s]
+        )
+
+        def L_fn(r_ab, kernel_grad, V_b):
+            return jnp.tensordot(-r_ab, kernel_grad * V_b, axes=0)
+
+        temp = vmap(L_fn)(r_ij, kernel_grad, V_j)
+        L_mati = jnp.linalg.inv(ops.segment_sum(temp, i_s, N))
+        # TODO: check whether this is the same
+        temp = vmap(L_fn)(-r_ij, kernel_grad, V_i)
+        L_matj = jnp.linalg.inv(ops.segment_sum(temp, j_s, N))
+
+        def rho_grad_fn(rho_a, rho_b, L_a, kernel_grad, V_b):
+            return (rho_b - rho_a) * jnp.dot(L_a, kernel_grad * V_b)
+
+        temp = vmap(rho_grad_fn)(rho[i_s], rho[j_s], L_mati[i_s], kernel_grad, V_j)
+        rho_grad_term_i = ops.segment_sum(temp, i_s, N)
+        temp = vmap(rho_grad_fn)(rho[j_s], rho[i_s], L_matj[j_s], -kernel_grad, V_i)
+        rho_grad_term_j = ops.segment_sum(temp, i_s, N)
+
+        def rho_diff_fn(
+            rho_i,
+            rho_j,
+            r_ij,
+            d_ij,
+            rho_grad_term_i,
+            rho_grad_term_j,
+            fluidmask_j,
+            kernel_grad,
+            V_j,
+        ):
+            rho_term = 2 * (rho_j - rho_i) * (-r_ij) / (d_ij + EPS) ** 2
+            psi_ij = rho_term - rho_grad_term_i - rho_grad_term_j
+            return jnp.dot(psi_ij, kernel_grad) * V_j * fluidmask_j
+
+        temp = vmap(rho_diff_fn)(
+            rho[i_s],
+            rho[j_s],
+            r_ij,
+            d_ij,
+            rho_grad_term_i[i_s],
+            rho_grad_term_j[j_s],
+            fluidmask_j,
+            kernel_grad,
+            V_j,
+        )
+        diff_term = ops.segment_sum(temp, i_s, N)
+
+        def cont_eq(u_i, u_j, kernel_grad, V_j):
+            return jnp.dot(u_i - u_j, kernel_grad) * V_j
+
+        temp = vmap(cont_eq)(u[i_s], u[j_s], kernel_grad, V_j)
+        drhodt = (
+            rho * ops.segment_sum(temp, i_s, N) + c_ref * delta * support * diff_term
+        )
+        rho = rho + dt * drhodt
+        return rho, drhodt
+
+    return rho_evol_fn_delta
+
+
 def rho_evol_riemann_fn_wrapper(kernel_fn, eos, c_ref):
     """Density evolution according to Zhang et al. 2017."""
 
@@ -179,6 +255,63 @@ def acceleration_standard_fn_wrapper(kernel_fn):
         return a_eq_8
 
     return acceleration_standard_fn
+
+
+def acceleration_delta_fn_wrapper(kernel_fn, alpha, support, c_ref, rho_ref):
+    """Standard SPH acceleration according to Adami et al. 2012."""
+    """Delta SPH acceleration according to Marrone et al. 2011."""
+
+    def acceleration_delta_fn(
+        r_ij,
+        d_ij,
+        rho_i,
+        rho_j,
+        u_i,
+        u_j,
+        v_i,
+        v_j,
+        m_i,
+        m_j,
+        eta_i,
+        eta_j,
+        p_i,
+        p_j,
+        fluidmask_j,
+    ):
+        # (Eq. 6) - inter-particle-averaged shear viscosity (harmonic mean)
+        eta_ij = 2 * eta_i * eta_j / (eta_i + eta_j + EPS)
+        # (Eq. 7) - density-weighted pressure (weighted arithmetic mean)
+        p_ij = (rho_j * p_i + rho_i * p_j) / (rho_i + rho_j)
+
+        # compute the common prefactor `c`
+        weighted_volume = ((m_i / rho_i) ** 2 + (m_j / rho_j) ** 2) / m_i
+        kernel_grad = kernel_fn.grad_w(d_ij)
+        c = weighted_volume * kernel_grad / (d_ij + EPS)
+
+        # (Eq. 8): \boldsymbol{e}_{ij} is computed as r_ij/d_ij here.
+        _A = (tvf_stress_fn(rho_i, u_i, v_i) + tvf_stress_fn(rho_j, u_j, v_j)) / 2
+        _u_ij = u_i - u_j
+        a_eq_8 = c * (-p_ij * r_ij + jnp.dot(_A, r_ij) + eta_ij * _u_ij)
+
+        e_ij = r_ij / (d_ij + EPS)
+        kernel_grad = kernel_grad * (e_ij)
+        V_j = m_j / rho_j
+        pi_ij = jnp.dot((u_j - u_i), (-r_ij)) / (d_ij + EPS) ** 2
+        acceleration_diff = (
+            V_j
+            * pi_ij
+            * kernel_grad
+            * alpha
+            * support
+            * c_ref
+            * rho_ref
+            / rho_i
+            * fluidmask_j
+        )
+
+        return a_eq_8 + acceleration_diff
+
+    return acceleration_delta_fn
 
 
 def acceleration_riemann_fn_wrapper(kernel_fn, eos, beta_fn, eta_limiter):
@@ -491,8 +624,11 @@ class WCSPH:
         dt: float,
         c_ref: float,
         eta_limiter: float = 3,
+        diff_delta: float = 0.02,
+        diff_alpha: float = 0.1,
         solver: str = "SPH",
         kernel: str = "QSK",
+        h_fac: float = 1.0,
         is_bc_trick: bool = False,
         is_rho_evol: bool = False,
         artificial_alpha: float = 0.0,
@@ -508,25 +644,28 @@ class WCSPH:
         self.is_rho_renorm = is_rho_renorm
         self.dt = dt
         self.eos = eos
+        self.c_ref = c_ref
+        self.diff_delta = diff_delta
+        self.diff_alpha = diff_alpha
         self.artificial_alpha = artificial_alpha
         self.is_heat_conduction = is_heat_conduction
 
         _beta_fn = limiter_fn_wrapper(eta_limiter, c_ref)
         match kernel:
             case "CSK":
-                self._kernel_fn = CubicKernel(h=dx, dim=dim)
+                self._kernel_fn = CubicKernel(h=h_fac * dx, dim=dim)
             case "QSK":
-                self._kernel_fn = QuinticKernel(h=dx, dim=dim)
+                self._kernel_fn = QuinticKernel(h=h_fac * dx, dim=dim)
             case "WC2K":
-                self._kernel_fn = WendlandC2Kernel(h=1.3 * dx, dim=dim)
+                self._kernel_fn = WendlandC2Kernel(h=h_fac * dx, dim=dim)
             case "WC4K":
-                self._kernel_fn = WendlandC4Kernel(h=1.3 * dx, dim=dim)
+                self._kernel_fn = WendlandC4Kernel(h=h_fac * dx, dim=dim)
             case "WC6K":
-                self._kernel_fn = WendlandC6Kernel(h=1.3 * dx, dim=dim)
+                self._kernel_fn = WendlandC6Kernel(h=h_fac * dx, dim=dim)
             case "GK":
-                self._kernel_fn = GaussianKernel(h=dx, dim=dim)
+                self._kernel_fn = GaussianKernel(h=h_fac * dx, dim=dim)
             case "SGK":
-                self._kernel_fn = SuperGaussianKernel(h=dx, dim=dim)
+                self._kernel_fn = SuperGaussianKernel(h=h_fac * dx, dim=dim)
 
         self._gwbc_fn = gwbc_fn_wrapper(is_free_slip, is_heat_conduction, eos)
         (
@@ -539,12 +678,22 @@ class WCSPH:
             self._kernel_fn, eos, _beta_fn, eta_limiter
         )
         self._acceleration_fn = acceleration_standard_fn_wrapper(self._kernel_fn)
+        self._acceleration_delta_fn = acceleration_delta_fn_wrapper(
+            self._kernel_fn,
+            self.diff_alpha,
+            h_fac * dx,
+            self.c_ref,
+            self.eos.rho_ref,
+        )
         self._artificial_viscosity_fn = artificial_viscosity_fn_wrapper(
             dx, artificial_alpha
         )
         self._wall_phi_vec = wall_phi_vec_wrapper(self._kernel_fn)
         self._rho_evol_riemann_fn = rho_evol_riemann_fn_wrapper(
             self._kernel_fn, eos, c_ref
+        )
+        self._rho_evol_detla_fn = rho_evol_fn_delta_wrapper(
+            self.diff_delta, h_fac * dx, self.c_ref, self._kernel_fn
         )
         self._temperature_derivative = temperature_derivative_wrapper(self._kernel_fn)
 
@@ -603,6 +752,21 @@ class WCSPH:
 
                 if self.is_rho_renorm:
                     rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
+            elif self.is_rho_evol and (self.solver == "DELTA"):
+                rho, drhodt = self._rho_evol_detla_fn(
+                    rho,
+                    mass,
+                    dr_i_j,
+                    dist,
+                    u,
+                    i_s,
+                    j_s,
+                    self.dt,
+                    N,
+                    fluid_mask[j_s],
+                )
+                if self.is_rho_renorm:
+                    rho = rho_renorm_fn(rho, mass, i_s, j_s, w_dist, N)
             elif self.is_rho_evol and (self.solver == "RIE"):
                 temp = vmap(self._rho_evol_riemann_fn)(
                     e_s,
@@ -637,7 +801,7 @@ class WCSPH:
 
             #####  Apply BC trick
 
-            if self.is_bc_trick and (self.solver == "SPH"):
+            if self.is_bc_trick and (self.solver == "SPH" or self.solver == "DELTA"):
                 p, rho, u, v, temperature = self._gwbc_fn(
                     temperature,
                     rho,
@@ -701,6 +865,24 @@ class WCSPH:
                     eta[j_s],
                     p[i_s],
                     p[j_s],
+                )
+            elif self.solver == "DELTA":
+                out = vmap(self._acceleration_delta_fn)(
+                    dr_i_j,
+                    dist,
+                    rho[i_s],
+                    rho[j_s],
+                    u[i_s],
+                    u[j_s],
+                    v[i_s],
+                    v[j_s],
+                    mass[i_s],
+                    mass[j_s],
+                    eta[i_s],
+                    eta[j_s],
+                    p[i_s],
+                    p[j_s],
+                    fluid_mask[j_s],
                 )
             elif self.solver == "RIE":
                 out = vmap(self._acceleration_riemann_fn)(
