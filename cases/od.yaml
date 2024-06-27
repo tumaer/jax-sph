@@ -1,0 +1,23 @@
+extends: JAX_SPH_DEFAULTS
+
+case:
+  source: "od.py"
+  dim: 2
+  dx: 0.0125
+  viscosity: 0.1
+  u_ref: 0.2
+
+solver:
+  t_end: 0.5
+  dt: 0.00005
+  sigma: 0.004
+  is_surface_tension: True
+  density_evolution: True
+
+eos:
+  kappa: 7
+
+io:
+  write_type: ["h5"]
+  write_every: 100
+  data_path: "data/debug"

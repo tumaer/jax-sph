@@ -63,6 +63,8 @@ def simulate(cfg: DictConfig):
         cfg.solver.free_slip,
         cfg.solver.density_renormalize,
         cfg.solver.heat_conduction,
+        cfg.solver.is_surface_tension,
+        cfg.solver.sigma,
     )
     forward = solver.forward_wrapper()
 

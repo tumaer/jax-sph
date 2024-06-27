@@ -92,6 +92,10 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver.heat_conduction = False
     # Whether to apply boundaty conditions
     cfg.solver.is_bc_trick = False  # new
+    # Whether to apply surface tension
+    cfg.solver.is_surface_tension = False
+    # Surface tension coefficient
+    cfg.solver.sigma = 0.0
 
     ### kernel
     cfg.kernel = OmegaConf.create({})
