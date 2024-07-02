@@ -3,21 +3,26 @@ extends: JAX_SPH_DEFAULTS
 case:
   source: "od.py"
   dim: 2
-  dx: 0.0125
+  dx: 0.00025
   viscosity: 0.1
-  u_ref: 0.2
+  u_ref: 0.04
+  rho_ref: 1000
 
 solver:
   t_end: 0.5
-  dt: 0.00005
+  dt: 0.000005
   sigma: 0.004
   is_surface_tension: True
   density_evolution: True
+  #artificial_alpha: 0.1
 
 eos:
   kappa: 7
 
+kernel:
+  name: "QSK"
+
 io:
   write_type: ["h5"]
-  write_every: 100
+  write_every: 1000
   data_path: "data/debug"

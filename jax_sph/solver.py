@@ -510,7 +510,7 @@ def detect_free_surface_fn_wrapper(kernel_fn):
 def surface_tension_fn_wrapper(kernel_fn):
     """Surface tension according to Zhang et al. 2023"""
 
-    def surface_tension_fn(surface, m, rho, e_ij, d_ij, r_ij, i_s, j_s, N, sigma):
+    def surface_tension_fn(surface, m, rho, e_ij, d_ij, r_ij, i_s, j_s, N, sigma, c0):
         # compute common quantities
         def quant_fn(e_ij, d_ij, m_j, rho_j):
             kernel = kernel_fn.w(d_ij)
@@ -521,45 +521,45 @@ def surface_tension_fn_wrapper(kernel_fn):
         kernel, kernel_grad, V_j = vmap(quant_fn)(e_ij, d_ij, m[j_s], rho[j_s])
 
         # define colorfunction having c0 = 1 as initial value
-        def c_fn(V_j, kernel):
-            return V_j * kernel
+        def c_fn(V_j, kernel, c0_j):
+            return V_j * kernel * c0_j
 
         # define the gradient of the colorfunction having c0 = 1 as initial value
-        def c_grad_fn(V_j, kernel_grad):
-            return V_j * kernel_grad
+        def c_grad_fn(V_j, kernel_grad, c0_j):
+            return V_j * kernel_grad * c0_j
 
         # define masked colorfunction
         def c_mask_fn(V_j, kernel, mask, c_j):
             return V_j * c_j * kernel * mask
 
         # define renormalization denominator
-        def c_renorm_fn(V_j, d_ij, mask):
-            return V_j * kernel_fn.w(d_ij) * mask
+        def c_renorm_fn(V_j, kernel, mask):
+            return V_j * kernel * mask
 
         # calculate color function and its derivative
-        temp = vmap(c_fn)(V_j, kernel)
+        temp = vmap(c_fn)(V_j, kernel, c0[j_s])
         color = ops.segment_sum(temp, i_s, N)
-        temp = vmap(c_grad_fn)(V_j, kernel_grad)
+        temp = vmap(c_grad_fn)(V_j, kernel_grad, c0[j_s])
         color_grad = ops.segment_sum(temp, i_s, N)
 
-        # surface mask and fluid mask
+        # surface mask "s" and fluid mask "f"
         mask_s = jnp.where(surface, 1, 0)
         mask_f = jnp.where(surface, 0, 1)
 
         # calculate color function for surface and fluid and renorm coefficients
         temp = vmap(c_mask_fn)(V_j, kernel, mask_s[j_s], color[j_s])
         color_s = ops.segment_sum(temp, i_s, N)
-        temp = vmap(c_renorm_fn)(V_j, d_ij, mask_s[j_s])
+        temp = vmap(c_renorm_fn)(V_j, kernel, mask_s[j_s])
         color_s_renorm = ops.segment_sum(temp, i_s, N)
         temp = vmap(c_mask_fn)(V_j, kernel, mask_f[j_s], color[j_s])
         color_f = ops.segment_sum(temp, i_s, N)
-        temp = vmap(c_renorm_fn)(V_j, d_ij, mask_f[j_s])
+        temp = vmap(c_renorm_fn)(V_j, kernel, mask_f[j_s])
         color_f_renorm = ops.segment_sum(temp, i_s, N)
 
         # define normal vector function
         def n_fn(c_grad, c_s, c_f, c_s_re, c_f_re):
             n = jnp.where(
-                jnp.logical_or(c_s_re == 0, c_f_re == 0),
+                jnp.logical_or(jnp.abs(c_s_re) <= EPS, jnp.abs(c_f_re) <= EPS),
                 2 * c_grad,
                 1 / (c_f / c_f_re - c_s / c_s_re) * c_grad,
             )
@@ -577,24 +577,25 @@ def surface_tension_fn_wrapper(kernel_fn):
         L_mat = jnp.linalg.inv(ops.segment_sum(temp, i_s, N))
 
         # define and calculate surface curvature function
-        def curve_fn(V_j, n_norm, L_mat, kernel_grad):
-            k = V_j * jnp.dot(n_norm, L_mat * kernel_grad)
+        def curve_fn(V_j, n_norm_i, n_norm_j, L_mat, kernel_grad):
+            # TODO: check dot product
+            k = V_j * jnp.dot(n_norm_i - n_norm_j, jnp.dot(L_mat, kernel_grad))
             return k
 
-        temp = vmap(curve_fn)(V_j, n_norm[i_s], L_mat[i_s], kernel_grad)
+        temp = vmap(curve_fn)(V_j, n_norm[i_s], n_norm[j_s], L_mat[i_s], kernel_grad)
         curve = ops.segment_sum(temp, i_s, N)
 
         # final step, calculate surface tension
         surface_tension = (
             sigma
-            * curve
+            * curve[:, None]
             * n_norm
             * jnp.linalg.norm(n, ord=2, axis=1)[:, None]
             / rho[:, None]
-            # * mask_s[:, None]
+            * mask_s[:, None]  # TODO: check whether mask is necessary
         )
 
-        return surface_tension
+        return surface_tension, n
 
     return surface_tension_fn
 
@@ -692,6 +693,8 @@ class WCSPH:
             rho, drhodt, p = state["rho"], state["drhodt"], state["p"]
             nw, kappa, Cp = state["nw"], state["kappa"], state["Cp"]
             temperature, dTdt = state["T"], state["dTdt"]
+            c0 = state["color0"]
+            n = state["n"]
             N = len(r)
 
             # precompute displacements `dr` and distances `dist`
@@ -875,9 +878,13 @@ class WCSPH:
                 surf = self._detect_free_surface_fn(
                     e_s, dr_i_j, dist, mass, rho, i_s, j_s, self.dim, N
                 )
-                dudt += self._surface_tension_fn(
-                    surf, mass, rho, e_s, dist, dr_i_j, i_s, j_s, N, self.sigma
+                # dudt += self._surface_tension_fn(
+                #     surf, mass, rho, e_s, dist, dr_i_j, i_s, j_s, N, self.sigma, c0
+                # )
+                ten, n = self._surface_tension_fn(
+                    surf, mass, rho, e_s, dist, dr_i_j, i_s, j_s, N, self.sigma, c0
                 )
+                dudt += ten
 
             state = {
                 "r": r,
@@ -896,6 +903,8 @@ class WCSPH:
                 "kappa": kappa,
                 "Cp": Cp,
                 "nw": nw,
+                "color0": c0,
+                "n": n,
             }
 
             return state

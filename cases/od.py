@@ -25,22 +25,20 @@ class OD(SimulationSetup):
             self._init_pos3D = self._get_relaxed_r0
 
     def _box_size2D(self, n_walls):
-        return np.array([1.0, 1.0])
+        return np.array([0.02, 0.02])
 
     def _box_size3D(self, n_walls):
-        return 2 * np.pi * np.array([1.0, 1.0, 1.0])
+        return np.array([1.0, 1.0, 1.0])
 
     def _init_walls_2d(self):
         pass
 
     def _init_walls_3d(self):
         pass
-    
+
     def _init_pos2D(self, box_size, dx, n_walls):
         # initialize fluid phase
-        r = np.array([0.25, 0.25]) + pos_init_cartesian_2d(
-            np.array([0.5, 0.5]), dx
-        )
+        r = np.array([0.005, 0.005]) + pos_init_cartesian_2d(np.array([0.01, 0.01]), dx)
 
         # set tags
         tag = jnp.full(len(r), Tag.FLUID, dtype=int)

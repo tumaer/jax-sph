@@ -13,7 +13,7 @@ from scipy.spatial import KDTree
 
 from jax_sph.io_state import read_h5
 from jax_sph.jax_md import partition, space
-from jax_sph.jax_md.partition import Dense
+from jax_sph.jax_md.partition import Dense, Sparse
 from jax_sph.kernel import QuinticKernel
 
 EPS = jnp.finfo(float).eps
@@ -164,6 +164,56 @@ def get_stats(state: Dict, props: list, dx: float):
             var, operation = prop.split("_")  # e.g. "u_max"
             res[prop] = get_array_stats(state, var, operation)
     return res
+
+
+def color_init(
+    r: jax.Array,
+    m: jax.Array,
+    rho: jax.Array,
+    dx: float,
+    dim: int,
+    box_size: jax.Array,
+    pbc: jax.Array,
+    cfg_nl: DictConfig,
+    displacement_fn: Callable,
+):
+    """Compute initial color function values. Jit-able JAX implementation."""
+
+    # set kernel function
+    kernel_fn = QuinticKernel(h=dx, dim=dim)
+
+    # compute neighbors list
+    neighbor_fn = partition.neighbor_list(
+        displacement_fn,
+        box_size,
+        r_cutoff=kernel_fn.cutoff,
+        backend=cfg_nl.backend,
+        capacity_multiplier=1.25,
+        mask_self=False,
+        format=Sparse,
+        num_particles_max=r.shape[0],
+        num_partitions=cfg_nl.num_partitions,
+        pbc=np.array(pbc),
+    )
+    num_particles = len(r)
+    neighbors = neighbor_fn.allocate(r, num_particles=num_particles)
+
+    # precompute quantities
+    i_s, j_s = neighbors.idx
+    r_ij = vmap(displacement_fn)(r[i_s], r[j_s])
+    dist = space.distance(r_ij)
+    w_dist = vmap(kernel_fn.w)(dist)
+
+    # define colorfunction having as initial value
+    def c_fn(m_j, rho_j, w_ij):
+        return m_j / rho_j * w_ij
+
+    temp = vmap(c_fn)(m[j_s], rho[j_s], w_dist)
+    color = ops.segment_sum(temp, i_s, num_particles)
+
+    # color = jnp.where(color <= 0.8, 0.5, 1.0)
+
+    return color
 
 
 def compute_nws_scipy(r, tag, dx, n_walls, offset_vec, wall_part_fn):

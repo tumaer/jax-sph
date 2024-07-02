@@ -15,6 +15,7 @@ from jax_sph.io_state import read_h5
 from jax_sph.jax_md import space
 from jax_sph.utils import (
     Tag,
+    color_init,
     compute_nws_jax_wrapper,
     compute_nws_scipy,
     get_noise_masked,
@@ -159,6 +160,23 @@ class SimulationSetup(ABC):
         ) and cfg.solver.is_bc_trick
         # calculate wall normals if necessary
         nw = self._compute_wall_normals("scipy")(r, tag) if is_nw else jnp.zeros_like(r)
+        # whether to initialize the color function
+        is_color0 = cfg.solver.is_surface_tension
+        # calculate color values if necessary
+        if is_color0:
+            color0 = color_init(
+                r=r,
+                m=mass,
+                rho=rho,
+                dx=dx,
+                dim=dim,
+                box_size=box_size,
+                pbc=[True, True, True],
+                cfg_nl=self.cfg.nl,
+                displacement_fn=displacement_fn,
+            )
+        else:
+            color0 = jnp.zeros_like(rho)
 
         # initialize the state dictionary
         state = {
@@ -178,6 +196,8 @@ class SimulationSetup(ABC):
             "kappa": kappa,
             "Cp": Cp,
             "nw": nw,
+            "color0": color0,
+            "n": jnp.zeros_like(r),
         }
 
         # overwrite the state dictionary with the provided one
