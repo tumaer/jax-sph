@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "jax-sph"
-version = "0.0.1"
+version = "0.1.0"
 description = "JAX-SPH: Smoothed Particle Hydrodynamics in JAX"
 authors = ["Artur Toshev <artur.toshev@tum.de>",]
 maintainers = ["Artur Toshev <artur.toshev@tum.de>",]
