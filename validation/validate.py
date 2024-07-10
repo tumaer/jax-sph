@@ -314,6 +314,7 @@ def val_2D_LDC(
     files_notvf = sorted(files_notvf, key=lambda x: int(x.split("_")[1][:-3]))
 
     cfg = OmegaConf.load(os.path.join(val_dir_path_Rie, "config.yaml"))
+    Rie_tvf_label = "Riemann + tvf" if cfg.solver.tvf != 0 else "Riemann"
     dx = cfg.case.dx
     Re = 1 / cfg.case.viscosity  # Reynolds number
 
@@ -373,7 +374,7 @@ def val_2D_LDC(
             np.asarray(x_axis - 3 * dx),
             np.asarray(v_val_Rie),
             color=cmap(0.9),
-            label=f"Riemann, dx={dx}",
+            label=Rie_tvf_label + f", dx={dx}",
         )
         ax2.set_xlim([0, 1])
         ax2.set_ylim([-0.6, 0.5])

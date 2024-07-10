@@ -5,7 +5,7 @@ case:
   dim: 2
   dx: 0.00025
   viscosity: 0.1
-  u_ref: 0.04
+  u_ref: 0.02
   rho_ref: 1000
 
 solver:
