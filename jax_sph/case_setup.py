@@ -187,7 +187,7 @@ class SimulationSetup(ABC):
                 if k not in cfg.case.state0_keys:
                     continue
                 assert k in _state, ValueError(f"Key {k} not found in state0 file.")
-                mask, _mask = state["tag"]==Tag.FLUID, _state["tag"]==Tag.FLUID
+                mask, _mask = state["tag"] == Tag.FLUID, _state["tag"] == Tag.FLUID
                 assert state[k][mask].shape == _state[k][_mask].shape, ValueError(
                     f"Shape mismatch for key {k} in state0 file."
                 )
