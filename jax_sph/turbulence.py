@@ -362,8 +362,7 @@ def mls_2nd_order(r, r_target, f, box_size, dx, dim):
 
     # compute edge list
     tree = KDTree(r_pbc)
-    # TODO: check used norm, L2-norm produces some weird results
-    senders = tree.query_ball_point(r_target, kernel_fn.cutoff, p=np.inf)
+    senders = tree.query_ball_point(r_target, kernel_fn.cutoff * 1.415)
     i_s = np.repeat(range(n_target), [len(x) for x in senders])
     j_s = np.concatenate(senders, axis=0)
 
