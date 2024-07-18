@@ -64,7 +64,8 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     ### solver
     cfg.solver = OmegaConf.create({})
 
-    # Solver name. One of "SPH" (standard SPH) or "RIE" (Riemann SPH)
+    # Solver name. One of "SPH" (standard SPH) or "RIE" (Riemann SPH) or
+    # "DELTA" (Delta SPH)
     cfg.solver.name = "SPH"
     # Transport velocity inclusion factor [0,...,1]
     cfg.solver.tvf = 0.0
@@ -92,6 +93,10 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     cfg.solver.heat_conduction = False
     # Whether to apply boundaty conditions
     cfg.solver.is_bc_trick = False  # new
+    # Delta SPH density diffusion weighting factor
+    cfg.solver.diff_delta = 0.1
+    # Delta SPH acceleratin diffusion weighting factor
+    cfg.solver.diff_alpha = 0.01
 
     ### kernel
     cfg.kernel = OmegaConf.create({})
@@ -105,8 +110,10 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     # "GK" (gaussian kernel)
     # "SGK" (super gaussian kernel)
     cfg.kernel.name = "QSK"
-    # Smoothing length factor
-    cfg.kernel.h_factor = 1.0  # new. Should default to 1.3 WC2K and 1.0 QSK
+    # Smoothing length factor, should default to
+    # 1.3 for WC2K, WC4K, WC6K
+    # 1.0 for CSK, QSK, GK, SGK
+    cfg.kernel.h_factor = 1.0
 
     ### equation of state
     cfg.eos = OmegaConf.create({})

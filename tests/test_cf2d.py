@@ -1,4 +1,4 @@
-"""Test a full run of the solver on the Poiseuille flow case from the validations."""
+"""Test a full run of the solver on the Coette flow case from the validations."""
 
 import os
 
@@ -11,8 +11,8 @@ from omegaconf import OmegaConf
 from main import load_embedded_configs
 
 
-def u_series_exp(y, t, n_max=10):
-    """Analytical solution to unsteady Poiseuille flow (low Re)
+def u_series_cf_exp(y, t, n_max=10):
+    """Analytical solution to unsteady Couette flow (low Re)
 
     Based on Series expansion as shown in:
     "Modeling Low Reynolds Number Incompressible Flows Using SPH"
@@ -24,18 +24,22 @@ def u_series_exp(y, t, n_max=10):
     nu = eta / rho  # kinematic viscosity
     u_max = 1.25  # max velocity in middle of channel
     d = 1.0  # channel width
-    fx = -8 * nu * u_max / d**2
-    offset = fx / (2 * nu) * y * (y - d)
+
+    Re = u_max * d / nu
+    print(f"Couette flow at Re={Re}")
+
+    offset = u_max * y / d
 
     def term(n):
-        base = np.pi * (2 * n + 1) / d
-        prefactor = 4 * fx / (nu * base**3 * d)
+        base = np.pi * n / d
+
+        prefactor = 2 * u_max / (n * np.pi) * (-1) ** n
         sin_term = np.sin(base * y)
         exp_term = np.exp(-(base**2) * nu * t)
         return prefactor * sin_term * exp_term
 
     res = offset
-    for i in range(n_max):
+    for i in range(1, n_max):
         res += term(i)
 
     return res
@@ -48,17 +52,17 @@ def setup_simulation():
     # get analytical solution
     ref_solutions = []
     for t_val in t_dimless:
-        ref_solutions.append(u_series_exp(y_axis, t_val))
+        ref_solutions.append(u_series_cf_exp(y_axis, t_val))
     return y_axis, t_dimless, ref_solutions
 
 
 def run_simulation(tmp_path, tvf, solver):
     """Emulate `main.py`."""
-    data_path = tmp_path / f"pf_test_{tvf}"
+    data_path = tmp_path / f"cf_test_{tvf}"
 
     cli_args = OmegaConf.create(
         {
-            "config": "cases/pf.yaml",
+            "config": "cases/cf.yaml",
             "case": {"dx": 0.0333333},
             "solver": {"name": solver, "tvf": tvf, "dt": 0.000002, "t_end": 0.005},
             "io": {"write_every": 250, "data_path": str(data_path)},
@@ -106,8 +110,8 @@ def get_solution(data_path, t_dimless, y_axis):
 @pytest.mark.parametrize(
     "tvf, solver", [(0.0, "SPH"), (1.0, "SPH"), (0.0, "RIE"), (0.0, "DELTA")]
 )
-def test_pf2d(tvf, solver, tmp_path, setup_simulation):
-    """Test whether the poiseuille flow simulation matches the analytical solution"""
+def test_cf2d(tvf, solver, tmp_path, setup_simulation):
+    """Test whether the couette flow simulation matches the analytical solution"""
     y_axis, t_dimless, ref_solutions = setup_simulation
     data_path = run_simulation(tmp_path, tvf, solver)
     solutions = get_solution(data_path, t_dimless, y_axis)
