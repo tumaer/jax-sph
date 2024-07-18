@@ -103,7 +103,9 @@ def get_solution(data_path, t_dimless, y_axis):
     return solutions
 
 
-@pytest.mark.parametrize("tvf, solver", [(0.0, "SPH"), (1.0, "SPH"), (0.0, "RIE")])
+@pytest.mark.parametrize(
+    "tvf, solver", [(0.0, "SPH"), (1.0, "SPH"), (0.0, "RIE"), (0.0, "DELTA")]
+)
 def test_pf2d(tvf, solver, tmp_path, setup_simulation):
     """Test whether the poiseuille flow simulation matches the analytical solution"""
     y_axis, t_dimless, ref_solutions = setup_simulation
