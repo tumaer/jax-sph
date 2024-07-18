@@ -33,7 +33,7 @@ def u_series_cf_exp(y, t, n_max=10):
     def term(n):
         base = np.pi * n / d
 
-        prefactor = 2 * u_max / (n * np.pi) * (-1)**n
+        prefactor = 2 * u_max / (n * np.pi) * (-1) ** n
         sin_term = np.sin(base * y)
         exp_term = np.exp(-(base**2) * nu * t)
         return prefactor * sin_term * exp_term
@@ -107,7 +107,9 @@ def get_solution(data_path, t_dimless, y_axis):
     return solutions
 
 
-@pytest.mark.parametrize("tvf, solver", [(0.0, "SPH"), (1.0, "SPH"), (0.0, "RIE")])
+@pytest.mark.parametrize(
+    "tvf, solver", [(0.0, "SPH"), (1.0, "SPH"), (0.0, "RIE"), (0.0, "DELTA")]
+)
 def test_cf2d(tvf, solver, tmp_path, setup_simulation):
     """Test whether the couette flow simulation matches the analytical solution"""
     y_axis, t_dimless, ref_solutions = setup_simulation
