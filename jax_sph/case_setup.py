@@ -145,9 +145,9 @@ class SimulationSetup(ABC):
 
         # initialize the velocity given the coordinates r with the noise
         if dim == 2:
-            v = vmap(self._init_velocity2D)(r)
+            v = self._init_velocity2D(r)
         elif dim == 3:
-            v = vmap(self._init_velocity3D)(r)
+            v = self._init_velocity3D(r)
 
         # initialize all other field values
         rho, mass, eta, temperature, kappa, Cp = self._set_field_properties(
@@ -191,7 +191,7 @@ class SimulationSetup(ABC):
                 assert state[k][mask].shape == _state[k][_mask].shape, ValueError(
                     f"Shape mismatch for key {k} in state0 file."
                 )
-                state[k][mask] = _state[k][_mask]
+                state[k] = state[k].at[mask].set(_state[k][_mask])
 
         # the following arguments are needed for dataset generation
         cfg.case.c_ref, cfg.case.p_ref, cfg.case.p_bg = c_ref, p_ref, p_bg

@@ -36,20 +36,20 @@ class TGV(SimulationSetup):
         pass
 
     def _init_velocity2D(self, r):
-        x, y = r
+        x, y = r.T
         # from Transport Veocity paper by Adami et al. 2013
         u = -1.0 * jnp.cos(2.0 * jnp.pi * x) * jnp.sin(2.0 * jnp.pi * y)
         v = +1.0 * jnp.sin(2.0 * jnp.pi * x) * jnp.cos(2.0 * jnp.pi * y)
 
-        return jnp.array([u, v])
+        return jnp.array([u, v]).T
 
     def _init_velocity3D(self, r):
-        x, y, z = r
+        x, y, z = r.T
         z_term = jnp.cos(z)
         u = +jnp.sin(x) * jnp.cos(y) * z_term
         v = -jnp.cos(x) * jnp.sin(y) * z_term
-        w = 0.0
-        return jnp.array([u, v, w])
+        w = jnp.zeros_like(u)
+        return jnp.array([u, v, w]).T
 
     def _external_acceleration_fn(self, r):
         return jnp.zeros_like(r)

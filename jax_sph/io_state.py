@@ -6,6 +6,7 @@ from typing import Dict
 
 import h5py
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import pyvista
 from omegaconf import DictConfig, OmegaConf
@@ -41,6 +42,28 @@ def write_vtk(data_dict: Dict, path: str):
     data_pv.save(path)
 
 
+def write_png(data_dict: Dict, path: str):
+    """Store a .png file for quick visualization."""
+    r = data_dict["r"]
+    v = data_dict["v"]
+    v_mag = jnp.linalg.norm(v, axis=1)
+    rho = data_dict["rho"]
+
+    fig, axs = plt.subplots(2, 2, figsize=(8,8))
+    for ax, val, label in zip(
+        axs.flatten(), 
+        [v[:, 0], v[:, 1], v_mag, rho], 
+        ["v_x", "v_y", "v_mag", "rho"]
+    ):
+        ax.scatter(r[:, 0], r[:, 1], c=val, s=5)
+        ax.set_title(f"{label} [{val.min():.2f}...{val.max():.2f}]")
+        ax.set_aspect("equal")
+        ax.grid()
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.close()
+
+
 def write_state(step: int, state: Dict, dir: str, cfg: DictConfig):
     """Write state to .h5 or .vtk file while simulation is running."""
     step_max = cfg.solver.sequence_length
@@ -65,6 +88,9 @@ def write_state(step: int, state: Dict, dir: str, cfg: DictConfig):
         if "vtk" in cfg.io.write_type:
             path = os.path.join(dir, name + ".vtk")
             write_vtk(state, path)
+        if "png" in cfg.io.write_type:
+            path = os.path.join(dir, name + ".png")
+            write_png(state, path)
 
 
 def read_h5(file_name: str, array_type: str = "jax"):

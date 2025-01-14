@@ -83,11 +83,11 @@ class CW(SimulationSetup):
         return r, tag
 
     def _init_velocity2D(self, r):
-        res = jnp.array(self.special.u_init)
+        res = jnp.ones_like(r) * jnp.array(self.special.u_init)
         return res
 
     def _init_velocity3D(self, r):
-        return jnp.zeros_like(r)
+        return jnp.ones_like(r) * jnp.array(self.special.u_init)
 
     def _external_acceleration_fn(self, r):
         res = jnp.zeros_like(r)

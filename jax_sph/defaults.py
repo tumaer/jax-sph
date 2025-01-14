@@ -143,7 +143,7 @@ def set_defaults(cfg: DictConfig = OmegaConf.create({})) -> DictConfig:
     # Where to write and read data
     cfg.io.data_path = "./"
     # What to print to stdout. As list of possible properties.
-    cfg.io.print_props = ["Ekin", "u_max"]
+    cfg.io.print_props = ["Ekin", "u_max", "rho_max"]
 
     return cfg
 
