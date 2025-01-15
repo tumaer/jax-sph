@@ -4,6 +4,9 @@ case:
   source: "tgv.py"
   dim: 2
   dx: 0.02
+  special:
+    num_vortices: 2  # per dimension
+    V0: 1.0
 
 solver:
   t_end: 5.0

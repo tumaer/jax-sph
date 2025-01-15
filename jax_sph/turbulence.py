@@ -3,12 +3,13 @@
 
 import jax.numpy as jnp
 import numpy as np
-from jax import ops, vmap
+from jax import Array, ops, vmap
 from jax.scipy.special import factorial
 from numpy import array
 from scipy.spatial import KDTree
 
 from jax_sph.jax_md import space
+from jax_sph.kernel import QuinticKernel
 
 EPS = jnp.finfo(float).eps
 
@@ -118,6 +119,64 @@ def get_energy_spectrum(vel):
     n_samples = n_samples.at[shell.flatten()].add(1)
     ek *= 4 * jnp.pi * k**2 / (n_samples + EPS)
     ek *= 1 / (n**dim)
+
+    return ek
+
+
+def energy_spectrum(vel: Array, mul_fac: float = 1.0, is_scalar_field: bool = False):
+    """JAX implemented energy spectrum computation on a grid.
+
+    Code based on JAX-FLUIDS implementation."""
+
+    dim = vel.shape[0]
+    ns = vel.shape[1:]
+
+    # check for square box with equal side length
+    assert jnp.array_equal(ns, jnp.ones(dim) * ns[0])
+
+    # common resolution
+    n = ns[0]
+
+    # Fourier transform
+    if dim == 1:
+        # TODO: check whether 1D is working
+        vel_hat = jnp.fft.rfftn(vel)
+    elif dim == 2:
+        vel_hat = jnp.fft.rfftn(vel, axes=(2, 1))
+    elif dim == 3:
+        vel_hat = jnp.fft.rfftn(vel, axes=(3, 2, 1))
+
+    # initialize wavenumber grid
+    k_field, k = get_real_wavenumber_grid(n, dim)
+
+    # compute prefactor
+    fact = (
+        2 * (k_field[0] > 0) * (k_field[0] < n // 2)
+        + 1 * (k_field[0] == 0)
+        + 1 * (k_field[0] == n // 2)
+    )
+
+    # calculate wavenumber vector norms
+    k_field_norm = jnp.linalg.norm(k_field, axis=0, ord=2)
+
+    # calculate integration shell
+    shell = (k_field_norm + 0.5).astype(int).flatten()
+
+    # fourier transform prefactor
+    vel_hat /= n**3
+
+    # calculate energy
+    abs_energy = jnp.sum(jnp.abs(vel_hat**2), axis=0)
+    abs_energy *= fact * mul_fac
+
+    # number of samples
+    n_samples = jnp.zeros(n)
+    n_samples = n_samples.at[shell].add(fact.flatten())
+
+    # compute energy spectrum
+    ek = jnp.zeros(n)
+    ek = ek.at[shell].add(abs_energy.flatten())
+    ek *= 4 * jnp.pi * k**2 / (n_samples + EPS)
 
     return ek
 
@@ -332,14 +391,19 @@ def pbc_copy_scalar(
     return r_pbc, f_pbc
 
 
-def mls_2nd_order(r, r_target, f, box_size, dx, dim):
+def mls_2nd_order(
+    r, r_target, f, box_size, dx, dim, kernel_name="M4Prime", h_factor=None
+):
     """2nd-order moving least squares interpolation for periodic flows in a
     rectangular box.
+
+    Based on, "Analysis of interpolation schemes for the accurate estimation of
+    energy spectrum in Lagrangian methods", Shi et al., 2013
 
     Args:
         r (np.ndarray): coordinates of N particles of shape (N, dim)
         r_target (np.ndarray): coordinates of target particles of shape (N, dim)
-        f (np.ndarray): scalar field, e.g. velocity of shape (N, dim)
+        f (np.ndarray): scalar field, e.g. velocity of shape (N, 1)
         box_size (np.ndarray): Domain box, e.g. np.array([1., 2., 3.])
         dx (float): average particle spacing
         dim (int): dimension of the vector field
@@ -349,7 +413,14 @@ def mls_2nd_order(r, r_target, f, box_size, dx, dim):
     """
 
     # define kernel function
-    kernel_fn = M4PrimeKernel(h=dx, dim=dim)
+    if kernel_name == "M4Prime":
+        h_factor = 0.85 if h_factor is None else h_factor
+        kernel_fn = M4PrimeKernel(h=h_factor * dx, dim=dim)
+    elif kernel_name == "Quintic":
+        h_factor = 2/3 if h_factor is None else h_factor
+        kernel_fn = QuinticKernel(h=h_factor * dx, dim=dim)
+    else:
+        raise NotImplementedError(f"Kernel {kernel_name} not implemented.")
 
     # displacement function for neighbors list
     displacement_fn, shift_fn = space.periodic(side=box_size)
@@ -362,16 +433,24 @@ def mls_2nd_order(r, r_target, f, box_size, dx, dim):
 
     # compute edge list
     tree = KDTree(r_pbc)
-    senders = tree.query_ball_point(r_target, kernel_fn.cutoff * 1.415)
+    senders = tree.query_ball_point(r_target, kernel_fn.cutoff, p=np.inf)
     i_s = np.repeat(range(n_target), [len(x) for x in senders])
     j_s = np.concatenate(senders, axis=0)
 
     # precompute quantities
     r_ji = vmap(displacement_fn)(r_pbc[j_s], r_target[i_s])
-    w_dist = vmap(kernel_fn.w)(r_ji)
+    if kernel_name == "M4Prime":
+        w_dist = vmap(kernel_fn.w)(r_ji)
+    elif kernel_name == "Quintic":
+        rel_distances = np.linalg.norm(r_ji, axis=1, ord=2)
+        w_dist = kernel_fn.w(rel_distances)
+    else:
+        raise NotImplementedError(f"Kernel {kernel_name} not implemented.")
 
     # define size of the linear system of equations
-    mat_size = 4 + round(factorial(dim))
+    sum1 = factorial(dim) / factorial(dim - 1)
+    sum2 = factorial(dim + 1) / (factorial(dim - 1) * 2)
+    mat_size = round(1 + sum1 + sum2)
 
     # calculate indices
     ind_d = jnp.diag_indices(dim)

@@ -37,9 +37,10 @@ class TGV(SimulationSetup):
 
     def _init_velocity2D(self, r):
         x, y = r.T
+        scale = self.case.special.num_vortices * jnp.pi
         # from Transport Veocity paper by Adami et al. 2013
-        u = -1.0 * jnp.cos(2.0 * jnp.pi * x) * jnp.sin(2.0 * jnp.pi * y)
-        v = +1.0 * jnp.sin(2.0 * jnp.pi * x) * jnp.cos(2.0 * jnp.pi * y)
+        u = -self.case.special.V0 * jnp.cos(scale * x) * jnp.sin(scale * y)
+        v = +self.case.special.V0 * jnp.sin(scale * x) * jnp.cos(scale * y)
 
         return jnp.array([u, v]).T
 
