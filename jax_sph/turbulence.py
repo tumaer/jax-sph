@@ -163,7 +163,7 @@ def energy_spectrum(vel: Array, mul_fac: float = 1.0, is_scalar_field: bool = Fa
     shell = (k_field_norm + 0.5).astype(int).flatten()
 
     # fourier transform prefactor
-    vel_hat /= n**3
+    vel_hat /= n**dim
 
     # calculate energy
     abs_energy = jnp.sum(jnp.abs(vel_hat**2), axis=0)
