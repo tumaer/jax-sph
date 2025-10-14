@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import jraph
 import numpy as onp
 from absl import logging
-from jax import eval_shape, jit, lax, ops, tree_map, vmap
+from jax import eval_shape, jit, lax, ops, tree, vmap
 from jax.core import ShapedArray
 
 from jax_sph.jax_md import dataclasses, space, util
@@ -1082,10 +1082,10 @@ def to_jraph(
         padding = jnp.zeros((1,) + x.shape[1:], dtype=x.dtype)
         return jnp.concatenate((x, padding), axis=0)
 
-    nodes = tree_map(pad, nodes)
+    nodes = tree.map(pad, nodes)
 
     # Pad the globals to add one fictitious global.
-    globals = tree_map(pad, globals)
+    globals = tree.map(pad, globals)
 
     # If there is an additional mask, reorder the edges.
     if mask is not None:
@@ -1099,7 +1099,7 @@ def to_jraph(
         def reorder_edges(x):
             return jnp.zeros_like(x).at[index].set(x)
 
-        edges = tree_map(reorder_edges, edges)
+        edges = tree.map(reorder_edges, edges)
         mask = receivers < N
 
     return jraph.GraphsTuple(

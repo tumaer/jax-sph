@@ -11,12 +11,12 @@ documentation = "https://jax-sph.readthedocs.io/"
 repository = "https://github.com/tumaer/jax-sph"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<=3.11"
+python = ">=3.10,<4.0"
 h5py = ">=3.9.0"
 pandas = ">=2.1.4" # for validation
 pyvista = ">=0.42.2" # for visualization
-jax = {version = "0.4.29", extras = ["cpu"]}
-jaxlib = "0.4.29"
+jax = {version = ">=0.6.2", extras = ["cpu"]}
+jaxlib = ">=0.6.2"
 omegaconf = ">=2.3.0"
 matscipy = ">=0.8.0"
 jraph = ">=0.0.6.dev0"  # for jax-md

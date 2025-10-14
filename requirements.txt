@@ -1,6 +1,6 @@
 absl-py>=2.1.0
 h5py
-jax[cpu]==0.4.29
+jax[cpu]>=0.6.2
 jraph>=0.0.6.dev0
 omegaconf
 pandas
