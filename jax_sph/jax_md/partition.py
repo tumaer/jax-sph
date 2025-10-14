@@ -103,9 +103,9 @@ class CellList:
 @dataclasses.dataclass
 class CellListFns:
     allocate: Callable[..., CellList] = dataclasses.static_field()
-    update: Callable[
-        [Array, Union[CellList, int]], CellList
-    ] = dataclasses.static_field()
+    update: Callable[[Array, Union[CellList, int]], CellList] = (
+        dataclasses.static_field()
+    )
 
     def __iter__(self):
         return iter((self.allocate, self.update))
@@ -492,9 +492,7 @@ class PartitionError:
             return "Partition Error: Cell size too small"
 
         if jnp.any(self.code & PEC.MALFORMED_BOX):
-            return (
-                "Partition Error: Incorrect box format. Expecting upper " "triangular."
-            )
+            return "Partition Error: Incorrect box format. Expecting upper triangular."
 
         raise ValueError(f"Unexpected Error Code {self.code}.")
 
@@ -523,8 +521,7 @@ def _displacement_or_metric_to_metric_sq(
         except ValueError:
             continue
     raise ValueError(
-        "Canonicalize displacement not implemented for spatial dimension larger"
-        "than 4."
+        "Canonicalize displacement not implemented for spatial dimension larger than 4."
     )
 
 
@@ -654,9 +651,9 @@ class NeighborList:
     format: NeighborListFormat = dataclasses.static_field()
     cell_size: Optional[float] = dataclasses.static_field()
     cell_list_fn: Callable[[Array, CellList], CellList] = dataclasses.static_field()
-    update_fn: Callable[
-        [Array, "NeighborList"], "NeighborList"
-    ] = dataclasses.static_field()
+    update_fn: Callable[[Array, "NeighborList"], "NeighborList"] = (
+        dataclasses.static_field()
+    )
 
     def update(self, position: Array, **kwargs) -> "NeighborList":
         return self.update_fn(position, self, **kwargs)

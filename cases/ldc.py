@@ -1,6 +1,5 @@
 """Lid-driven cavity case setup"""
 
-
 import jax.numpy as jnp
 import numpy as np
 from omegaconf import DictConfig
