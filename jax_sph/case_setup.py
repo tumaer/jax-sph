@@ -191,7 +191,7 @@ class SimulationSetup(ABC):
                 assert state[k][mask].shape == _state[k][_mask].shape, ValueError(
                     f"Shape mismatch for key {k} in state0 file."
                 )
-                state[k][mask] = _state[k][_mask]
+                state[k] = state[k].at[mask].set(_state[k][_mask])
 
         # the following arguments are needed for dataset generation
         cfg.case.c_ref, cfg.case.p_ref, cfg.case.p_bg = c_ref, p_ref, p_bg
