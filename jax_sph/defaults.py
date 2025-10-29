@@ -172,9 +172,9 @@ def check_cfg(cfg: DictConfig) -> None:
     assert cfg.solver.dt is None or cfg.solver.dt > 0.0, "dt must be > 0.0."
     assert cfg.solver.t_end > 0.0, "t_end must be > 0.0."
     assert cfg.solver.artificial_alpha >= 0.0, "artificial_alpha must be >= 0.0."
-    assert (
-        cfg.solver.eta_limiter == -1 or cfg.solver.eta_limiter >= 0
-    ), "eta_limiter must be -1 or >0."
+    assert cfg.solver.eta_limiter == -1 or cfg.solver.eta_limiter >= 0, (
+        "eta_limiter must be -1 or >0."
+    )
     assert cfg.solver.kappa >= 0.0, "kappa must be >= 0.0."
 
     assert cfg.kernel.name in ["QSK", "WC2K"], "Kernel must be one of 'QSK' or 'WC2K'."
@@ -189,7 +189,7 @@ def check_cfg(cfg: DictConfig) -> None:
     assert cfg.nl.backend in _nl_backends, f"nl_backend must be in {_nl_backends}."
 
     _io_trite_type = ["h5", "vtk"]
-    assert all(
-        [w in _io_trite_type for w in cfg.io.write_type]
-    ), f"write_type must be in {_io_trite_type}."
+    assert all([w in _io_trite_type for w in cfg.io.write_type]), (
+        f"write_type must be in {_io_trite_type}."
+    )
     assert cfg.io.write_every > 0, "write_every must be > 0."

@@ -1,8 +1,9 @@
 """Dirichelt Energy computation
 
-From: 
+From:
 "Neural SPH: Improved Neural Modeling of Lagrangian Fluid Dynamics", Toshev et al 2024
 """
+
 import os
 
 import jax.numpy as jnp
@@ -128,7 +129,7 @@ def dirichlet_energy(r, tag, mass, dim, dx, box_size, kernel_arg="QSK", is_rho=F
         from jax_sph.solver import rho_summation_fn
 
         rho = rho_summation_fn(mass, i_s, kernel_fn.w(dist), N)
-        print(f"Density deviation from mean: {np.abs(rho-1).mean():.4e}")
+        print(f"Density deviation from mean: {np.abs(rho - 1).mean():.4e}")
 
     return dir_energy, dir_energy_per_particle, rho, drhodr, drhodr_norm
 
@@ -142,8 +143,8 @@ def vis_density(rho, drhodr, drhodr_norm, suffix=""):
     ax[1, 0].scatter(r[:, 0], r[:, 1], c=np.asarray(rho))
     ax[1, 1].scatter(r[:, 0], r[:, 1], c=np.asarray(drhodr_norm))
 
-    ax[0, 0].set_title(f"drhodr_x ({drhodr[:,0].min():.4e}, {drhodr[:,0].max():.4e})")
-    ax[0, 1].set_title(f"drhodr_y ({drhodr[:,1].min():.4e}, {drhodr[:,1].max():.4e})")
+    ax[0, 0].set_title(f"drhodr_x ({drhodr[:, 0].min():.4e}, {drhodr[:, 0].max():.4e})")
+    ax[0, 1].set_title(f"drhodr_y ({drhodr[:, 1].min():.4e}, {drhodr[:, 1].max():.4e})")
     ax[1, 0].set_title(f"rho ({rho.min():.4e}, {rho.max():.4e})")
     ax[1, 1].set_title(
         f"drhodr_norm ({drhodr_norm.min():.4e}, {drhodr_norm.max():.4e})"

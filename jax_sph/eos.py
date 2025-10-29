@@ -1,6 +1,5 @@
 """Equation of state."""
 
-
 from abc import ABC, abstractmethod
 
 

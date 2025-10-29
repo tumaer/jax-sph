@@ -31,7 +31,7 @@
 Install the `jax-sph` library from PyPI as
 
 ```bash
-python3.10 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 pip install jax-sph
 ```
@@ -39,7 +39,7 @@ pip install jax-sph
 By default `jax-sph` is installed without GPU support. If you have a CUDA-capable GPU, follow the instructions in the [GPU support](#gpu-support) section.
 
 ### Clone
-We recommend using a `poetry` or `python3-venv` environment.
+We recommend using a `poetry` or `python3-venv` environment. Last tested with python3.10 + jax[cpu]==0.6.2 and python3.12 + jax[cpu]==0.7.2.
 
 **Using Poetry**
 ```bash
@@ -51,7 +51,7 @@ Later, you just need to `source .venv/bin/activate` to activate the environment.
 
 **Using `python3-venv`**
 ```bash
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install -e . # to install jax_sph in interactive mode
@@ -62,7 +62,7 @@ Later, you just need to `source venv/bin/activate` to activate the environment.
 If you want to use a CUDA GPU, you first need a running Nvidia driver. And then just follow the instructions [here](https://jax.readthedocs.io/en/latest/installation.html). The whole process could look like this:
 ```bash
 source .venv/bin/activate
-pip install -U "jax[cuda12]==0.4.29"
+pip install -U "jax[cuda12]" # specify version as "jax[cuda12]==0.6.2"
 ```
 
 ## Getting Started

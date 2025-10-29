@@ -85,7 +85,7 @@ def inverse(box: Box) -> Box:
     elif box.ndim == 2:
         return jnp.linalg.inv(box)
     raise ValueError(
-        ("Box must be either: a scalar, a vector, or a matrix. " f"Found {box}.")
+        (f"Box must be either: a scalar, a vector, or a matrix. Found {box}.")
     )
 
 
@@ -116,7 +116,7 @@ def raw_transform(box: Box, R: Array) -> Array:
         right_indices = free_indices + "i"
         return jnp.einsum(f"ij,{left_indices}->{right_indices}", box, R)
     raise ValueError(
-        ("Box must be either: a scalar, a vector, or a matrix. " f"Found {box}.")
+        (f"Box must be either: a scalar, a vector, or a matrix. Found {box}.")
     )
 
 
@@ -473,6 +473,5 @@ def canonicalize_displacement_or_metric(displacement_or_metric):
         except ValueError:
             continue
     raise ValueError(
-        "Canonicalize displacement not implemented for spatial dimension larger"
-        "than 4."
+        "Canonicalize displacement not implemented for spatial dimension larger than 4."
     )

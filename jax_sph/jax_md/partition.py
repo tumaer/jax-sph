@@ -25,7 +25,7 @@ import jax.numpy as jnp
 import jraph
 import numpy as onp
 from absl import logging
-from jax import eval_shape, jit, lax, ops, tree_map, vmap
+from jax import eval_shape, jit, lax, ops, tree, vmap
 from jax.core import ShapedArray
 
 from jax_sph.jax_md import dataclasses, space, util
@@ -103,9 +103,9 @@ class CellList:
 @dataclasses.dataclass
 class CellListFns:
     allocate: Callable[..., CellList] = dataclasses.static_field()
-    update: Callable[
-        [Array, Union[CellList, int]], CellList
-    ] = dataclasses.static_field()
+    update: Callable[[Array, Union[CellList, int]], CellList] = (
+        dataclasses.static_field()
+    )
 
     def __iter__(self):
         return iter((self.allocate, self.update))
@@ -492,9 +492,7 @@ class PartitionError:
             return "Partition Error: Cell size too small"
 
         if jnp.any(self.code & PEC.MALFORMED_BOX):
-            return (
-                "Partition Error: Incorrect box format. Expecting upper " "triangular."
-            )
+            return "Partition Error: Incorrect box format. Expecting upper triangular."
 
         raise ValueError(f"Unexpected Error Code {self.code}.")
 
@@ -523,8 +521,7 @@ def _displacement_or_metric_to_metric_sq(
         except ValueError:
             continue
     raise ValueError(
-        "Canonicalize displacement not implemented for spatial dimension larger"
-        "than 4."
+        "Canonicalize displacement not implemented for spatial dimension larger than 4."
     )
 
 
@@ -654,9 +651,9 @@ class NeighborList:
     format: NeighborListFormat = dataclasses.static_field()
     cell_size: Optional[float] = dataclasses.static_field()
     cell_list_fn: Callable[[Array, CellList], CellList] = dataclasses.static_field()
-    update_fn: Callable[
-        [Array, "NeighborList"], "NeighborList"
-    ] = dataclasses.static_field()
+    update_fn: Callable[[Array, "NeighborList"], "NeighborList"] = (
+        dataclasses.static_field()
+    )
 
     def update(self, position: Array, **kwargs) -> "NeighborList":
         return self.update_fn(position, self, **kwargs)
@@ -1082,10 +1079,10 @@ def to_jraph(
         padding = jnp.zeros((1,) + x.shape[1:], dtype=x.dtype)
         return jnp.concatenate((x, padding), axis=0)
 
-    nodes = tree_map(pad, nodes)
+    nodes = tree.map(pad, nodes)
 
     # Pad the globals to add one fictitious global.
-    globals = tree_map(pad, globals)
+    globals = tree.map(pad, globals)
 
     # If there is an additional mask, reorder the edges.
     if mask is not None:
@@ -1099,7 +1096,7 @@ def to_jraph(
         def reorder_edges(x):
             return jnp.zeros_like(x).at[index].set(x)
 
-        edges = tree_map(reorder_edges, edges)
+        edges = tree.map(reorder_edges, edges)
         mask = receivers < N
 
     return jraph.GraphsTuple(
